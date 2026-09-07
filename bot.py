@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 Oshxona uchun Telegram bot.
-- Mijoz: /start -> menyu -> savat -> buyurtma (ism, telefon, manzil)
-- Egasi (OWNER_CHAT_ID): har bir yangi buyurtma haqida xabar oladi
-  va tugmalar orqali holatini o'zgartiradi (Tayyorlanmoqda / Yo'lda / Yetkazildi)
+- Mijoz: /start -> menyu (rasmlar bilan) -> savat -> buyurtma (ism, telefon, lokatsiya)
+- Egasi (OWNER_CHAT_ID): har bir yangi buyurtma haqida xabar oladi (mijozning joylashuvi xarita
+  ko'rinishida ham keladi) va tugmalar orqali holatini o'zgartiradi.
 - Admin buyruqlari (faqat OWNER_CHAT_ID uchun):
-    /menu           - menyudagi taomlar ro'yxati (id bilan)
-    /add_dish       - Nomi;Narxi;Tavsif  (masalan: /add_dish Osh;35;Palov go'shtli)
-    /remove_dish id - taomni o'chirish
+    /menu                 - menyudagi taomlar ro'yxati (id bilan)
+    /add_dish             - Nomi;Narxi;Tavsif  (rasmsiz qo'shish uchun)
+    /remove_dish id       - taomni o'chirish
+    RASM + caption        - rasmga "Nomi;Narxi;Tavsif" deb yozib yuborsangiz, taom rasm bilan qo'shiladi
 """
 
 import json
@@ -52,14 +53,22 @@ def next_order_id(orders):
     return (max([o["id"] for o in orders], default=0)) + 1
 
 # xotiradagi holat: har bir mijozning savati va checkout bosqichi
-carts = {}       # user_id -> {dish_id: qty}
-checkout_state = {}  # user_id -> {"step": "name"/"phone"/"address", "name":..., "phone":...}
+carts = {}            # user_id -> {dish_id: qty}
+checkout_state = {}   # user_id -> {"step": "name"/"phone"/"address", "name":..., "phone":...}
 
 def is_owner(chat_id):
     return chat_id == OWNER_CHAT_ID
 
 def fmt_sum(n):
     return f"{n:,.0f} SAR".replace(",", " ")
+
+def parse_dish_caption(text):
+    """'Nomi;Narxi;Tavsif' formatini o'qiydi."""
+    parts = text.split(";")
+    name = parts[0].strip()
+    price = float(parts[1].strip())
+    desc = parts[2].strip() if len(parts) > 2 else ""
+    return name, price, desc
 
 # ---------- /start ----------
 
@@ -75,30 +84,31 @@ def cmd_start(message):
         reply_markup=kb
     )
 
-# ---------- menyuni ko'rsatish ----------
-
-def build_menu_keyboard():
-    menu = load_menu()
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    if not menu:
-        return kb, True
-    for dish in menu:
-        text = f"{dish['name']} — {fmt_sum(dish['price'])}"
-        kb.add(types.InlineKeyboardButton(text, callback_data=f"add:{dish['id']}"))
-    kb.add(types.InlineKeyboardButton("🛒 Savatni ko'rish", callback_data="show_cart"))
-    return kb, False
+# ---------- menyuni ko'rsatish (har bir taom alohida xabar, rasm bilan) ----------
 
 @bot.callback_query_handler(func=lambda c: c.data == "show_menu")
 def cb_show_menu(call):
-    kb, empty = build_menu_keyboard()
-    if empty:
+    menu = load_menu()
+    if not menu:
         bot.answer_callback_query(call.id, "Menyu hozircha bo'sh.")
         return
-    bot.send_message(call.message.chat.id, "Menyudan taom tanlang (bosganda savatga qo'shiladi):", reply_markup=kb)
+    for dish in menu:
+        caption = f"{dish['name']} — {fmt_sum(dish['price'])}"
+        if dish.get("desc"):
+            caption += f"\n{dish['desc']}"
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton("➕ Savatga qo'shish", callback_data=f"add:{dish['id']}"))
+        if dish.get("photo_id"):
+            bot.send_photo(call.message.chat.id, dish["photo_id"], caption=caption, reply_markup=kb)
+        else:
+            bot.send_message(call.message.chat.id, caption, reply_markup=kb)
+    kb_cart = types.InlineKeyboardMarkup()
+    kb_cart.add(types.InlineKeyboardButton("🛒 Savatni ko'rish", callback_data="show_cart"))
+    bot.send_message(call.message.chat.id, "Tanlab bo'lgach, savatni ko'ring:", reply_markup=kb_cart)
     bot.answer_callback_query(call.id)
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("add:"))
-def cb_add_dish(call):
+def cb_add_dish_to_cart(call):
     dish_id = int(call.data.split(":")[1])
     menu = load_menu()
     dish = next((d for d in menu if d["id"] == dish_id), None)
@@ -180,7 +190,7 @@ def cb_clear_cart(call):
 def cb_noop(call):
     bot.answer_callback_query(call.id)
 
-# ---------- checkout (ism -> telefon -> manzil) ----------
+# ---------- checkout (ism -> telefon -> lokatsiya) ----------
 
 @bot.callback_query_handler(func=lambda c: c.data == "checkout")
 def cb_checkout(call):
@@ -192,26 +202,47 @@ def cb_checkout(call):
     bot.send_message(call.message.chat.id, "Ismingizni kiriting:")
     bot.answer_callback_query(call.id)
 
-@bot.message_handler(func=lambda m: m.from_user.id in checkout_state)
+def location_keyboard():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    kb.add(types.KeyboardButton("📍 Joylashuvimni yuborish", request_location=True))
+    return kb
+
+@bot.message_handler(func=lambda m: m.from_user.id in checkout_state, content_types=["text", "location"])
 def handle_checkout_steps(message):
     user_id = message.from_user.id
     state = checkout_state[user_id]
     step = state["step"]
 
     if step == "name":
+        if message.content_type != "text":
+            return
         state["name"] = message.text.strip()
         state["step"] = "phone"
         bot.send_message(message.chat.id, "Telefon raqamingiz:")
         return
 
     if step == "phone":
+        if message.content_type != "text":
+            return
         state["phone"] = message.text.strip()
         state["step"] = "address"
-        bot.send_message(message.chat.id, "Yetkazib berish manzilini kiriting:")
+        bot.send_message(
+            message.chat.id,
+            "Endi joylashuvingizni yuboring 📍\n"
+            "Pastdagi tugmani bosing (eng aniq usul) — yoki xohlasangiz manzilni yozib yuborishingiz ham mumkin.",
+            reply_markup=location_keyboard()
+        )
         return
 
     if step == "address":
-        state["address"] = message.text.strip()
+        if message.content_type == "location":
+            state["latitude"] = message.location.latitude
+            state["longitude"] = message.location.longitude
+            state["address_text"] = None
+        else:
+            state["latitude"] = None
+            state["longitude"] = None
+            state["address_text"] = message.text.strip()
         finalize_order(message, user_id, state)
         checkout_state.pop(user_id, None)
         return
@@ -233,7 +264,9 @@ def finalize_order(message, user_id, state):
         "id": next_order_id(orders),
         "customer_name": state["name"],
         "phone": state["phone"],
-        "address": state["address"],
+        "latitude": state.get("latitude"),
+        "longitude": state.get("longitude"),
+        "address_text": state.get("address_text"),
         "items": items,
         "total": total,
         "status": "Yangi",
@@ -248,7 +281,8 @@ def finalize_order(message, user_id, state):
     bot.send_message(
         message.chat.id,
         f"✅ Buyurtmangiz qabul qilindi!\nJami: {fmt_sum(total)}\n"
-        f"To'lov: yetkazib berilganda naqd.\nTez orada siz bilan bog'lanamiz."
+        f"To'lov: yetkazib berilganda naqd.\nTez orada siz bilan bog'lanamiz.",
+        reply_markup=types.ReplyKeyboardRemove()
     )
 
     if OWNER_CHAT_ID:
@@ -256,6 +290,11 @@ def finalize_order(message, user_id, state):
 
 def order_items_text(order):
     return "\n".join([f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}" for it in order["items"]])
+
+def order_address_line(order):
+    if order.get("latitude") is not None:
+        return "📍 Joylashuv quyida xarita orqali yuborildi"
+    return f"📍 {order.get('address_text') or '—'}"
 
 def status_keyboard(order_id):
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -271,11 +310,13 @@ def notify_owner_new_order(order):
         f"🆕 Yangi buyurtma #{order['id']}\n\n"
         f"👤 {order['customer_name']}\n"
         f"📞 {order['phone']}\n"
-        f"📍 {order['address']}\n\n"
+        f"{order_address_line(order)}\n\n"
         f"{order_items_text(order)}\n\n"
         f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {order['status']}"
     )
+    if order.get("latitude") is not None:
+        bot.send_location(OWNER_CHAT_ID, order["latitude"], order["longitude"])
     bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order["id"]))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
@@ -297,7 +338,7 @@ def cb_update_status(call):
         f"📦 Buyurtma #{order['id']}\n\n"
         f"👤 {order['customer_name']}\n"
         f"📞 {order['phone']}\n"
-        f"📍 {order['address']}\n\n"
+        f"{order_address_line(order)}\n\n"
         f"{order_items_text(order)}\n\n"
         f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {new_status}"
@@ -309,7 +350,6 @@ def cb_update_status(call):
         pass
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
-    # mijozga ham xabar beramiz
     try:
         bot.send_message(order["user_id"], f"Buyurtmangiz #{order['id']} holati: {new_status}")
     except Exception:
@@ -323,9 +363,10 @@ def cmd_menu_admin(message):
         return
     menu = load_menu()
     if not menu:
-        bot.send_message(message.chat.id, "Menyu bo'sh. /add_dish bilan qo'shing.")
+        bot.send_message(message.chat.id, "Menyu bo'sh. Rasm + tavsif yuborib yoki /add_dish bilan qo'shing.")
         return
     lines = [f"#{d['id']} — {d['name']} — {fmt_sum(d['price'])}" + (f" ({d['desc']})" if d.get("desc") else "")
+             + (" 🖼" if d.get("photo_id") else "")
              for d in menu]
     bot.send_message(message.chat.id, "Menyu:\n" + "\n".join(lines))
 
@@ -335,18 +376,39 @@ def cmd_add_dish(message):
         return
     try:
         payload = message.text.split(" ", 1)[1]
-        parts = payload.split(";")
-        name = parts[0].strip()
-        price = float(parts[1].strip())
-        desc = parts[2].strip() if len(parts) > 2 else ""
+        name, price, desc = parse_dish_caption(payload)
     except Exception:
         bot.send_message(message.chat.id, "Format: /add_dish Nomi;Narxi;Tavsif\nMasalan: /add_dish Osh;35;Palov go'shtli")
         return
     menu = load_menu()
     new_id = (max([d["id"] for d in menu], default=0)) + 1
-    menu.append({"id": new_id, "name": name, "price": price, "desc": desc})
+    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None})
     save_menu(menu)
-    bot.send_message(message.chat.id, f"Qo'shildi: #{new_id} {name} — {fmt_sum(price)}")
+    bot.send_message(message.chat.id, f"Qo'shildi (rasmsiz): #{new_id} {name} — {fmt_sum(price)}\n"
+                                       f"Rasm qo'shish uchun rasmni caption bilan yuboring.")
+
+@bot.message_handler(content_types=["photo"])
+def handle_dish_photo(message):
+    if not is_owner(message.chat.id):
+        return
+    if not message.caption:
+        bot.send_message(
+            message.chat.id,
+            "Taom rasmini caption bilan yuboring.\nFormat: Nomi;Narxi;Tavsif\n"
+            "Masalan: Osh;35;Palov go'shtli"
+        )
+        return
+    try:
+        name, price, desc = parse_dish_caption(message.caption)
+    except Exception:
+        bot.send_message(message.chat.id, "Caption formati noto'g'ri. Namuna: Osh;35;Palov go'shtli")
+        return
+    photo_id = message.photo[-1].file_id  # eng katta o'lchamdagi rasm
+    menu = load_menu()
+    new_id = (max([d["id"] for d in menu], default=0)) + 1
+    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": photo_id})
+    save_menu(menu)
+    bot.send_message(message.chat.id, f"Qo'shildi (rasm bilan): #{new_id} {name} — {fmt_sum(price)}")
 
 @bot.message_handler(commands=["remove_dish"])
 def cmd_remove_dish(message):
