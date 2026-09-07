@@ -33,11 +33,14 @@ OWNER_CHAT_ID = int(os.environ.get("OWNER_CHAT_ID", "0"))
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
 BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Uy oshxonasi")
 
-MENU_FILE = "menu.json"
-ORDERS_FILE = "orders.json"
-SETTINGS_FILE = "settings.json"
-DISH_PHOTOS_DIR = "static/dishes"
-LOGO_PATH = "static/logo.jpg"
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+MENU_FILE = os.path.join(DATA_DIR, "menu.json")
+ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+DISH_PHOTOS_DIR = os.path.join(DATA_DIR, "static", "dishes")
+LOGO_PATH = os.path.join(DATA_DIR, "static", "logo.jpg")
 
 os.makedirs(DISH_PHOTOS_DIR, exist_ok=True)
 
@@ -106,7 +109,10 @@ def download_telegram_file(file_id, dest_path):
 def main_keyboard():
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     if WEBAPP_URL:
-        kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=WEBAPP_URL)))
+        # Telegram Mini App sahifalarni qattiq keshlaydi — har safar yangi ?v= qo'shib,
+        # eng so'nggi versiya yuklanishini ta'minlaymiz.
+        fresh_url = f"{WEBAPP_URL}?v={int(time.time())}"
+        kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
     kb.row(types.KeyboardButton("🍽 Menyu"), types.KeyboardButton("🛒 Savat"))
     return kb
 
@@ -569,7 +575,7 @@ def serve_dish_photo(filename):
 def serve_logo():
     if not os.path.exists(LOGO_PATH):
         return "", 404
-    return send_from_directory("static", "logo.jpg")
+    return send_from_directory(os.path.dirname(LOGO_PATH), os.path.basename(LOGO_PATH))
 
 @app.route("/api/menu")
 def api_menu():
