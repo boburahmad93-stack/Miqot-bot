@@ -529,23 +529,32 @@ def cmd_remove_dish(message):
 def validate_init_data(init_data):
     """Telegram WebApp initData'ni tekshiradi. Muvaffaqiyatli bo'lsa user dict qaytaradi."""
     try:
-        parsed = dict(urllib.parse.parse_qsl(init_data, strict_parsing=True))
-    except Exception:
-        return None
-    received_hash = parsed.pop("hash", None)
-    if not received_hash:
-        return None
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(computed_hash, received_hash):
-        return None
-    user_raw = parsed.get("user")
-    if not user_raw:
-        return None
-    try:
+        data = {}
+        for pair in init_data.split("&"):
+            if "=" not in pair:
+                continue
+            k, v = pair.split("=", 1)
+            data[urllib.parse.unquote(k)] = urllib.parse.unquote(v)
+
+        received_hash = data.pop("hash", None)
+        if not received_hash:
+            print("initData: hash yo'q")
+            return None
+
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+        if not hmac.compare_digest(computed_hash, received_hash):
+            print("initData: hash mos kelmadi")
+            return None
+
+        user_raw = data.get("user")
+        if not user_raw:
+            return None
         return json.loads(user_raw)
-    except Exception:
+    except Exception as e:
+        print(f"initData validatsiya xatosi: {e}")
         return None
 
 @app.route("/")
