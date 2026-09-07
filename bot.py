@@ -590,6 +590,7 @@ def api_menu():
 def api_order():
     body = request.get_json(force=True, silent=True) or {}
     init_data = body.get("initData", "")
+    print(f"DEBUG initData uzunligi={len(init_data)} qiymati={init_data[:300]!r}")
     user = validate_init_data(init_data)
     if not user:
         return jsonify({"error": "Telegram orqali tasdiqlanmadi"}), 403
