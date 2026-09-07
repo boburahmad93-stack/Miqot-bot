@@ -1,0 +1,5 @@
+[
+  {"id": 1, "name": "Osh", "price": 35, "desc": "Palov, go'shtli"},
+  {"id": 2, "name": "Manti", "price": 25, "desc": "5 dona, qaymoq bilan"},
+  {"id": 3, "name": "Somsa", "price": 8, "desc": "1 dona"}
+]
