@@ -550,7 +550,7 @@ def validate_init_data(init_data):
 
 @app.route("/")
 def miniapp_index():
-    return send_from_directory("miniapp", "index.html")
+    return send_from_directory(".", "index.html")
 
 @app.route("/static/dishes/<path:filename>")
 def serve_dish_photo(filename):
