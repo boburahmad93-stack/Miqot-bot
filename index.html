@@ -357,15 +357,32 @@ document.getElementById('get-location-btn').addEventListener('click', ()=>{
   );
 });
 
+function notify(msg){
+  const statusEl = document.getElementById('loc-status');
+  statusEl.textContent = msg;
+  statusEl.style.color = '#c0392b';
+  statusEl.style.fontWeight = '600';
+  if(tg && tg.showAlert){ tg.showAlert(msg); }
+  else{ alert(msg); }
+}
+
 document.getElementById('submit-order-btn').addEventListener('click', async ()=>{
+  const submitBtn = document.getElementById('submit-order-btn');
   const name = document.getElementById('in-name').value.trim();
   const phone = document.getElementById('in-phone').value.trim();
   const addressText = document.getElementById('in-address').value.trim();
   const note = document.getElementById('in-note').value.trim();
-  const statusEl = document.getElementById('loc-status');
 
-  if(!phone || (!userLocation && !addressText)){
-    statusEl.textContent = "Telefon va manzil (yoki joylashuv) kerak.";
+  if(cartCount() === 0){
+    notify("Savatingiz bo'sh — avval taom tanlang.");
+    return;
+  }
+  if(!phone){
+    notify("Iltimos, telefon raqamingizni kiriting.");
+    return;
+  }
+  if(!userLocation && !addressText){
+    notify("Iltimos, joylashuvni yuboring yoki manzilni yozing.");
     return;
   }
 
@@ -380,15 +397,20 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
     note: note
   };
 
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Yuborilmoqda...";
+
   try{
     const res = await fetch('/api/order', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await res.json().catch(()=>({}));
     if(!res.ok){
-      statusEl.textContent = data.error || "Xatolik yuz berdi.";
+      notify(data.error || `Xatolik yuz berdi (kod: ${res.status}).`);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Buyurtmani tasdiqlash";
       return;
     }
     cart = {};
@@ -396,8 +418,10 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
     closeSheet('checkout');
     openSheet('confirm');
   }catch(e){
-    statusEl.textContent = "Internet aloqasida muammo.";
+    notify("Internet aloqasida muammo. Qayta urinib ko'ring.");
   }
+  submitBtn.disabled = false;
+  submitBtn.textContent = "Buyurtmani tasdiqlash";
 });
 
 document.getElementById('close-app-btn').addEventListener('click', ()=>{
