@@ -142,8 +142,15 @@ def cmd_start(message):
 
 # ---------- menyuni ko'rsatish (chat fallback) ----------
 
+def sort_menu_by_availability(menu):
+    """Mavjud taomlar avval, tugaganlari oxirida — ikkalasi ichida qo'shilgan tartib saqlanadi."""
+    def is_sold_out(d):
+        stock = d.get("stock")
+        return stock is not None and stock <= 0
+    return sorted(menu, key=is_sold_out)
+
 def send_menu(chat_id):
-    menu = load_menu()
+    menu = sort_menu_by_availability(load_menu())
     if not menu:
         bot.send_message(chat_id, "Menyu hozircha bo'sh.")
         return
@@ -689,7 +696,7 @@ def serve_logo():
 
 @app.route("/api/menu")
 def api_menu():
-    menu = load_menu()
+    menu = sort_menu_by_availability(load_menu())
     out = []
     for d in menu:
         item = {"id": d["id"], "name": d["name"], "price": d["price"], "desc": d.get("desc", ""), "stock": d.get("stock")}
