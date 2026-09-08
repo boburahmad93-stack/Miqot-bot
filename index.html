@@ -396,6 +396,7 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
 
   const payload = {
     initData: tg ? tg.initData : "",
+    unsafe_user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null,
     cart: cart,
     name: name,
     phone: phone,
