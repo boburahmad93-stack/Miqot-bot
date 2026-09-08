@@ -80,6 +80,15 @@
     font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.08);
   }
   .qty-pill span{font-size:13px;font-weight:600;min-width:14px;text-align:center;}
+  .qty-pill button:disabled{opacity:0.35;cursor:not-allowed;}
+
+  .dish-card.sold-out{opacity:0.55;}
+  .dish-card.sold-out .dish-photo,.dish-card.sold-out .dish-photo-fallback{filter:grayscale(1);}
+  .sold-out-badge{
+    background:var(--ink-soft);color:#fff;font-size:11px;font-weight:700;
+    padding:5px 10px;border-radius:999px;
+  }
+  .stock-note{font-size:10.5px;color:var(--accent2);font-weight:600;margin-bottom:4px;}
 
   .empty-state{padding:60px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
 
@@ -251,23 +260,34 @@ function renderMenu(){
   grid.innerHTML = '';
   menu.forEach(dish=>{
     const qty = cart[dish.id] || 0;
+    const stock = (dish.stock === null || dish.stock === undefined) ? null : dish.stock;
+    const soldOut = stock !== null && stock <= 0;
     const card = document.createElement('div');
-    card.className = 'dish-card';
+    card.className = 'dish-card' + (soldOut ? ' sold-out' : '');
     const photoHtml = dish.photo_url
       ? `<img class="dish-photo" src="${dish.photo_url}" alt="${dish.name}">`
       : `<div class="dish-photo-fallback">🍲</div>`;
-    const bottomHtml = qty > 0
-      ? `<div class="qty-pill">
+    let bottomHtml;
+    if(soldOut){
+      bottomHtml = `<span class="sold-out-badge">Tugadi</span>`;
+    }else if(qty > 0){
+      const canAddMore = stock === null || qty < stock;
+      bottomHtml = `<div class="qty-pill">
            <button data-act="dec" data-id="${dish.id}">−</button>
            <span>${qty}</span>
-           <button data-act="inc" data-id="${dish.id}">+</button>
-         </div>`
-      : `<button class="add-btn" data-act="inc" data-id="${dish.id}">+</button>`;
+           <button data-act="inc" data-id="${dish.id}" ${canAddMore ? '' : 'disabled'}>+</button>
+         </div>`;
+    }else{
+      bottomHtml = `<button class="add-btn" data-act="inc" data-id="${dish.id}">+</button>`;
+    }
+    const stockNote = (!soldOut && stock !== null && stock <= 5)
+      ? `<div class="stock-note">Oxirgi ${stock} dona</div>` : '';
     card.innerHTML = `
       ${photoHtml}
       <div class="dish-info">
         <div class="dish-name">${dish.name}</div>
         ${dish.desc ? `<div class="dish-desc">${dish.desc}</div>` : '<div class="dish-desc">&nbsp;</div>'}
+        ${stockNote}
         <div class="dish-bottom">
           <div class="dish-price">${fmtSar(dish.price)}</div>
           ${bottomHtml}
@@ -277,9 +297,15 @@ function renderMenu(){
   });
   grid.querySelectorAll('[data-act]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
+      if(btn.disabled) return;
       const id = btn.getAttribute('data-id');
       const act = btn.getAttribute('data-act');
+      const dish = menu.find(d=>String(d.id)===String(id));
       const cur = cart[id] || 0;
+      if(act === 'inc' && dish && dish.stock !== null && dish.stock !== undefined && cur + 1 > dish.stock){
+        notify(`"${dish.name}" uchun faqat ${dish.stock} dona qoldi.`);
+        return;
+      }
       const next = act === 'inc' ? cur + 1 : Math.max(0, cur - 1);
       if(next === 0) delete cart[id]; else cart[id] = next;
       renderMenu();
