@@ -31,7 +31,7 @@ from flask import Flask, request, jsonify, send_from_directory
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "TOKEN_BU_YERGA")
 OWNER_CHAT_ID = int(os.environ.get("OWNER_CHAT_ID", "0"))
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
-BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Uy oshxonasi")
+BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Miqot Food")
 
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -106,12 +106,19 @@ def download_telegram_file(file_id, dest_path):
 
 # ---------- doimiy pastki klaviatura ----------
 
-def main_keyboard():
+def sign_user_params(user_id, username):
+    ts = int(time.time())
+    uname = username or ""
+    payload = f"{user_id}:{uname}:{ts}"
+    sig = hmac.new(BOT_TOKEN.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return ts, sig
+
+def main_keyboard(user_id=None, username=None):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    if WEBAPP_URL:
-        # Telegram Mini App sahifalarni qattiq keshlaydi — har safar yangi ?v= qo'shib,
-        # eng so'nggi versiya yuklanishini ta'minlaymiz.
-        fresh_url = f"{WEBAPP_URL}?v={int(time.time())}"
+    if WEBAPP_URL and user_id:
+        ts, sig = sign_user_params(user_id, username)
+        params = f"uid={user_id}&uname={urllib.parse.quote(username or '')}&ts={ts}&sig={sig}&v={ts}"
+        fresh_url = f"{WEBAPP_URL}?{params}"
         kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
     kb.row(types.KeyboardButton("🍽 Menyu"), types.KeyboardButton("🛒 Savat"))
     return kb
@@ -127,10 +134,11 @@ def cmd_start(message):
         "Pastdagi tugma orqali buyurtma bera boshlang:"
     )
     settings = load_settings()
+    kb = main_keyboard(message.from_user.id, message.from_user.username)
     if settings.get("logo_photo_id"):
-        bot.send_photo(message.chat.id, settings["logo_photo_id"], caption=welcome, reply_markup=main_keyboard())
+        bot.send_photo(message.chat.id, settings["logo_photo_id"], caption=welcome, reply_markup=kb)
     else:
-        bot.send_message(message.chat.id, welcome, reply_markup=main_keyboard())
+        bot.send_message(message.chat.id, welcome, reply_markup=kb)
 
 # ---------- menyuni ko'rsatish (chat fallback) ----------
 
@@ -320,7 +328,7 @@ def handle_checkout_steps(message):
             message.chat.id,
             f"✅ Buyurtmangiz qabul qilindi!\nJami: {fmt_sum(order['total'])}\n"
             f"To'lov: yetkazib berilganda naqd.\nTez orada siz bilan bog'lanamiz.",
-            reply_markup=main_keyboard()
+            reply_markup=main_keyboard(message.from_user.id, message.from_user.username)
         )
         return
 
@@ -592,6 +600,15 @@ def api_menu():
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
 
+def verify_signed_user(uid, uname, ts, sig):
+    if not (uid and ts and sig):
+        return None
+    payload = f"{uid}:{uname or ''}:{ts}"
+    expected = hmac.new(BOT_TOKEN.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    return {"id": int(uid), "username": uname or None}
+
 @app.route("/api/order", methods=["POST"])
 def api_order():
     body = request.get_json(force=True, silent=True) or {}
@@ -599,12 +616,17 @@ def api_order():
     user = validate_init_data(init_data) or {}
 
     if not user:
-        # Xavfsiz tasdiqlash muvaffaqiyatsiz bo'lsa ham, mijoz tomonidan yuborilgan
-        # (imzolanmagan) ma'lumotdan foydalanamiz — buyurtma baribir o'tishi kerak.
-        unsafe_user = body.get("unsafe_user")
-        if isinstance(unsafe_user, dict):
-            user = unsafe_user
-        print(f"DEBUG: initData tasdiqlanmadi, unsafe_user bilan davom etyapmiz: {user}")
+        # 1) avval botning o'zi imzolagan uid/uname/ts/sig orqali tekshiramiz (eng ishonchli)
+        signed_user = verify_signed_user(
+            body.get("uid"), body.get("uname"), body.get("ts"), body.get("sig")
+        )
+        if signed_user:
+            user = signed_user
+        else:
+            # 2) bo'lmasa, Telegram tomonidan berilgan (imzosiz) ma'lumotdan foydalanamiz
+            unsafe_user = body.get("unsafe_user")
+            if isinstance(unsafe_user, dict):
+                user = unsafe_user
 
     items_cart = body.get("cart", {})
     phone = (body.get("phone") or "").strip()
