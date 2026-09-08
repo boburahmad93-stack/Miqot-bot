@@ -514,6 +514,7 @@ def cmd_menu_admin(message):
         message.chat.id,
         "Menyu:\n" + "\n".join(lines) +
         "\n\nZaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
+        "Barchasini \"Tugadi\" qilish (ishlamagan kun): /reset_stock\n"
         "Cheklovni olib tashlash: /set_stock id -1"
     )
 
@@ -542,6 +543,23 @@ def cmd_set_stock(message):
         save_menu(menu)
         bot.send_message(message.chat.id, f"{dish['name']} — zaxira {soni} dona qilib belgilandi.")
 
+@bot.message_handler(commands=["reset_stock"])
+def cmd_reset_stock(message):
+    if not is_owner(message.chat.id):
+        return
+    menu = load_menu()
+    if not menu:
+        bot.send_message(message.chat.id, "Menyu bo'sh.")
+        return
+    for d in menu:
+        d["stock"] = 0
+    save_menu(menu)
+    bot.send_message(
+        message.chat.id,
+        "✅ Barcha taomlar \"Tugadi\" holatiga qaytarildi.\n"
+        "Bugun tayyorlaydigan taomlaringiz uchun /set_stock id soni yozing."
+    )
+
 @bot.message_handler(commands=["add_dish"])
 def cmd_add_dish(message):
     if not is_owner(message.chat.id):
@@ -554,9 +572,10 @@ def cmd_add_dish(message):
         return
     menu = load_menu()
     new_id = (max([d["id"] for d in menu], default=0)) + 1
-    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None, "local_photo": None, "stock": None})
+    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None, "local_photo": None, "stock": 0})
     save_menu(menu)
-    bot.send_message(message.chat.id, f"Qo'shildi (rasmsiz): #{new_id} {name} — {fmt_sum(price)}")
+    bot.send_message(message.chat.id, f"Qo'shildi (rasmsiz): #{new_id} {name} — {fmt_sum(price)}\n"
+                                       f"Diqqat: zaxira 0 — sotuvga chiqarish uchun /set_stock {new_id} soni yozing.")
 
 @bot.message_handler(content_types=["photo"])
 def handle_owner_photo(message):
@@ -601,10 +620,11 @@ def handle_owner_photo(message):
         local_filename = None
     menu.append({
         "id": new_id, "name": name, "price": price, "desc": desc,
-        "photo_id": photo_id, "local_photo": local_filename, "stock": None
+        "photo_id": photo_id, "local_photo": local_filename, "stock": 0
     })
     save_menu(menu)
-    bot.send_message(message.chat.id, f"Qo'shildi (rasm bilan): #{new_id} {name} — {fmt_sum(price)}")
+    bot.send_message(message.chat.id, f"Qo'shildi (rasm bilan): #{new_id} {name} — {fmt_sum(price)}\n"
+                                       f"Diqqat: zaxira 0 — sotuvga chiqarish uchun /set_stock {new_id} soni yozing.")
 
 @bot.message_handler(commands=["remove_dish"])
 def cmd_remove_dish(message):
