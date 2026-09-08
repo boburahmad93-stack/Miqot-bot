@@ -209,13 +209,14 @@
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
-// VAQTINCHALIK TEKSHIRUV
-(function(){
-  const el = document.createElement('div');
-  el.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#111;color:#0f0;font-size:11px;padding:6px;z-index:9999;word-break:break-all;';
-  el.textContent = `tg mavjud: ${!!tg} | initData uzunligi: ${tg ? tg.initData.length : 'N/A'} | platform: ${tg ? tg.platform : 'N/A'} | version: ${tg ? tg.version : 'N/A'}`;
-  document.body.prepend(el);
-})();
+// Bot o'zi imzolab bergan foydalanuvchi ma'lumoti (Telegram initData ishlamasa ham ishonchli)
+const urlParams = new URLSearchParams(window.location.search);
+const signedUser = {
+  uid: urlParams.get('uid'),
+  uname: urlParams.get('uname'),
+  ts: urlParams.get('ts'),
+  sig: urlParams.get('sig')
+};
 
 let menu = [];
 let cart = {}; // id -> qty
@@ -397,6 +398,10 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
   const payload = {
     initData: tg ? tg.initData : "",
     unsafe_user: (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null,
+    uid: signedUser.uid,
+    uname: signedUser.uname,
+    ts: signedUser.ts,
+    sig: signedUser.sig,
     cart: cart,
     name: name,
     phone: phone,
