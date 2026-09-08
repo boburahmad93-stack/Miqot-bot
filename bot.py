@@ -148,11 +148,20 @@ def send_menu(chat_id):
         bot.send_message(chat_id, "Menyu hozircha bo'sh.")
         return
     for dish in menu:
+        stock = dish.get("stock")
+        sold_out = stock is not None and stock <= 0
         caption = f"{dish['name']} — {fmt_sum(dish['price'])}"
         if dish.get("desc"):
             caption += f"\n{dish['desc']}"
+        if sold_out:
+            caption += "\n❌ Tugadi"
+        elif stock is not None:
+            caption += f"\n📦 Qoldi: {stock} dona"
         kb = types.InlineKeyboardMarkup()
-        kb.add(types.InlineKeyboardButton("➕ Savatga qo'shish", callback_data=f"add:{dish['id']}"))
+        if sold_out:
+            kb.add(types.InlineKeyboardButton("❌ Tugadi", callback_data="noop"))
+        else:
+            kb.add(types.InlineKeyboardButton("➕ Savatga qo'shish", callback_data=f"add:{dish['id']}"))
         if dish.get("photo_id"):
             bot.send_photo(chat_id, dish["photo_id"], caption=caption, reply_markup=kb)
         else:
@@ -178,7 +187,12 @@ def cb_add_dish_to_cart(call):
         return
     user_id = call.from_user.id
     cart = carts.setdefault(user_id, {})
-    cart[dish_id] = cart.get(dish_id, 0) + 1
+    current_qty = cart.get(dish_id, 0)
+    stock = dish.get("stock")
+    if stock is not None and current_qty + 1 > stock:
+        bot.answer_callback_query(call.id, f"Faqat {stock} dona qoldi.")
+        return
+    cart[dish_id] = current_qty + 1
     bot.answer_callback_query(call.id, f"{dish['name']} savatga qo'shildi ✅")
 
 # ---------- savat (chat fallback) ----------
@@ -311,7 +325,7 @@ def handle_checkout_steps(message):
             state["latitude"] = None
             state["longitude"] = None
             state["address_text"] = message.text.strip()
-        order = create_order(
+        order, error = create_order(
             items_cart=carts.get(user_id, {}),
             customer_name=state["name"],
             phone=state["phone"],
@@ -322,8 +336,15 @@ def handle_checkout_steps(message):
             tg_user_id=user_id,
             username=message.from_user.username,
         )
-        carts[user_id] = {}
         checkout_state.pop(user_id, None)
+        if error:
+            bot.send_message(
+                message.chat.id,
+                f"❌ {error}\nIltimos, savatingizni tekshirib, qayta urinib ko'ring.",
+                reply_markup=main_keyboard(message.from_user.id, message.from_user.username)
+            )
+            return
+        carts[user_id] = {}
         bot.send_message(
             message.chat.id,
             f"✅ Buyurtmangiz qabul qilindi!\nJami: {fmt_sum(order['total'])}\n"
@@ -335,16 +356,35 @@ def handle_checkout_steps(message):
 # ---------- buyurtma yaratish (chat va Mini App uchun umumiy) ----------
 
 def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username):
-    menu = {d["id"]: d for d in load_menu()}
+    """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi."""
+    full_menu = load_menu()
+    menu = {d["id"]: d for d in full_menu}
     items = []
     total = 0
+    parsed_cart = []
     for dish_id, qty in items_cart.items():
         dish_id = int(dish_id)
+        qty = int(qty)
         dish = menu.get(dish_id)
         if not dish or qty <= 0:
             continue
+        stock = dish.get("stock")
+        if stock is not None and qty > stock:
+            if stock <= 0:
+                return None, f"\"{dish['name']}\" tugagan. Iltimos, savatdan olib tashlang."
+            return None, f"\"{dish['name']}\" uchun faqat {stock} dona qoldi (siz {qty} dona so'ragansiz)."
+        parsed_cart.append((dish, qty))
         items.append({"name": dish["name"], "price": dish["price"], "qty": qty})
         total += dish["price"] * qty
+
+    if not items:
+        return None, "Savat bo'sh."
+
+    # zaxirani kamaytiramiz
+    for dish, qty in parsed_cart:
+        if dish.get("stock") is not None:
+            dish["stock"] = max(0, dish["stock"] - qty)
+    save_menu(full_menu)
 
     orders = load_orders()
     order = {
@@ -367,7 +407,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     save_orders(orders)
     if OWNER_CHAT_ID:
         notify_owner_new_order(order)
-    return order
+    return order, None
 
 def order_items_text(order):
     return "\n".join([f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}" for it in order["items"]])
@@ -455,10 +495,52 @@ def cmd_menu_admin(message):
     if not menu:
         bot.send_message(message.chat.id, "Menyu bo'sh. Rasm + tavsif yuborib yoki /add_dish bilan qo'shing.")
         return
-    lines = [f"#{d['id']} — {d['name']} — {fmt_sum(d['price'])}" + (f" ({d['desc']})" if d.get("desc") else "")
-             + (" 🖼" if d.get("photo_id") else "")
-             for d in menu]
-    bot.send_message(message.chat.id, "Menyu:\n" + "\n".join(lines))
+    lines = []
+    for d in menu:
+        line = f"#{d['id']} — {d['name']} — {fmt_sum(d['price'])}"
+        if d.get("desc"):
+            line += f" ({d['desc']})"
+        if d.get("photo_id"):
+            line += " 🖼"
+        stock = d.get("stock")
+        if stock is None:
+            line += " | cheklanmagan"
+        elif stock <= 0:
+            line += " | ❌ TUGADI"
+        else:
+            line += f" | qoldiq: {stock}"
+        lines.append(line)
+    bot.send_message(
+        message.chat.id,
+        "Menyu:\n" + "\n".join(lines) +
+        "\n\nZaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
+        "Cheklovni olib tashlash: /set_stock id -1"
+    )
+
+@bot.message_handler(commands=["set_stock"])
+def cmd_set_stock(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        parts = message.text.split()
+        dish_id = int(parts[1])
+        soni = int(parts[2])
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /set_stock id soni\nMasalan: /set_stock 1 10\nCheklovsiz qilish: /set_stock 1 -1")
+        return
+    menu = load_menu()
+    dish = next((d for d in menu if d["id"] == dish_id), None)
+    if not dish:
+        bot.send_message(message.chat.id, f"#{dish_id} topilmadi. /menu bilan tekshiring.")
+        return
+    if soni < 0:
+        dish["stock"] = None
+        save_menu(menu)
+        bot.send_message(message.chat.id, f"{dish['name']} — endi cheklanmagan (istagancha buyurtma qilinadi).")
+    else:
+        dish["stock"] = soni
+        save_menu(menu)
+        bot.send_message(message.chat.id, f"{dish['name']} — zaxira {soni} dona qilib belgilandi.")
 
 @bot.message_handler(commands=["add_dish"])
 def cmd_add_dish(message):
@@ -472,7 +554,7 @@ def cmd_add_dish(message):
         return
     menu = load_menu()
     new_id = (max([d["id"] for d in menu], default=0)) + 1
-    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None, "local_photo": None})
+    menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None, "local_photo": None, "stock": None})
     save_menu(menu)
     bot.send_message(message.chat.id, f"Qo'shildi (rasmsiz): #{new_id} {name} — {fmt_sum(price)}")
 
@@ -519,7 +601,7 @@ def handle_owner_photo(message):
         local_filename = None
     menu.append({
         "id": new_id, "name": name, "price": price, "desc": desc,
-        "photo_id": photo_id, "local_photo": local_filename
+        "photo_id": photo_id, "local_photo": local_filename, "stock": None
     })
     save_menu(menu)
     bot.send_message(message.chat.id, f"Qo'shildi (rasm bilan): #{new_id} {name} — {fmt_sum(price)}")
@@ -590,7 +672,7 @@ def api_menu():
     menu = load_menu()
     out = []
     for d in menu:
-        item = {"id": d["id"], "name": d["name"], "price": d["price"], "desc": d.get("desc", "")}
+        item = {"id": d["id"], "name": d["name"], "price": d["price"], "desc": d.get("desc", ""), "stock": d.get("stock")}
         if d.get("local_photo"):
             item["photo_url"] = f"/static/dishes/{d['local_photo']}"
         out.append(item)
@@ -639,7 +721,7 @@ def api_order():
     if not phone or not items_cart:
         return jsonify({"error": "Ma'lumotlar to'liq emas"}), 400
 
-    order = create_order(
+    order, error = create_order(
         items_cart=items_cart,
         customer_name=customer_name,
         phone=phone,
@@ -650,6 +732,8 @@ def api_order():
         tg_user_id=user.get("id"),
         username=user.get("username"),
     )
+    if error:
+        return jsonify({"error": error}), 409
     return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
 
 # ---------- ishga tushirish ----------
