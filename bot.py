@@ -6,6 +6,9 @@ Oshxona uchun Telegram bot + Mini App (professional buyurtma ilovasi).
 - Har bir buyurtmada mijozning Telegram username va doimiy ID'si avtomatik yoziladi
 - Egasi (OWNER_CHAT_ID): yangi buyurtma haqida xabar oladi, mijozga to'g'ridan-to'g'ri
   yozish tugmasi bilan, va holatni o'zgartiradi.
+- Mijoz "✉️ Savol / Murojaat" tugmasi orqali botga yozadi -> xabar OWNER_CHAT_ID'ga
+  keladi (mijozning shaxsiy akkaunti egaga ochilmaydi). Ega o'sha xabarga *reply*
+  qilsa, javob avtomatik mijozga bot orqali yetadi (ega ham shaxsini ochmaydi).
 
 Admin buyruqlari (faqat OWNER_CHAT_ID uchun):
     /menu                 - menyudagi taomlar ro'yxati
@@ -83,6 +86,10 @@ def next_order_id(orders):
 carts = {}
 checkout_state = {}
 
+# --- "Adminga yozish" uchun holat ---
+waiting_for_admin_message = set()   # xabar yozmoqchi bo'lgan mijozlar (user_id)
+contact_map = {}                    # {ownerga_yuborilgan_xabar_id: mijoz_user_id}
+
 def is_owner(chat_id):
     return chat_id == OWNER_CHAT_ID
 
@@ -121,6 +128,7 @@ def main_keyboard(user_id=None, username=None):
         fresh_url = f"{WEBAPP_URL}?{params}"
         kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
     kb.row(types.KeyboardButton("🍽 Menyu"), types.KeyboardButton("🛒 Savat"))
+    kb.row(types.KeyboardButton("✉️ Savol / Murojaat"))
     return kb
 
 # ---------- /start ----------
@@ -129,6 +137,7 @@ def main_keyboard(user_id=None, username=None):
 def cmd_start(message):
     carts.pop(message.from_user.id, None)
     checkout_state.pop(message.from_user.id, None)
+    waiting_for_admin_message.discard(message.from_user.id)
     welcome = (
         f"Assalomu alaykum! 👋\n{BUSINESS_NAME}ga xush kelibsiz.\n"
         "Pastdagi tugma orqali buyurtma bera boshlang:"
@@ -451,9 +460,26 @@ def notify_owner_new_order(order):
         f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {order['status']}"
     )
-    if order.get("latitude") is not None:
-        bot.send_location(OWNER_CHAT_ID, order["latitude"], order["longitude"])
-    bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order))
+    # MUHIM: bu funksiya hech qachon xato chiqarmasligi kerak. Buyurtma orders.json'ga
+    # allaqachon saqlangan bo'ladi (shu funksiya chaqirilishidan oldin) - shuning uchun
+    # bu yerdagi Telegram xatosi (flood limit, tarmoq va h.k.) mijozning "buyurtma
+    # qabul qilindi" javobini buzmasligi kerak.
+    try:
+        if order.get("latitude") is not None:
+            bot.send_location(OWNER_CHAT_ID, order["latitude"], order["longitude"])
+        bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order))
+    except Exception as e:
+        print(f"[OGOHLANTIRISH] Buyurtma #{order['id']} haqida to'liq xabar yuborilmadi: {e}")
+        # Zaxira: hech bo'lmasa qisqa ogohlantiruvchi xabar yuborishga urinamiz,
+        # shunda buyurtma diqqatingizdan chetda qolmaydi.
+        try:
+            bot.send_message(
+                OWNER_CHAT_ID,
+                f"🆕 Yangi buyurtma #{order['id']} (to'liq xabar yuborishda xato chiqdi - "
+                f"orders.json faylidan yoki /menu orqali tekshiring)"
+            )
+        except Exception:
+            pass
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -491,6 +517,65 @@ def cb_update_status(call):
         bot.send_message(order["user_id"], f"Buyurtmangiz #{order['id']} holati: {new_status}")
     except Exception:
         pass
+
+# ---------- Mijoz -> Admin: "Savol / Murojaat" ----------
+
+@bot.message_handler(func=lambda m: (
+    m.text == "✉️ Savol / Murojaat"
+    and not is_owner(m.chat.id)
+    and m.from_user.id not in checkout_state
+))
+def handle_contact_button(message):
+    waiting_for_admin_message.add(message.from_user.id)
+    bot.send_message(
+        message.chat.id,
+        "Xabaringizni yozing, men uni administratorga yetkazaman:",
+        reply_markup=types.ReplyKeyboardRemove()
+    )
+
+@bot.message_handler(func=lambda m: (
+    m.from_user.id in waiting_for_admin_message
+    and m.from_user.id not in checkout_state
+), content_types=["text"])
+def handle_customer_message_to_admin(message):
+    waiting_for_admin_message.discard(message.from_user.id)
+    user = message.from_user
+
+    # mijozning oxirgi buyurtmasini topamiz (bo'lsa) - kontekst uchun
+    orders = load_orders()
+    last_order = None
+    for o in reversed(orders):
+        if o.get("user_id") == user.id:
+            last_order = o
+            break
+
+    contact_info = f"@{user.username}" if user.username else "username yo'q"
+    header = f"📩 Yangi murojaat\n👤 {user.first_name or ''} ({contact_info}, ID: {user.id})\n"
+    if last_order:
+        header += f"🧾 Oxirgi buyurtma: #{last_order['id']} — {last_order['status']}\n"
+    header += f"\n\"{message.text}\"\n\n(Javob berish uchun shu xabarga reply qiling)"
+
+    sent = bot.send_message(OWNER_CHAT_ID, header)
+    contact_map[sent.message_id] = user.id
+
+    bot.send_message(
+        message.chat.id,
+        "✅ Xabaringiz yuborildi. Tez orada javob beramiz.",
+        reply_markup=main_keyboard(user.id, user.username)
+    )
+
+@bot.message_handler(func=lambda m: (
+    is_owner(m.chat.id)
+    and m.reply_to_message is not None
+    and m.reply_to_message.message_id in contact_map
+), content_types=["text"])
+def handle_owner_reply_to_customer(message):
+    customer_id = contact_map[message.reply_to_message.message_id]
+    try:
+        bot.send_message(customer_id, f"✉️ Administrator javobi:\n{message.text}")
+        bot.send_message(message.chat.id, "✅ Javob mijozga yuborildi.")
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Yuborilmadi (mijoz botni bloklagan bo'lishi mumkin): {e}")
 
 # ---------- admin: menyuni boshqarish ----------
 
@@ -720,48 +805,54 @@ def verify_signed_user(uid, uname, ts, sig):
 
 @app.route("/api/order", methods=["POST"])
 def api_order():
-    body = request.get_json(force=True, silent=True) or {}
-    init_data = body.get("initData", "")
-    user = validate_init_data(init_data) or {}
+    try:
+        body = request.get_json(force=True, silent=True) or {}
+        init_data = body.get("initData", "")
+        user = validate_init_data(init_data) or {}
 
-    if not user:
-        # 1) avval botning o'zi imzolagan uid/uname/ts/sig orqali tekshiramiz (eng ishonchli)
-        signed_user = verify_signed_user(
-            body.get("uid"), body.get("uname"), body.get("ts"), body.get("sig")
+        if not user:
+            # 1) avval botning o'zi imzolagan uid/uname/ts/sig orqali tekshiramiz (eng ishonchli)
+            signed_user = verify_signed_user(
+                body.get("uid"), body.get("uname"), body.get("ts"), body.get("sig")
+            )
+            if signed_user:
+                user = signed_user
+            else:
+                # 2) bo'lmasa, Telegram tomonidan berilgan (imzosiz) ma'lumotdan foydalanamiz
+                unsafe_user = body.get("unsafe_user")
+                if isinstance(unsafe_user, dict):
+                    user = unsafe_user
+
+        items_cart = body.get("cart", {})
+        phone = (body.get("phone") or "").strip()
+        address_text = (body.get("address_text") or "").strip() or None
+        latitude = body.get("latitude")
+        longitude = body.get("longitude")
+        note = (body.get("note") or "").strip()
+        customer_name = (body.get("name") or "").strip() or user.get("first_name") or "Mijoz"
+
+        if not phone or not items_cart:
+            return jsonify({"error": "Ma'lumotlar to'liq emas"}), 400
+
+        order, error = create_order(
+            items_cart=items_cart,
+            customer_name=customer_name,
+            phone=phone,
+            latitude=latitude,
+            longitude=longitude,
+            address_text=address_text,
+            note=note,
+            tg_user_id=user.get("id"),
+            username=user.get("username"),
         )
-        if signed_user:
-            user = signed_user
-        else:
-            # 2) bo'lmasa, Telegram tomonidan berilgan (imzosiz) ma'lumotdan foydalanamiz
-            unsafe_user = body.get("unsafe_user")
-            if isinstance(unsafe_user, dict):
-                user = unsafe_user
-
-    items_cart = body.get("cart", {})
-    phone = (body.get("phone") or "").strip()
-    address_text = (body.get("address_text") or "").strip() or None
-    latitude = body.get("latitude")
-    longitude = body.get("longitude")
-    note = (body.get("note") or "").strip()
-    customer_name = (body.get("name") or "").strip() or user.get("first_name") or "Mijoz"
-
-    if not phone or not items_cart:
-        return jsonify({"error": "Ma'lumotlar to'liq emas"}), 400
-
-    order, error = create_order(
-        items_cart=items_cart,
-        customer_name=customer_name,
-        phone=phone,
-        latitude=latitude,
-        longitude=longitude,
-        address_text=address_text,
-        note=note,
-        tg_user_id=user.get("id"),
-        username=user.get("username"),
-    )
-    if error:
-        return jsonify({"error": error}), 409
-    return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
+        if error:
+            return jsonify({"error": error}), 409
+        return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
+    except Exception as e:
+        # Kutilmagan xato bo'lsa ham, mijozga tushunarli javob va serverga
+        # tekshirish uchun log qoldiramiz (Railway loglarida ko'rinadi).
+        print(f"[XATO] /api/order da kutilmagan muammo: {e}")
+        return jsonify({"error": "Server xatoligi. Iltimos, qayta urinib ko'ring."}), 500
 
 # ---------- ishga tushirish ----------
 
