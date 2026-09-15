@@ -445,8 +445,13 @@ def status_keyboard(order):
         types.InlineKeyboardButton("🚴 Yo'lda", callback_data=f"status:{order['id']}:Yo'lda"),
     )
     kb.add(types.InlineKeyboardButton("✅ Yetkazildi", callback_data=f"status:{order['id']}:Yetkazildi"))
-    if order.get("user_id"):
-        kb.add(types.InlineKeyboardButton("✉️ Mijozga yozish", url=f"tg://user?id={order['user_id']}"))
+    # DIQQAT: bu yerda avval "tg://user?id=..." havolali tugma bor edi. Ba'zi
+    # mijozlarning maxfiylik sozlamalari bunday havolani taqiqlaydi va Telegram
+    # BUTTON_USER_PRIVACY_RESTRICTED xatosi bilan BUTUN xabarni rad etadi (shu
+    # tugmalar ham, taom tafsilotlari ham yuborilmay qoladi). Shu sabab olib
+    # tashlandi. Endi buyurtma xabariga oddiy REPLY qilib yozsangiz, javobingiz
+    # mijozga bot orqali (shaxsiy havolasiz) yetadi - handle_owner_reply_to_customer
+    # funksiyasiga qarang.
     return kb
 
 def notify_owner_new_order(order):
@@ -467,7 +472,11 @@ def notify_owner_new_order(order):
     try:
         if order.get("latitude") is not None:
             bot.send_location(OWNER_CHAT_ID, order["latitude"], order["longitude"])
-        bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order))
+        sent = bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order))
+        # Shu xabarga reply qilib yozsangiz ham, javobingiz mijozga bot orqali yetadi
+        # (tg://user havolasiz, shaxsiy ma'lumot ochilmaydi).
+        if order.get("user_id"):
+            contact_map[sent.message_id] = order["user_id"]
     except Exception as e:
         print(f"[OGOHLANTIRISH] Buyurtma #{order['id']} haqida to'liq xabar yuborilmadi: {e}")
         # Zaxira: hech bo'lmasa qisqa ogohlantiruvchi xabar yuborishga urinamiz,
