@@ -25,6 +25,7 @@ import threading
 import hashlib
 import hmac
 import urllib.parse
+from datetime import datetime, timedelta, timezone
 
 import requests as httpreq
 import telebot
@@ -38,6 +39,16 @@ BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Miqot Food")
 
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 os.makedirs(DATA_DIR, exist_ok=True)
+
+# Mahalliy vaqt zonasi - Saudiya Arabistoni doim UTC+3, yoz vaqtiga o'tish yo'q.
+TZ = timezone(timedelta(hours=3))
+
+def local_now():
+    return datetime.now(TZ)
+
+def local_date_str(ts):
+    """Unix timestamp'ni mahalliy sana satriga o'giradi (masalan '2026-09-17')."""
+    return datetime.fromtimestamp(ts, TZ).strftime("%Y-%m-%d")
 
 MENU_FILE = os.path.join(DATA_DIR, "menu.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
@@ -82,6 +93,12 @@ def save_settings(s):
 
 def next_order_id(orders):
     return (max([o["id"] for o in orders], default=0)) + 1
+
+def next_daily_no(orders):
+    """Bugun (mahalliy vaqt bo'yicha) uchun keyingi tartib raqamini beradi - har kuni 1'dan boshlanadi."""
+    today = local_date_str(time.time())
+    todays_orders = [o for o in orders if o.get("date") == today]
+    return (max([o.get("daily_no", 0) for o in todays_orders], default=0)) + 1
 
 carts = {}
 checkout_state = {}
@@ -363,8 +380,7 @@ def handle_checkout_steps(message):
         carts[user_id] = {}
         bot.send_message(
             message.chat.id,
-            f"✅ Buyurtmangiz qabul qilindi!\nJami: {fmt_sum(order['total'])}\n"
-            f"To'lov: yetkazib berilganda naqd.\nTez orada siz bilan bog'lanamiz.",
+            "🙏 Rahmat! Buyurtmangiz qabul qilindi, tafsilotlar yuqorida.",
             reply_markup=main_keyboard(message.from_user.id, message.from_user.username)
         )
         return
@@ -405,6 +421,8 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     orders = load_orders()
     order = {
         "id": next_order_id(orders),
+        "daily_no": next_daily_no(orders),
+        "date": local_date_str(time.time()),
         "customer_name": customer_name,
         "phone": phone,
         "latitude": latitude,
@@ -423,6 +441,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     save_orders(orders)
     if OWNER_CHAT_ID:
         notify_owner_new_order(order)
+    notify_customer_order(order)
     return order, None
 
 def order_items_text(order):
@@ -456,7 +475,7 @@ def status_keyboard(order):
 
 def notify_owner_new_order(order):
     text = (
-        f"🆕 Yangi buyurtma #{order['id']}\n\n"
+        f"🆕 Yangi buyurtma #{order['daily_no']} ({order['date']})\n\n"
         f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
         f"📞 {order['phone']}\n"
         f"{order_address_line(order)}\n"
@@ -478,17 +497,37 @@ def notify_owner_new_order(order):
         if order.get("user_id"):
             contact_map[sent.message_id] = order["user_id"]
     except Exception as e:
-        print(f"[OGOHLANTIRISH] Buyurtma #{order['id']} haqida to'liq xabar yuborilmadi: {e}")
+        print(f"[OGOHLANTIRISH] Buyurtma #{order['daily_no']} haqida to'liq xabar yuborilmadi: {e}")
         # Zaxira: hech bo'lmasa qisqa ogohlantiruvchi xabar yuborishga urinamiz,
         # shunda buyurtma diqqatingizdan chetda qolmaydi.
         try:
             bot.send_message(
                 OWNER_CHAT_ID,
-                f"🆕 Yangi buyurtma #{order['id']} (to'liq xabar yuborishda xato chiqdi - "
+                f"🆕 Yangi buyurtma #{order['daily_no']} (to'liq xabar yuborishda xato chiqdi - "
                 f"orders.json faylidan yoki /menu orqali tekshiring)"
             )
         except Exception:
             pass
+
+def notify_customer_order(order):
+    """Mijozga buyurtmasi haqida to'liq chek yuboradi - bot chatida saqlanib qoladi."""
+    if not order.get("user_id"):
+        return
+    text = (
+        f"✅ Buyurtmangiz qabul qilindi!\n\n"
+        f"🧾 Buyurtma #{order['daily_no']} ({order['date']})\n\n"
+        f"{order_items_text(order)}\n\n"
+        f"💰 Jami: {fmt_sum(order['total'])}\n"
+        f"💳 To'lov: naqd (yetkazib berilganda)\n"
+        f"{order_address_line(order)}\n"
+        f"📞 {order['phone']}\n\n"
+        f"Holat: {order['status']}\n"
+        f"Tez orada siz bilan bog'lanamiz."
+    )
+    try:
+        bot.send_message(order["user_id"], text)
+    except Exception as e:
+        print(f"[OGOHLANTIRISH] Buyurtma #{order['daily_no']} - mijozga chek yuborilmadi: {e}")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -506,7 +545,7 @@ def cb_update_status(call):
     save_orders(orders)
 
     text = (
-        f"📦 Buyurtma #{order['id']}\n\n"
+        f"📦 Buyurtma #{order['daily_no']} ({order['date']})\n\n"
         f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
         f"📞 {order['phone']}\n"
         f"{order_address_line(order)}\n"
@@ -523,7 +562,7 @@ def cb_update_status(call):
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
     try:
-        bot.send_message(order["user_id"], f"Buyurtmangiz #{order['id']} holati: {new_status}")
+        bot.send_message(order["user_id"], f"Buyurtmangiz #{order['daily_no']} holati: {new_status}")
     except Exception:
         pass
 
@@ -561,7 +600,7 @@ def handle_customer_message_to_admin(message):
     contact_info = f"@{user.username}" if user.username else "username yo'q"
     header = f"📩 Yangi murojaat\n👤 {user.first_name or ''} ({contact_info}, ID: {user.id})\n"
     if last_order:
-        header += f"🧾 Oxirgi buyurtma: #{last_order['id']} — {last_order['status']}\n"
+        header += f"🧾 Oxirgi buyurtma: #{last_order.get('daily_no', last_order['id'])} ({last_order.get('date', '')}) — {last_order['status']}\n"
     header += f"\n\"{message.text}\"\n\n(Javob berish uchun shu xabarga reply qiling)"
 
     sent = bot.send_message(OWNER_CHAT_ID, header)
@@ -741,6 +780,57 @@ def cmd_remove_dish(message):
     save_menu(menu)
     bot.send_message(message.chat.id, f"#{dish_id} o'chirildi.")
 
+# ---------- kunlik hisobot ----------
+
+def build_daily_report(date_str):
+    orders = load_orders()
+    days_orders = [o for o in orders if o.get("date") == date_str]
+    if not days_orders:
+        return f"📊 {date_str} kuni uchun buyurtmalar bo'lmadi."
+
+    total_revenue = sum(o["total"] for o in days_orders)
+    count = len(days_orders)
+
+    dish_counts = {}
+    for o in days_orders:
+        for it in o["items"]:
+            dish_counts[it["name"]] = dish_counts.get(it["name"], 0) + it["qty"]
+    top_dishes = sorted(dish_counts.items(), key=lambda x: -x[1])[:5]
+
+    lines = [
+        f"📊 {date_str} kunlik hisobot",
+        "",
+        f"🧾 Buyurtmalar soni: {count}",
+        f"💰 Jami savdo: {fmt_sum(total_revenue)}",
+    ]
+    if top_dishes:
+        lines.append("")
+        lines.append("🍽 Eng ko'p buyurtma qilingan taomlar:")
+        for name, qty in top_dishes:
+            lines.append(f"  • {name} — {qty} dona")
+    return "\n".join(lines)
+
+@bot.message_handler(commands=["hisobot"])
+def cmd_report(message):
+    if not is_owner(message.chat.id):
+        return
+    today_str = local_date_str(time.time())
+    bot.send_message(message.chat.id, build_daily_report(today_str))
+
+def daily_report_scheduler():
+    """Har kuni mahalliy 00:01'da o'tgan kunning savdo hisobotini avtomatik yuboradi."""
+    while True:
+        now = local_now()
+        next_run = (now + timedelta(days=1)).replace(hour=0, minute=1, second=0, microsecond=0)
+        sleep_seconds = (next_run - now).total_seconds()
+        time.sleep(max(sleep_seconds, 1))
+        yesterday_str = (local_now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        if OWNER_CHAT_ID:
+            try:
+                bot.send_message(OWNER_CHAT_ID, build_daily_report(yesterday_str))
+            except Exception as e:
+                print(f"[OGOHLANTIRISH] Kunlik hisobotni yuborishda xato: {e}")
+
 # ================= MINI APP (Flask) =================
 
 def validate_init_data(init_data):
@@ -856,7 +946,7 @@ def api_order():
         )
         if error:
             return jsonify({"error": error}), 409
-        return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
+        return jsonify({"ok": True, "order_id": order["id"], "daily_order_no": order["daily_no"], "total": order["total"]})
     except Exception as e:
         # Kutilmagan xato bo'lsa ham, mijozga tushunarli javob va serverga
         # tekshirish uchun log qoldiramiz (Railway loglarida ko'rinadi).
@@ -870,6 +960,7 @@ def run_bot_polling():
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot_polling, daemon=True).start()
+    threading.Thread(target=daily_report_scheduler, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
     print(f"Mini App server {port}-portda ishga tushdi, bot polling fonda ishlayapti...")
     app.run(host="0.0.0.0", port=port)
