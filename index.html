@@ -41,12 +41,15 @@
   header .titles h1{font-size:18px;font-weight:700;}
   header .titles p{margin:2px 0 0;font-size:12.5px;color:var(--ink-soft);}
 
-  .chips{display:flex;gap:8px;padding:2px 18px 16px;overflow-x:auto;}
-  .chip{
-    background:var(--card);border:1.5px solid var(--line);padding:8px 16px;border-radius:999px;
-    font-size:13px;font-weight:600;white-space:nowrap;color:var(--ink-soft);
+  .category-section{margin-bottom:22px;}
+  .category-header{
+    display:flex;align-items:center;gap:8px;padding:2px 18px 12px;
   }
-  .chip.active{background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#fff;border-color:transparent;}
+  .category-header .cat-emoji{font-size:18px;}
+  .category-header h2{
+    font-family:'Poppins',sans-serif;font-size:15px;font-weight:700;color:var(--ink);
+    letter-spacing:0.2px;
+  }
 
   .grid{
     display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 18px;
@@ -163,9 +166,7 @@
   </div>
 </header>
 
-<div class="chips"><div class="chip active">Barcha taomlar</div></div>
-
-<div class="grid" id="menu-grid"></div>
+<div id="menu-sections"></div>
 
 <div class="cart-bar" id="cart-bar">
   <div class="cb-left"><span id="cart-count">0</span> ta mahsulot</div>
@@ -228,6 +229,8 @@ const signedUser = {
 };
 
 let menu = [];
+let categories = [];
+let categoryEmoji = {};
 let cart = {}; // id -> qty
 let userLocation = null;
 
@@ -238,6 +241,8 @@ async function loadMenu(){
     const res = await fetch('/api/menu');
     const data = await res.json();
     menu = data.menu || [];
+    categories = data.categories || [];
+    categoryEmoji = data.category_emoji || {};
     document.getElementById('business-name').textContent = data.business_name || "Uy oshxonasi";
     const logoSlot = document.getElementById('logo-slot');
     if(data.logo_url){
@@ -247,42 +252,33 @@ async function loadMenu(){
     }
     renderMenu();
   }catch(e){
-    document.getElementById('menu-grid').innerHTML = '<div class="empty-state">Menyuni yuklab bo\'lmadi.</div>';
+    document.getElementById('menu-sections').innerHTML = '<div class="empty-state">Menyuni yuklab bo\'lmadi.</div>';
   }
 }
 
-function renderMenu(){
-  const grid = document.getElementById('menu-grid');
-  if(menu.length === 0){
-    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">Menyu hozircha bo\'sh.</div>';
-    return;
+function dishCardHtml(dish){
+  const qty = cart[dish.id] || 0;
+  const stock = (dish.stock === null || dish.stock === undefined) ? null : dish.stock;
+  const soldOut = stock !== null && stock <= 0;
+  const photoHtml = dish.photo_url
+    ? `<img class="dish-photo" src="${dish.photo_url}" alt="${dish.name}">`
+    : `<div class="dish-photo-fallback">🍲</div>`;
+  let bottomHtml;
+  if(soldOut){
+    bottomHtml = `<span class="sold-out-badge">Tugadi</span>`;
+  }else if(qty > 0){
+    const canAddMore = stock === null || qty < stock;
+    bottomHtml = `<div class="qty-pill">
+         <button data-act="dec" data-id="${dish.id}">−</button>
+         <span>${qty}</span>
+         <button data-act="inc" data-id="${dish.id}" ${canAddMore ? '' : 'disabled'}>+</button>
+       </div>`;
+  }else{
+    bottomHtml = `<button class="add-btn" data-act="inc" data-id="${dish.id}">+</button>`;
   }
-  grid.innerHTML = '';
-  menu.forEach(dish=>{
-    const qty = cart[dish.id] || 0;
-    const stock = (dish.stock === null || dish.stock === undefined) ? null : dish.stock;
-    const soldOut = stock !== null && stock <= 0;
-    const card = document.createElement('div');
-    card.className = 'dish-card' + (soldOut ? ' sold-out' : '');
-    const photoHtml = dish.photo_url
-      ? `<img class="dish-photo" src="${dish.photo_url}" alt="${dish.name}">`
-      : `<div class="dish-photo-fallback">🍲</div>`;
-    let bottomHtml;
-    if(soldOut){
-      bottomHtml = `<span class="sold-out-badge">Tugadi</span>`;
-    }else if(qty > 0){
-      const canAddMore = stock === null || qty < stock;
-      bottomHtml = `<div class="qty-pill">
-           <button data-act="dec" data-id="${dish.id}">−</button>
-           <span>${qty}</span>
-           <button data-act="inc" data-id="${dish.id}" ${canAddMore ? '' : 'disabled'}>+</button>
-         </div>`;
-    }else{
-      bottomHtml = `<button class="add-btn" data-act="inc" data-id="${dish.id}">+</button>`;
-    }
-    const stockNote = (!soldOut && stock !== null && stock <= 5)
-      ? `<div class="stock-note">Oxirgi ${stock} dona</div>` : '';
-    card.innerHTML = `
+  const stockNote = (!soldOut && stock !== null && stock <= 5)
+    ? `<div class="stock-note">Oxirgi ${stock} dona</div>` : '';
+  return `<div class="dish-card${soldOut ? ' sold-out' : ''}">
       ${photoHtml}
       <div class="dish-info">
         <div class="dish-name">${dish.name}</div>
@@ -292,10 +288,28 @@ function renderMenu(){
           <div class="dish-price">${fmtSar(dish.price)}</div>
           ${bottomHtml}
         </div>
+      </div>
+    </div>`;
+}
+
+function renderMenu(){
+  const container = document.getElementById('menu-sections');
+  if(menu.length === 0){
+    container.innerHTML = '<div class="empty-state">Menyu hozircha bo\'sh.</div>';
+    return;
+  }
+  const cats = categories.length ? categories : [...new Set(menu.map(d=>d.category))];
+  container.innerHTML = cats.map(cat=>{
+    const items = menu.filter(d=>d.category === cat);
+    if(items.length === 0) return '';
+    const emoji = categoryEmoji[cat] || '🍽';
+    return `<div class="category-section">
+        <div class="category-header"><span class="cat-emoji">${emoji}</span><h2>${cat}</h2></div>
+        <div class="grid">${items.map(dishCardHtml).join('')}</div>
       </div>`;
-    grid.appendChild(card);
-  });
-  grid.querySelectorAll('[data-act]').forEach(btn=>{
+  }).join('');
+
+  container.querySelectorAll('[data-act]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       if(btn.disabled) return;
       const id = btn.getAttribute('data-id');
