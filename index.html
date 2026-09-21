@@ -4,20 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Buyurtma</title>
+<meta name="theme-color" content="#0a1230">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#faf5ef;
-    --card:#ffffff;
-    --ink:#2b2320;
-    --ink-soft:#8b8078;
-    --accent1:#ff7a45;
-    --accent2:#ff3d5a;
-    --accent-soft:#fff1ea;
-    --line:#f0e6da;
-    --shadow: 0 10px 24px rgba(43,35,32,0.08);
+    --bg:#0a1230;
+    --card:#131c40;
+    --card-2:#0e1636;
+    --ink:#f3ecd8;
+    --ink-soft:#9aa3c9;
+    --accent1:#e3b34a;
+    --accent2:#c98f2e;
+    --accent-soft:#241d0e;
+    --line:#25305c;
+    --shadow: 0 10px 24px rgba(0,0,0,0.35);
     --radius:20px;
   }
   *{box-sizing:border-box;}
@@ -26,6 +28,8 @@
     font-family:'Inter',sans-serif;
     padding-bottom:96px;
     -webkit-tap-highlight-color:transparent;
+    background-image:
+      radial-gradient(ellipse 900px 500px at 50% -80px, rgba(227,179,74,0.12), transparent 70%);
   }
   h1,h2,h3{font-family:'Poppins',sans-serif;margin:0;}
 
@@ -38,8 +42,8 @@
     width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
     display:flex;align-items:center;justify-content:center;font-size:20px;box-shadow:var(--shadow);
   }
-  header .titles h1{font-size:18px;font-weight:700;}
-  header .titles p{margin:2px 0 0;font-size:12.5px;color:var(--ink-soft);}
+  header .titles h1{font-size:18px;font-weight:700;letter-spacing:0.3px;}
+  header .titles p{margin:2px 0 0;font-size:12px;color:var(--accent1);font-weight:600;}
 
   .category-section{margin-bottom:22px;}
   .category-header{
@@ -71,9 +75,9 @@
   .dish-price{font-weight:700;font-size:14px;}
   .add-btn{
     width:30px;height:30px;border-radius:50%;border:none;
-    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#fff;
-    font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;
-    box-shadow:0 4px 10px rgba(255,61,90,0.35);
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;
+    font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 4px 10px rgba(227,179,74,0.35);
   }
   .qty-pill{
     display:flex;align-items:center;gap:8px;background:var(--accent-soft);border-radius:999px;padding:3px 6px;
@@ -91,19 +95,19 @@
     background:var(--ink-soft);color:#fff;font-size:11px;font-weight:700;
     padding:5px 10px;border-radius:999px;
   }
-  .stock-note{font-size:10.5px;color:var(--accent2);font-weight:600;margin-bottom:4px;}
+  .stock-note{font-size:10.5px;color:#ff8a65;font-weight:600;margin-bottom:4px;}
 
   .empty-state{padding:60px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
 
   /* floating cart bar */
   .cart-bar{
     position:fixed;left:16px;right:16px;bottom:16px;
-    background:var(--ink);color:#fff;border-radius:18px;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;border-radius:18px;
     padding:14px 18px;display:none;align-items:center;justify-content:space-between;
-    box-shadow:0 12px 30px rgba(0,0,0,0.25);z-index:40;cursor:pointer;
+    box-shadow:0 12px 30px rgba(0,0,0,0.45);z-index:40;cursor:pointer;
   }
   .cart-bar.show{display:flex;}
-  .cart-bar .cb-left{font-size:13px;opacity:0.85;}
+  .cart-bar .cb-left{font-size:13px;opacity:0.8;}
   .cart-bar .cb-total{font-weight:700;font-size:16px;}
 
   /* sheet (savat / checkout) */
@@ -130,9 +134,9 @@
 
   .primary-btn{
     width:100%;padding:14px 0;border-radius:14px;border:none;
-    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#fff;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;
     font-weight:700;font-size:14.5px;cursor:pointer;font-family:'Inter',sans-serif;margin-top:14px;
-    box-shadow:0 8px 20px rgba(255,61,90,0.3);
+    box-shadow:0 8px 20px rgba(227,179,74,0.3);
   }
   .ghost-btn{
     width:100%;padding:12px 0;border-radius:14px;border:1.5px solid var(--line);background:transparent;
@@ -162,7 +166,7 @@
   <div id="logo-slot"></div>
   <div class="titles">
     <h1 id="business-name">Yuklanmoqda...</h1>
-    <p>Taom tanlang va buyurtma bering</p>
+    <p id="business-tagline">Taom tanlang va buyurtma bering</p>
   </div>
 </header>
 
@@ -244,6 +248,7 @@ async function loadMenu(){
     categories = data.categories || [];
     categoryEmoji = data.category_emoji || {};
     document.getElementById('business-name').textContent = data.business_name || "Uy oshxonasi";
+    document.getElementById('business-tagline').textContent = data.tagline || "Taom tanlang va buyurtma bering";
     const logoSlot = document.getElementById('logo-slot');
     if(data.logo_url){
       logoSlot.innerHTML = `<img class="logo" src="${data.logo_url}" alt="logo">`;
@@ -409,7 +414,7 @@ document.getElementById('get-location-btn').addEventListener('click', ()=>{
 function notify(msg){
   const statusEl = document.getElementById('loc-status');
   statusEl.textContent = msg;
-  statusEl.style.color = '#c0392b';
+  statusEl.style.color = '#ff6b5b';
   statusEl.style.fontWeight = '600';
   if(tg && tg.showAlert){ tg.showAlert(msg); }
   else{ alert(msg); }
