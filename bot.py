@@ -170,7 +170,7 @@ def main_keyboard(user_id=None, username=None):
         params = f"uid={user_id}&uname={urllib.parse.quote(username or '')}&ts={ts}&sig={sig}&v={ts}"
         fresh_url = f"{WEBAPP_URL}?{params}"
         kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
-    kb.row(types.KeyboardButton("🍽 Menyu"), types.KeyboardButton("🛒 Savat"))
+    kb.row(types.KeyboardButton("🛒 Savat"))
     return kb
 
 # ---------- /start ----------
