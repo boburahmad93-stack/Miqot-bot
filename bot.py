@@ -22,6 +22,8 @@ import threading
 import hashlib
 import hmac
 import urllib.parse
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests as httpreq
 import telebot
@@ -32,6 +34,8 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "TOKEN_BU_YERGA")
 OWNER_CHAT_ID = int(os.environ.get("OWNER_CHAT_ID", "0"))
 WEBAPP_URL = os.environ.get("WEBAPP_URL", "").rstrip("/")
 BUSINESS_NAME = os.environ.get("BUSINESS_NAME", "Miqot Food")
+BUSINESS_TAGLINE = os.environ.get("BUSINESS_TAGLINE", "Halol lazzatli, barakali ne'mat")
+TIMEZONE = ZoneInfo(os.environ.get("TIMEZONE", "Asia/Riyadh"))
 
 DATA_DIR = os.environ.get("DATA_DIR", ".")
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -102,8 +106,29 @@ def match_category(raw):
             return c
     return None
 
+def load_admin_ids():
+    settings = load_settings()
+    ids = set(settings.get("admin_ids", []))
+    ids.add(OWNER_CHAT_ID)
+    return ids
+
+def add_admin_id(new_id):
+    settings = load_settings()
+    ids = set(settings.get("admin_ids", []))
+    ids.add(OWNER_CHAT_ID)
+    ids.add(new_id)
+    settings["admin_ids"] = list(ids)
+    save_settings(settings)
+
+def remove_admin_id(rem_id):
+    settings = load_settings()
+    ids = set(settings.get("admin_ids", []))
+    ids.discard(rem_id)
+    settings["admin_ids"] = list(ids)
+    save_settings(settings)
+
 def is_owner(chat_id):
-    return chat_id == OWNER_CHAT_ID
+    return chat_id in load_admin_ids()
 
 def fmt_sum(n):
     return f"{n:,.0f} SAR".replace(",", " ")
@@ -489,9 +514,13 @@ def notify_owner_new_order(order):
         f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {order['status']}"
     )
-    if order.get("latitude") is not None:
-        bot.send_location(OWNER_CHAT_ID, order["latitude"], order["longitude"])
-    bot.send_message(OWNER_CHAT_ID, text, reply_markup=status_keyboard(order))
+    for admin_id in load_admin_ids():
+        try:
+            if order.get("latitude") is not None:
+                bot.send_location(admin_id, order["latitude"], order["longitude"])
+            bot.send_message(admin_id, text, reply_markup=status_keyboard(order))
+        except Exception:
+            pass
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -532,6 +561,45 @@ def cb_update_status(call):
 
 # ---------- admin: menyuni boshqarish ----------
 
+@bot.message_handler(commands=["add_admin"])
+def cmd_add_admin(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        new_id = int(message.text.split(" ", 1)[1].strip())
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /add_admin id\nMasalan: /add_admin 123456789\n"
+                                           "(ID ni bilish uchun @userinfobot dan foydalaning)")
+        return
+    add_admin_id(new_id)
+    bot.send_message(message.chat.id, f"✅ {new_id} endi admin. U ham botni boshqara oladi (menyu, zaxira, buyurtmalar).")
+    try:
+        bot.send_message(new_id, "🎉 Siz Miqot Food botiga admin etib tayinlandingiz. /menu yozib boshlang.")
+    except Exception:
+        pass
+
+@bot.message_handler(commands=["remove_admin"])
+def cmd_remove_admin(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        rem_id = int(message.text.split(" ", 1)[1].strip())
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /remove_admin id")
+        return
+    if rem_id == OWNER_CHAT_ID:
+        bot.send_message(message.chat.id, "Bosh adminni o'chirib bo'lmaydi.")
+        return
+    remove_admin_id(rem_id)
+    bot.send_message(message.chat.id, f"{rem_id} adminlikdan olib tashlandi.")
+
+@bot.message_handler(commands=["admins"])
+def cmd_list_admins(message):
+    if not is_owner(message.chat.id):
+        return
+    ids = load_admin_ids()
+    bot.send_message(message.chat.id, "Adminlar:\n" + "\n".join(str(i) for i in ids))
+
 @bot.message_handler(commands=["menu"])
 def cmd_menu_admin(message):
     if not is_owner(message.chat.id):
@@ -562,7 +630,9 @@ def cmd_menu_admin(message):
         "Barchasini \"Tugadi\" qilish (ishlamagan kun): /reset_stock\n"
         "Cheklovni olib tashlash: /set_stock id -1\n"
         f"Kategoriya o'zgartirish: /set_category id Kategoriya (masalan: /set_category 1 Ovqatlar)\n"
-        f"Kategoriyalar: {', '.join(CATEGORIES)}"
+        f"Kategoriyalar: {', '.join(CATEGORIES)}\n\n"
+        "Hisobot: /report (bugungi), /yesterday_report (kechagi)\n"
+        "Admin qo'shish: /add_admin id | /remove_admin id | /admins"
     )
 
 @bot.message_handler(commands=["set_category"])
@@ -795,6 +865,7 @@ def api_menu():
         "categories": categories_present,
         "category_emoji": CATEGORY_EMOJI,
         "business_name": BUSINESS_NAME,
+        "tagline": BUSINESS_TAGLINE,
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
 
@@ -852,6 +923,79 @@ def api_order():
         return jsonify({"error": error}), 409
     return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
 
+# ---------- kunlik hisobot ----------
+
+def build_daily_report_text(target_date):
+    """target_date — datetime.date. O'sha kunning barcha buyurtmalari bo'yicha hisobot matnini quradi."""
+    orders = load_orders()
+    day_orders = [
+        o for o in orders
+        if datetime.fromtimestamp(o["created_at"], TIMEZONE).date() == target_date
+    ]
+    if not day_orders:
+        return (
+            f"📊 Kunlik hisobot — {target_date.strftime('%d.%m.%Y')}\n\n"
+            f"Bugun buyurtma tushmadi."
+        )
+
+    total_revenue = sum(o["total"] for o in day_orders)
+    dish_counts = {}
+    for o in day_orders:
+        for it in o["items"]:
+            dish_counts[it["name"]] = dish_counts.get(it["name"], 0) + it["qty"]
+
+    sorted_dishes = sorted(dish_counts.items(), key=lambda x: -x[1])
+    dish_lines = "\n".join(f"  • {name} — {qty} dona" for name, qty in sorted_dishes)
+
+    status_counts = {}
+    for o in day_orders:
+        status_counts[o["status"]] = status_counts.get(o["status"], 0) + 1
+    status_lines = "\n".join(f"  • {s}: {c}" for s, c in status_counts.items())
+
+    return (
+        f"📊 Kunlik hisobot — {target_date.strftime('%d.%m.%Y')}\n\n"
+        f"🧾 Buyurtmalar soni: {len(day_orders)}\n"
+        f"💰 Jami savdo: {fmt_sum(total_revenue)}\n\n"
+        f"🍽 Sotilgan taomlar:\n{dish_lines}\n\n"
+        f"📦 Holatlar bo'yicha:\n{status_lines}"
+    )
+
+def send_daily_report(target_date):
+    text = build_daily_report_text(target_date)
+    for admin_id in load_admin_ids():
+        try:
+            bot.send_message(admin_id, text)
+        except Exception:
+            pass
+
+@bot.message_handler(commands=["report"])
+def cmd_report(message):
+    if not is_owner(message.chat.id):
+        return
+    today = datetime.now(TIMEZONE).date()
+    bot.send_message(message.chat.id, build_daily_report_text(today))
+
+@bot.message_handler(commands=["yesterday_report"])
+def cmd_yesterday_report(message):
+    if not is_owner(message.chat.id):
+        return
+    yday = datetime.now(TIMEZONE).date() - timedelta(days=1)
+    bot.send_message(message.chat.id, build_daily_report_text(yday))
+
+def daily_report_scheduler():
+    """Har kuni 00:00 da (TIMEZONE bo'yicha) o'tgan kunning hisobotini yuboradi."""
+    last_sent_date = None
+    while True:
+        try:
+            now = datetime.now(TIMEZONE)
+            if now.hour == 0 and now.minute == 0 and last_sent_date != now.date():
+                yesterday = now.date() - timedelta(days=1)
+                send_daily_report(yesterday)
+                last_sent_date = now.date()
+        except Exception as e:
+            print(f"Kunlik hisobot xatosi: {e}")
+        time.sleep(30)
+
 # ---------- ishga tushirish ----------
 
 def run_bot_polling():
@@ -859,6 +1003,7 @@ def run_bot_polling():
 
 if __name__ == "__main__":
     threading.Thread(target=run_bot_polling, daemon=True).start()
+    threading.Thread(target=daily_report_scheduler, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
     print(f"Mini App server {port}-portda ishga tushdi, bot polling fonda ishlayapti...")
     app.run(host="0.0.0.0", port=port)
