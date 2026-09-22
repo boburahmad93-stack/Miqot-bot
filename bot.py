@@ -127,8 +127,34 @@ def remove_admin_id(rem_id):
     settings["admin_ids"] = list(ids)
     save_settings(settings)
 
+def load_staff_ids():
+    settings = load_settings()
+    return set(settings.get("staff_ids", []))
+
+def add_staff_id(new_id):
+    settings = load_settings()
+    ids = set(settings.get("staff_ids", []))
+    ids.add(new_id)
+    settings["staff_ids"] = list(ids)
+    save_settings(settings)
+
+def remove_staff_id(rem_id):
+    settings = load_settings()
+    ids = set(settings.get("staff_ids", []))
+    ids.discard(rem_id)
+    settings["staff_ids"] = list(ids)
+    save_settings(settings)
+
 def is_owner(chat_id):
+    """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
     return chat_id in load_admin_ids()
+
+def is_staff_or_admin(chat_id):
+    """Xodim yoki admin — buyurtma xabarini oladi, holatini o'zgartira oladi."""
+    return chat_id in load_admin_ids() or chat_id in load_staff_ids()
+
+def notify_recipients():
+    return load_admin_ids() | load_staff_ids()
 
 def fmt_sum(n):
     return f"{n:,.0f} SAR".replace(",", " ")
@@ -170,7 +196,7 @@ def main_keyboard(user_id=None, username=None):
         params = f"uid={user_id}&uname={urllib.parse.quote(username or '')}&ts={ts}&sig={sig}&v={ts}"
         fresh_url = f"{WEBAPP_URL}?{params}"
         kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
-    kb.row(types.KeyboardButton("🛒 Savat"))
+    kb.row(types.KeyboardButton("💬 Biz bilan bog'lanish"))
     return kb
 
 # ---------- /start ----------
@@ -514,17 +540,17 @@ def notify_owner_new_order(order):
         f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {order['status']}"
     )
-    for admin_id in load_admin_ids():
+    for recipient_id in notify_recipients():
         try:
             if order.get("latitude") is not None:
-                bot.send_location(admin_id, order["latitude"], order["longitude"])
-            bot.send_message(admin_id, text, reply_markup=status_keyboard(order))
+                bot.send_location(recipient_id, order["latitude"], order["longitude"])
+            bot.send_message(recipient_id, text, reply_markup=status_keyboard(order))
         except Exception:
             pass
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
-    if not is_owner(call.message.chat.id):
+    if not is_staff_or_admin(call.message.chat.id):
         bot.answer_callback_query(call.id, "Ruxsat yo'q.")
         return
     _, order_id_str, new_status = call.data.split(":", 2)
@@ -597,8 +623,48 @@ def cmd_remove_admin(message):
 def cmd_list_admins(message):
     if not is_owner(message.chat.id):
         return
-    ids = load_admin_ids()
-    bot.send_message(message.chat.id, "Adminlar:\n" + "\n".join(str(i) for i in ids))
+    admins = load_admin_ids()
+    staff = load_staff_ids()
+    text = "To'liq adminlar (hammasini boshqara oladi):\n" + "\n".join(str(i) for i in admins)
+    if staff:
+        text += "\n\nXodimlar (faqat buyurtma xabari + holat o'zgartirish):\n" + "\n".join(str(i) for i in staff)
+    else:
+        text += "\n\nXodimlar: yo'q"
+    bot.send_message(message.chat.id, text)
+
+@bot.message_handler(commands=["add_staff"])
+def cmd_add_staff(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        new_id = int(message.text.split(" ", 1)[1].strip())
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /add_staff id\nMasalan: /add_staff 123456789\n"
+                                           "(ID ni bilish uchun @userinfobot dan foydalaning)")
+        return
+    add_staff_id(new_id)
+    bot.send_message(
+        message.chat.id,
+        f"✅ {new_id} endi xodim. U buyurtma xabarlarini oladi va holatini "
+        "(Tayyorlanmoqda/Yo'lda/Yetkazildi) o'zgartira oladi — lekin menyu, "
+        "narx, zaxira yoki adminlarni o'zgartira olmaydi."
+    )
+    try:
+        bot.send_message(new_id, "🎉 Siz Miqot Food botida xodim etib tayinlandingiz. Endi yangi buyurtmalar sizga ham keladi.")
+    except Exception:
+        pass
+
+@bot.message_handler(commands=["remove_staff"])
+def cmd_remove_staff(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        rem_id = int(message.text.split(" ", 1)[1].strip())
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /remove_staff id")
+        return
+    remove_staff_id(rem_id)
+    bot.send_message(message.chat.id, f"{rem_id} xodimlikdan olib tashlandi.")
 
 @bot.message_handler(commands=["menu"])
 def cmd_menu_admin(message):
@@ -632,7 +698,8 @@ def cmd_menu_admin(message):
         f"Kategoriya o'zgartirish: /set_category id Kategoriya (masalan: /set_category 1 Ovqatlar)\n"
         f"Kategoriyalar: {', '.join(CATEGORIES)}\n\n"
         "Hisobot: /report (bugungi), /yesterday_report (kechagi)\n"
-        "Admin qo'shish: /add_admin id | /remove_admin id | /admins"
+        "Admin qo'shish: /add_admin id | /remove_admin id | /admins\n"
+        "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id"
     )
 
 @bot.message_handler(commands=["set_category"])
@@ -995,6 +1062,58 @@ def daily_report_scheduler():
         except Exception as e:
             print(f"Kunlik hisobot xatosi: {e}")
         time.sleep(30)
+
+# ---------- mijoz bilan yozishish (support chat) ----------
+
+support_message_map = {}  # (admin_chat_id, message_id) -> mijoz_user_id
+
+@bot.message_handler(func=lambda m: m.text == "💬 Biz bilan bog'lanish")
+def handle_contact_button(message):
+    bot.send_message(
+        message.chat.id,
+        "✍️ Savolingiz yoki fikringizni shu yerga yozing — tez orada javob beramiz."
+    )
+
+@bot.message_handler(
+    func=lambda m: (
+        m.reply_to_message is not None
+        and is_staff_or_admin(m.from_user.id)
+        and (m.chat.id, m.reply_to_message.message_id) in support_message_map
+    )
+)
+def handle_admin_reply(message):
+    customer_id = support_message_map.get((message.chat.id, message.reply_to_message.message_id))
+    if not customer_id:
+        return
+    try:
+        bot.send_message(customer_id, f"💬 Miqot Food'dan javob:\n{message.text}")
+        bot.send_message(message.chat.id, "✅ Javobingiz mijozga yuborildi.")
+    except Exception:
+        bot.send_message(message.chat.id, "❌ Yuborib bo'lmadi — mijoz botni bloklagan bo'lishi mumkin.")
+
+@bot.message_handler(
+    func=lambda m: (
+        m.content_type == "text"
+        and not m.text.startswith("/")
+        and m.from_user.id not in checkout_state
+        and not is_staff_or_admin(m.from_user.id)
+        and m.text != "💬 Biz bilan bog'lanish"
+    )
+)
+def handle_customer_free_text(message):
+    sender = message.from_user
+    label = f"{sender.first_name or ''} (@{sender.username})" if sender.username else (sender.first_name or "Mijoz")
+    forward_text = (
+        f"📩 Mijozdan xabar\n👤 {label} (ID: {sender.id})\n\n{message.text}\n\n"
+        "↩️ Javob berish uchun shu xabarga \"Reply\" qiling."
+    )
+    for recipient_id in notify_recipients():
+        try:
+            sent = bot.send_message(recipient_id, forward_text)
+            support_message_map[(recipient_id, sent.message_id)] = sender.id
+        except Exception:
+            pass
+    bot.send_message(message.chat.id, "✅ Xabaringiz qabul qilindi, tez orada javob beramiz.")
 
 # ---------- ishga tushirish ----------
 
