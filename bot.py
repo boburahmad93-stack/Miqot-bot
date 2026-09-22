@@ -84,6 +84,21 @@ def save_settings(s):
 def next_order_id(orders):
     return (max([o["id"] for o in orders], default=0)) + 1
 
+def today_key(ts=None):
+    dt = datetime.fromtimestamp(ts, TIMEZONE) if ts else datetime.now(TIMEZONE)
+    return dt.strftime("%Y-%m-%d")
+
+def next_daily_number(orders, day_key):
+    same_day = [o for o in orders if o.get("day_key") == day_key]
+    return len(same_day) + 1
+
+def renumber_day(orders, day_key):
+    """day_key kuniga tegishli buyurtmalarni 1,2,3... qilib qayta raqamlaydi (bo'shliqsiz)."""
+    same_day = [o for o in orders if o.get("day_key") == day_key]
+    same_day.sort(key=lambda o: o["id"])
+    for i, o in enumerate(same_day, start=1):
+        o["daily_number"] = i
+
 carts = {}
 checkout_state = {}
 
@@ -441,12 +456,7 @@ def handle_checkout_steps(message):
             )
             return
         carts[user_id] = {}
-        bot.send_message(
-            message.chat.id,
-            f"✅ Buyurtmangiz qabul qilindi!\nJami: {fmt_sum(order['total'])}\n"
-            f"To'lov: yetkazib berilganda naqd.\nTez orada siz bilan bog'lanamiz.",
-            reply_markup=main_keyboard(message.from_user.id, message.from_user.username)
-        )
+        # Chek create_order ichida avtomatik mijozga yuboriladi — bu yerda qayta yuborish shart emas.
         return
 
 # ---------- buyurtma yaratish (chat va Mini App uchun umumiy) ----------
@@ -483,8 +493,12 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     save_menu(full_menu)
 
     orders = load_orders()
+    created_at = int(time.time())
+    day_key = today_key(created_at)
     order = {
         "id": next_order_id(orders),
+        "day_key": day_key,
+        "daily_number": next_daily_number(orders, day_key),
         "customer_name": customer_name,
         "phone": phone,
         "latitude": latitude,
@@ -495,7 +509,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
         "total": total,
         "status": "Yangi",
         "payment": "naqd",
-        "created_at": int(time.time()),
+        "created_at": created_at,
         "user_id": tg_user_id,
         "username": username,
     }
@@ -503,7 +517,28 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     save_orders(orders)
     if OWNER_CHAT_ID:
         notify_owner_new_order(order)
+    if tg_user_id:
+        try:
+            bot.send_message(
+                tg_user_id,
+                build_customer_receipt_text(order),
+                reply_markup=main_keyboard(tg_user_id, username)
+            )
+        except Exception:
+            pass
     return order, None
+
+def build_customer_receipt_text(order):
+    text = (
+        f"✅ Buyurtmangiz qabul qilindi! (#{order['daily_number']})\n\n"
+        f"{order_items_text(order)}\n\n"
+        f"💰 Jami: {fmt_sum(order['total'])} (naqd — yetkazib berilganda)\n"
+        f"{order_address_line(order)}\n"
+    )
+    if order.get("note"):
+        text += f"📝 {order['note']}\n"
+    text += "\nTez orada siz bilan bog'lanamiz. Holat o'zgarganda sizga xabar boradi."
+    return text
 
 def order_items_text(order):
     return "\n".join([f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}" for it in order["items"]])
@@ -531,7 +566,7 @@ def status_keyboard(order):
 
 def notify_owner_new_order(order):
     text = (
-        f"🆕 Yangi buyurtma #{order['id']}\n\n"
+        f"🆕 Yangi buyurtma #{order['daily_number']}\n\n"
         f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
         f"📞 {order['phone']}\n"
         f"{order_address_line(order)}\n"
@@ -564,7 +599,7 @@ def cb_update_status(call):
     save_orders(orders)
 
     text = (
-        f"📦 Buyurtma #{order['id']}\n\n"
+        f"📦 Buyurtma #{order['daily_number']}\n\n"
         f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
         f"📞 {order['phone']}\n"
         f"{order_address_line(order)}\n"
@@ -581,7 +616,7 @@ def cb_update_status(call):
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
     try:
-        bot.send_message(order["user_id"], f"Buyurtmangiz #{order['id']} holati: {new_status}")
+        bot.send_message(order["user_id"], f"Buyurtmangiz #{order['daily_number']} holati: {new_status}")
     except Exception:
         pass
 
@@ -602,7 +637,11 @@ def cmd_add_admin(message):
     try:
         bot.send_message(new_id, "🎉 Siz Miqot Food botiga admin etib tayinlandingiz. /menu yozib boshlang.")
     except Exception:
-        pass
+        bot.send_message(
+            message.chat.id,
+            f"⚠️ Diqqat: {new_id} ga xabar yuborib bo'lmadi — u hali botga /start bosmagan bo'lishi mumkin.\n"
+            "Unga botni ochib bir marta /start bosishni ayting, shundan keyin xabarlar keladi."
+        )
 
 @bot.message_handler(commands=["remove_admin"])
 def cmd_remove_admin(message):
@@ -652,7 +691,11 @@ def cmd_add_staff(message):
     try:
         bot.send_message(new_id, "🎉 Siz Miqot Food botida xodim etib tayinlandingiz. Endi yangi buyurtmalar sizga ham keladi.")
     except Exception:
-        pass
+        bot.send_message(
+            message.chat.id,
+            f"⚠️ Diqqat: {new_id} ga xabar yuborib bo'lmadi — u hali botga /start bosmagan bo'lishi mumkin.\n"
+            "Unga botni ochib bir marta /start bosishni ayting, shundan keyin buyurtma xabarlari keladi."
+        )
 
 @bot.message_handler(commands=["remove_staff"])
 def cmd_remove_staff(message):
@@ -699,7 +742,8 @@ def cmd_menu_admin(message):
         f"Kategoriyalar: {', '.join(CATEGORIES)}\n\n"
         "Hisobot: /report (bugungi), /yesterday_report (kechagi)\n"
         "Admin qo'shish: /add_admin id | /remove_admin id | /admins\n"
-        "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id"
+        "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id\n"
+        "Buyurtmani o'chirish (faqat bugungi): /delete_order kunlik_raqami"
     )
 
 @bot.message_handler(commands=["set_category"])
@@ -861,6 +905,30 @@ def cmd_remove_dish(message):
     save_menu(menu)
     bot.send_message(message.chat.id, f"#{dish_id} o'chirildi.")
 
+@bot.message_handler(commands=["delete_order"])
+def cmd_delete_order(message):
+    if not is_owner(message.chat.id):
+        return
+    try:
+        daily_number = int(message.text.split(" ", 1)[1].strip())
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /delete_order kunlik_raqami\nMasalan: /delete_order 3\n"
+                                           "(Faqat BUGUNGI buyurtmalar uchun ishlaydi)")
+        return
+    orders = load_orders()
+    day_key = today_key()
+    target = next((o for o in orders if o.get("day_key") == day_key and o.get("daily_number") == daily_number), None)
+    if not target:
+        bot.send_message(message.chat.id, f"Bugungi buyurtmalar orasida #{daily_number} topilmadi.")
+        return
+    orders = [o for o in orders if o["id"] != target["id"]]
+    renumber_day(orders, day_key)
+    save_orders(orders)
+    bot.send_message(
+        message.chat.id,
+        f"🗑 Buyurtma #{daily_number} o'chirildi. Qolgan bugungi buyurtmalar qayta raqamlandi — bo'shliq qolmadi."
+    )
+
 # ================= MINI APP (Flask) =================
 
 def validate_init_data(init_data):
@@ -988,7 +1056,7 @@ def api_order():
     )
     if error:
         return jsonify({"error": error}), 409
-    return jsonify({"ok": True, "order_id": order["id"], "total": order["total"]})
+    return jsonify({"ok": True, "order_id": order["daily_number"], "total": order["total"]})
 
 # ---------- kunlik hisobot ----------
 
