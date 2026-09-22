@@ -34,12 +34,22 @@
   h1,h2,h3{font-family:'Poppins',sans-serif;margin:0;}
 
   .hero{
+    position:relative;overflow:hidden;
     padding:32px 18px 24px;text-align:center;
     background:
       radial-gradient(ellipse 600px 380px at 50% -60px, rgba(227,179,74,0.22), transparent 70%),
       linear-gradient(180deg, var(--card) 0%, var(--bg) 100%);
     border-bottom:1px solid var(--line);
   }
+  .hero::before{
+    content:'';
+    position:absolute;inset:0;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%23e3b34a' stroke-width='1'%3E%3Cpath d='M32 2 L62 32 L32 62 L2 32 Z'/%3E%3Cpath d='M32 18 L46 32 L32 46 L18 32 Z'/%3E%3C/g%3E%3C/svg%3E");
+    background-size:64px 64px;
+    opacity:0.14;
+    pointer-events:none;
+  }
+  .hero-inner{position:relative;z-index:1;}
   #logo-slot{margin:0 auto 16px;display:flex;justify-content:center;}
   #logo-slot img.logo{
     width:128px;height:128px;border-radius:26px;object-fit:cover;
