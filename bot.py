@@ -565,23 +565,33 @@ def status_keyboard(order):
     return kb
 
 def notify_owner_new_order(order):
-    text = (
-        f"🆕 Yangi buyurtma #{order['daily_number']}\n\n"
-        f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
-        f"📞 {order['phone']}\n"
-        f"{order_address_line(order)}\n"
-        + (f"📝 {order['note']}\n" if order.get('note') else "")
-        + f"\n{order_items_text(order)}\n\n"
-        f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
-        f"Holat: {order['status']}"
-    )
+    try:
+        text = (
+            f"🆕 Yangi buyurtma #{order['daily_number']}\n\n"
+            f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
+            f"📞 {order['phone']}\n"
+            f"{order_address_line(order)}\n"
+            + (f"📝 {order['note']}\n" if order.get('note') else "")
+            + f"\n{order_items_text(order)}\n\n"
+            f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
+            f"Holat: {order['status']}"
+        )
+        kb = status_keyboard(order)
+    except Exception as e:
+        print(f"Buyurtma matnini tuzishda xato: {e}")
+        text = f"🆕 Yangi buyurtma #{order.get('daily_number', order.get('id', '?'))} — {fmt_sum(order.get('total', 0))}. Tafsilot chiqarishda xato bo'ldi, /report bilan tekshiring."
+        kb = None
+
     for recipient_id in notify_recipients():
-        try:
-            if order.get("latitude") is not None:
+        if order.get("latitude") is not None:
+            try:
                 bot.send_location(recipient_id, order["latitude"], order["longitude"])
-            bot.send_message(recipient_id, text, reply_markup=status_keyboard(order))
-        except Exception:
-            pass
+            except Exception as e:
+                print(f"Joylashuv yuborishda xato ({recipient_id}): {e}")
+        try:
+            bot.send_message(recipient_id, text, reply_markup=kb)
+        except Exception as e:
+            print(f"Buyurtma matnini yuborishda xato ({recipient_id}): {e}")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
