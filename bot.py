@@ -553,14 +553,14 @@ def order_contact_line(order):
         return f"@{order['username']}"
     return "username yo'q"
 
-def status_keyboard(order):
+def status_keyboard(order, include_contact=True):
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
         types.InlineKeyboardButton("👨‍🍳 Tayyorlanmoqda", callback_data=f"status:{order['id']}:Tayyorlanmoqda"),
         types.InlineKeyboardButton("🚴 Yo'lda", callback_data=f"status:{order['id']}:Yo'lda"),
     )
     kb.add(types.InlineKeyboardButton("✅ Yetkazildi", callback_data=f"status:{order['id']}:Yetkazildi"))
-    if order.get("user_id"):
+    if include_contact and order.get("user_id"):
         kb.add(types.InlineKeyboardButton("✉️ Mijozga yozish", url=f"tg://user?id={order['user_id']}"))
     return kb
 
@@ -592,6 +592,12 @@ def notify_owner_new_order(order):
             bot.send_message(recipient_id, text, reply_markup=kb)
         except Exception as e:
             print(f"Buyurtma matnini yuborishda xato ({recipient_id}): {e}")
+            if "BUTTON_USER_PRIVACY_RESTRICTED" in str(e):
+                try:
+                    fallback_kb = status_keyboard(order, include_contact=False) if kb is not None else None
+                    bot.send_message(recipient_id, text, reply_markup=fallback_kb)
+                except Exception as e2:
+                    print(f"Qayta urinishda ham xato ({recipient_id}): {e2}")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -621,8 +627,14 @@ def cb_update_status(call):
     try:
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
                                reply_markup=status_keyboard(order))
-    except Exception:
-        pass
+    except Exception as e:
+        if "BUTTON_USER_PRIVACY_RESTRICTED" in str(e):
+            try:
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
+                                       reply_markup=status_keyboard(order, include_contact=False))
+            except Exception:
+                pass
+        # boshqa xatolar (masalan matn o'zgarmagan) e'tiborsiz qoldiriladi
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
     try:
