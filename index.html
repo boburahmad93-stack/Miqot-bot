@@ -7,7 +7,8 @@
 <meta name="theme-color" content="#0a1230">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0a1230;
@@ -20,149 +21,205 @@
     --accent-soft:#241d0e;
     --line:#25305c;
     --shadow: 0 10px 24px rgba(0,0,0,0.35);
-    --radius:20px;
+    --radius:16px;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;background:var(--bg);color:var(--ink);
     font-family:'Inter',sans-serif;
-    padding-bottom:96px;
+    padding-bottom:104px;
     -webkit-tap-highlight-color:transparent;
     background-image:
       radial-gradient(ellipse 900px 500px at 50% -80px, rgba(227,179,74,0.12), transparent 70%);
   }
   h1,h2,h3{font-family:'Poppins',sans-serif;margin:0;}
 
+  /* ---------- hero ---------- */
   .hero{
     position:relative;overflow:hidden;
-    padding:32px 18px 24px;text-align:center;
+    padding:26px 18px 20px;text-align:center;
     background:
       radial-gradient(ellipse 600px 380px at 50% -60px, rgba(227,179,74,0.22), transparent 70%),
       linear-gradient(180deg, var(--card) 0%, var(--bg) 100%);
     border-bottom:1px solid var(--line);
   }
   .hero::before{
-    content:'';
-    position:absolute;inset:0;
+    content:'';position:absolute;inset:0;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%23e3b34a' stroke-width='1'%3E%3Cpath d='M32 2 L62 32 L32 62 L2 32 Z'/%3E%3Cpath d='M32 18 L46 32 L32 46 L18 32 Z'/%3E%3C/g%3E%3C/svg%3E");
-    background-size:64px 64px;
-    opacity:0.14;
-    pointer-events:none;
+    background-size:64px 64px;opacity:0.14;pointer-events:none;
   }
   .hero-inner{position:relative;z-index:1;}
-  #logo-slot{margin:0 auto 16px;display:flex;justify-content:center;}
+  #logo-slot{margin:0 auto 14px;display:flex;justify-content:center;}
   #logo-slot img.logo{
-    width:128px;height:128px;border-radius:26px;object-fit:cover;
+    width:104px;height:104px;border-radius:24px;object-fit:cover;
     box-shadow:0 14px 34px rgba(0,0,0,0.5), 0 0 0 1px rgba(227,179,74,0.25);
   }
   #logo-slot .logo-fallback{
-    width:128px;height:128px;border-radius:26px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-size:52px;
+    width:104px;height:104px;border-radius:24px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:44px;
     box-shadow:0 14px 34px rgba(0,0,0,0.5);
   }
-  .hero h1{
-    font-size:23px;font-weight:700;letter-spacing:1.5px;color:var(--ink);
-    text-transform:uppercase;
-  }
-  .hero p{margin:6px 0 0;font-size:13px;color:var(--accent1);font-weight:600;letter-spacing:0.3px;}
+  .hero h1{font-size:21px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;}
+  .hero p{margin:6px 0 0;font-size:12.5px;color:var(--accent1);font-weight:600;letter-spacing:0.3px;}
 
-  .welcome-bubble{
-    margin:16px 18px;padding:14px 16px;background:var(--card);border:1px solid var(--line);
-    border-radius:16px;font-size:13px;line-height:1.6;color:var(--ink-soft);
+  /* ---------- sticky qidiruv + kategoriya ---------- */
+  .sticky-bar{
+    position:sticky;top:0;z-index:30;
+    background:rgba(10,18,48,0.92);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+    padding:10px 0 8px;
   }
-  .welcome-bubble span{color:var(--accent1);font-weight:700;}
+  .search-wrap{position:relative;padding:0 14px 8px;}
+  .search-wrap .si{
+    position:absolute;left:26px;top:50%;transform:translateY(-58%);
+    font-size:14px;opacity:0.55;pointer-events:none;
+  }
+  #search-input{
+    width:100%;padding:10px 36px 10px 34px;border-radius:12px;
+    border:1.5px solid var(--line);background:var(--card-2);
+    color:var(--ink);font-size:14px;font-family:'Inter',sans-serif;
+  }
+  #search-input::placeholder{color:var(--ink-soft);}
+  #search-input:focus{outline:none;border-color:var(--accent1);}
+  #search-clear{
+    position:absolute;right:22px;top:50%;transform:translateY(-58%);
+    width:22px;height:22px;border-radius:50%;border:none;display:none;
+    background:var(--line);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;
+  }
+  #search-clear.show{display:block;}
 
-  .category-section{margin-bottom:26px;}
-  .category-header{
-    display:flex;align-items:flex-start;justify-content:space-between;padding:2px 18px 14px;
+  .chips{
+    display:flex;gap:8px;overflow-x:auto;padding:0 14px 2px;
+    scrollbar-width:none;-ms-overflow-style:none;
   }
-  .category-header .ch-left{display:flex;align-items:center;gap:10px;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:none;padding:7px 13px;border-radius:999px;border:1px solid var(--line);
+    background:var(--card);color:var(--ink-soft);
+    font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;
+    transition:background 0.18s, color 0.18s, border-color 0.18s;
+  }
+  .chip.active{
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));
+    color:#1a1305;border-color:transparent;
+    box-shadow:0 4px 12px rgba(227,179,74,0.28);
+  }
+
+  /* ---------- kategoriya sarlavhasi ---------- */
+  .category-section{margin-bottom:22px;scroll-margin-top:104px;}
+  .category-header{display:flex;align-items:center;gap:9px;padding:16px 16px 12px;}
   .category-header .cat-emoji{
-    font-size:18px;width:36px;height:36px;border-radius:11px;flex-shrink:0;
+    font-size:16px;width:32px;height:32px;border-radius:10px;flex-shrink:0;
     background:var(--accent-soft);display:flex;align-items:center;justify-content:center;
   }
-  .category-header h2{
-    font-family:'Poppins',sans-serif;font-size:15.5px;font-weight:700;color:var(--ink);
-    letter-spacing:0.2px;
-  }
-  .category-header .ch-sub{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .category-header h2{font-size:14.5px;font-weight:700;letter-spacing:0.2px;}
+  .category-header .ch-sub{font-size:10.5px;color:var(--ink-soft);margin-top:1px;}
 
-  .grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 18px;
-  }
+  /* ---------- 3 ustunli katak ---------- */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 14px;}
   .dish-card{
     background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
     overflow:hidden;display:flex;flex-direction:column;position:relative;
+    border:1px solid rgba(255,255,255,0.03);
   }
-  .dish-photo{width:100%;aspect-ratio:1/1;object-fit:cover;background:var(--accent-soft);}
+  .ph-wrap{
+    position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;
+    background:var(--card-2);
+  }
+  .ph-wrap::after{
+    content:'';position:absolute;inset:0;
+    background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,0.05) 45%,transparent 70%);
+    background-size:220% 100%;animation:shimmer 1.4s infinite linear;
+  }
+  .ph-wrap.loaded::after{display:none;}
+  @keyframes shimmer{ from{background-position:180% 0;} to{background-position:-60% 0;} }
+  .dish-photo{
+    width:100%;height:100%;object-fit:cover;display:block;
+    opacity:0;transition:opacity 0.35s ease;position:relative;z-index:1;
+  }
+  .dish-photo.in{opacity:1;}
   .dish-photo-fallback{
-    width:100%;aspect-ratio:1/1;background:var(--accent-soft);display:flex;align-items:center;
-    justify-content:center;font-size:34px;
+    width:100%;height:100%;background:var(--accent-soft);
+    display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;z-index:1;
   }
-  .dish-info{padding:10px 12px 12px;}
-  .dish-name{font-size:13.5px;font-weight:600;line-height:1.25;margin-bottom:2px;}
-  .dish-desc{font-size:11px;color:var(--ink-soft);margin-bottom:8px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
-  .dish-bottom{display:flex;align-items:center;justify-content:space-between;}
-  .dish-price{font-weight:700;font-size:14px;}
+  .dish-info{padding:8px 8px 9px;display:flex;flex-direction:column;flex:1;}
+  .dish-name{
+    font-size:11.5px;font-weight:600;line-height:1.3;margin-bottom:3px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    min-height:30px;
+  }
+  .stock-note{font-size:9.5px;color:#ff8a65;font-weight:600;margin-bottom:3px;}
+  .dish-price{font-weight:700;font-size:12.5px;margin-bottom:7px;}
+  .dish-ctl{margin-top:auto;}
   .add-btn{
-    width:30px;height:30px;border-radius:50%;border:none;
+    width:100%;height:28px;border-radius:9px;border:none;
     background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;
-    font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;
-    box-shadow:0 4px 10px rgba(227,179,74,0.35);
+    font-size:12px;font-weight:700;font-family:'Inter',sans-serif;
+    cursor:pointer;box-shadow:0 4px 10px rgba(227,179,74,0.3);
   }
+  .add-btn:active{transform:scale(0.96);}
   .qty-pill{
-    display:flex;align-items:center;gap:8px;background:var(--accent-soft);border-radius:999px;padding:3px 6px;
+    display:flex;align-items:center;justify-content:space-between;
+    background:var(--accent-soft);border-radius:9px;padding:3px;height:28px;
   }
   .qty-pill button{
-    width:24px;height:24px;border-radius:50%;border:none;background:#fff;color:var(--accent2);
-    font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,0.08);
+    width:22px;height:22px;border-radius:7px;border:none;background:var(--accent1);color:#1a1305;
+    font-size:14px;font-weight:700;line-height:1;cursor:pointer;
   }
-  .qty-pill span{font-size:13px;font-weight:600;min-width:14px;text-align:center;}
-  .qty-pill button:disabled{opacity:0.35;cursor:not-allowed;}
+  .qty-pill button:disabled{opacity:0.3;cursor:not-allowed;}
+  .qty-pill span{font-size:12.5px;font-weight:700;}
 
-  .dish-card.sold-out{opacity:0.55;}
+  .dish-card.sold-out{opacity:0.5;}
   .dish-card.sold-out .dish-photo,.dish-card.sold-out .dish-photo-fallback{filter:grayscale(1);}
   .sold-out-badge{
-    background:var(--ink-soft);color:#fff;font-size:11px;font-weight:700;
-    padding:5px 10px;border-radius:999px;
+    display:block;text-align:center;background:var(--line);color:var(--ink-soft);
+    font-size:10.5px;font-weight:700;padding:7px 0;border-radius:9px;
   }
-  .stock-note{font-size:10.5px;color:#ff8a65;font-weight:600;margin-bottom:4px;}
 
-  .empty-state{padding:60px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
+  .empty-state{padding:56px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
 
-  /* floating cart bar */
+  /* ---------- suzuvchi savat ---------- */
   .cart-bar{
     position:fixed;left:16px;right:16px;bottom:16px;
-    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;border-radius:18px;
-    padding:14px 18px;display:none;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;border-radius:16px;
+    padding:13px 18px;display:none;align-items:center;justify-content:space-between;
     box-shadow:0 12px 30px rgba(0,0,0,0.45);z-index:40;cursor:pointer;
   }
-  .cart-bar.show{display:flex;}
-  .cart-bar .cb-left{font-size:13px;opacity:0.8;}
+  .cart-bar.show{display:flex;animation:pop 0.28s cubic-bezier(.2,1.3,.5,1);}
+  @keyframes pop{ from{transform:translateY(16px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .cart-bar .cb-left{font-size:13px;font-weight:600;opacity:0.85;}
   .cart-bar .cb-total{font-weight:700;font-size:16px;}
 
-  /* sheet (savat / checkout) */
-  .sheet-overlay{
-    position:fixed;inset:0;background:rgba(30,20,15,0.45);display:none;z-index:50;
-  }
+  /* ---------- sheet ---------- */
+  .sheet-overlay{position:fixed;inset:0;background:rgba(5,8,22,0.6);display:none;z-index:50;}
   .sheet-overlay.show{display:block;}
   .sheet{
     position:fixed;left:0;right:0;bottom:0;background:var(--bg);
-    border-radius:24px 24px 0 0;padding:20px 18px 24px;max-height:85vh;overflow-y:auto;
-    z-index:51;transform:translateY(100%);transition:transform 0.25s ease;
+    border-radius:22px 22px 0 0;padding:18px 18px 24px;max-height:86vh;overflow-y:auto;
+    z-index:51;transform:translateY(100%);transition:transform 0.28s cubic-bezier(.3,.9,.3,1);
+    border-top:1px solid var(--line);
   }
   .sheet.show{transform:translateY(0);}
   .sheet-handle{width:40px;height:4px;background:var(--line);border-radius:99px;margin:0 auto 14px;}
   .sheet h2{font-size:17px;margin-bottom:14px;}
 
   .cart-line{
-    display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);
   }
-  .cart-line:last-child{border-bottom:none;}
+  .cart-line:last-of-type{border-bottom:none;}
+  .cart-line .cl-main{flex:1;min-width:0;}
   .cl-name{font-size:13.5px;font-weight:600;}
-  .cl-sub{font-size:11.5px;color:var(--ink-soft);}
-  .cart-total-row{display:flex;justify-content:space-between;font-weight:700;font-size:16px;padding-top:12px;margin-top:6px;}
+  .cl-sub{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .cl-amt{font-size:13.5px;font-weight:700;white-space:nowrap;}
+  .cl-qty{display:flex;align-items:center;gap:7px;background:var(--card);border-radius:10px;padding:4px;}
+  .cl-qty button{
+    width:25px;height:25px;border-radius:8px;border:none;background:var(--accent1);color:#1a1305;
+    font-size:15px;font-weight:700;line-height:1;cursor:pointer;
+  }
+  .cl-qty button:disabled{opacity:0.3;}
+  .cl-qty span{font-size:13px;font-weight:700;min-width:14px;text-align:center;}
+  .cart-total-row{display:flex;justify-content:space-between;font-weight:700;font-size:16px;padding-top:14px;margin-top:6px;border-top:1px solid var(--line);}
 
   .primary-btn{
     width:100%;padding:14px 0;border-radius:14px;border:none;
@@ -170,6 +227,7 @@
     font-weight:700;font-size:14.5px;cursor:pointer;font-family:'Inter',sans-serif;margin-top:14px;
     box-shadow:0 8px 20px rgba(227,179,74,0.3);
   }
+  .primary-btn:disabled{opacity:0.6;}
   .ghost-btn{
     width:100%;padding:12px 0;border-radius:14px;border:1.5px solid var(--line);background:transparent;
     color:var(--ink-soft);font-weight:600;font-size:13.5px;cursor:pointer;margin-top:8px;
@@ -184,11 +242,10 @@
   input:focus,textarea:focus{outline:none;border-color:var(--accent1);}
   .loc-btn{
     width:100%;padding:11px 0;border-radius:12px;border:1.5px dashed var(--accent1);
-    background:var(--accent-soft);color:var(--accent2);font-weight:600;font-size:13.5px;
+    background:var(--accent-soft);color:var(--accent1);font-weight:600;font-size:13.5px;
     cursor:pointer;margin-top:6px;
   }
   .loc-status{font-size:12px;color:var(--ink-soft);margin-top:6px;}
-
   .confirm{text-align:center;padding:20px 0;}
   .confirm .big{font-size:44px;margin-bottom:8px;}
 </style>
@@ -203,9 +260,13 @@
   </div>
 </div>
 
-<div class="welcome-bubble">
-  👋 Assalomu alaykum! <span id="business-name-2">Miqot Food</span> botiga xush kelibsiz!<br>
-  Biz sizga eng mazali va sifatli taomlarni o'z vaqtida yetkazib beramiz.
+<div class="sticky-bar" id="sticky-bar">
+  <div class="search-wrap">
+    <span class="si">🔍</span>
+    <input type="text" id="search-input" placeholder="Taom qidirish..." autocomplete="off">
+    <button id="search-clear" aria-label="Tozalash">✕</button>
+  </div>
+  <div class="chips" id="chips"></div>
 </div>
 
 <div id="menu-sections"></div>
@@ -215,7 +276,7 @@
   <div class="cb-total" id="cart-bar-total">0 SAR</div>
 </div>
 
-<!-- SAVAT SHEET -->
+<!-- SAVAT -->
 <div class="sheet-overlay" id="cart-overlay"></div>
 <div class="sheet" id="cart-sheet">
   <div class="sheet-handle"></div>
@@ -226,7 +287,7 @@
   <button class="ghost-btn" id="close-cart-btn">Yopish</button>
 </div>
 
-<!-- CHECKOUT SHEET -->
+<!-- CHECKOUT -->
 <div class="sheet-overlay" id="checkout-overlay"></div>
 <div class="sheet" id="checkout-sheet">
   <div class="sheet-handle"></div>
@@ -245,7 +306,7 @@
   <button class="primary-btn" id="submit-order-btn">Buyurtmani tasdiqlash</button>
 </div>
 
-<!-- CONFIRM SHEET -->
+<!-- TASDIQ -->
 <div class="sheet-overlay" id="confirm-overlay"></div>
 <div class="sheet" id="confirm-sheet">
   <div class="sheet-handle"></div>
@@ -261,7 +322,7 @@
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
-// Bot o'zi imzolab bergan foydalanuvchi ma'lumoti (Telegram initData ishlamasa ham ishonchli)
+// Bot o'zi imzolab bergan foydalanuvchi ma'lumoti
 const urlParams = new URLSearchParams(window.location.search);
 const signedUser = {
   uid: urlParams.get('uid'),
@@ -273,10 +334,16 @@ const signedUser = {
 let menu = [];
 let categories = [];
 let categoryEmoji = {};
-let cart = {}; // id -> qty
+let cart = {};            // id -> qty
 let userLocation = null;
+let searchQuery = '';
+let spy = null;
 
+const $ = (id) => document.getElementById(id);
 function fmtSar(n){ return Math.round(n).toLocaleString('en-US') + " SAR"; }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function haptic(kind){ try{ if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(kind || 'light'); }catch(e){} }
+function slug(cat){ return 'cat-' + cat.replace(/[^a-zA-Z0-9]/g, '-'); }
 
 async function loadMenu(){
   try{
@@ -285,98 +352,177 @@ async function loadMenu(){
     menu = data.menu || [];
     categories = data.categories || [];
     categoryEmoji = data.category_emoji || {};
-    document.getElementById('business-name').textContent = data.business_name || "Uy oshxonasi";
-    document.getElementById('business-name-2').textContent = data.business_name || "Uy oshxonasi";
-    document.getElementById('business-tagline').textContent = data.tagline || "Taom tanlang va buyurtma bering";
-    const logoSlot = document.getElementById('logo-slot');
-    if(data.logo_url){
-      logoSlot.innerHTML = `<img class="logo" src="${data.logo_url}" alt="logo">`;
-    }else{
-      logoSlot.innerHTML = `<div class="logo-fallback">🍽️</div>`;
-    }
+    $('business-name').textContent = data.business_name || "Uy oshxonasi";
+    $('business-tagline').textContent = data.tagline || "Taom tanlang va buyurtma bering";
+    const logoSlot = $('logo-slot');
+    logoSlot.innerHTML = data.logo_url
+      ? '<img class="logo" src="' + esc(data.logo_url) + '" alt="logo">'
+      : '<div class="logo-fallback">🍽️</div>';
+    renderChips();
     renderMenu();
   }catch(e){
-    document.getElementById('menu-sections').innerHTML = '<div class="empty-state">Menyuni yuklab bo\'lmadi.</div>';
+    $('menu-sections').innerHTML = '<div class="empty-state">Menyuni yuklab bo\'lmadi.<br>Qaytadan urinib ko\'ring.</div>';
   }
 }
 
+/* ---------- kategoriya tugmalari ---------- */
+function activeCategories(){
+  return (categories.length ? categories : [...new Set(menu.map(d => d.category))])
+    .filter(cat => menu.some(d => d.category === cat));
+}
+
+function renderChips(){
+  const box = $('chips');
+  box.innerHTML = '';
+  activeCategories().forEach((cat, i) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (i === 0 ? ' active' : '');
+    b.dataset.cat = cat;
+    b.textContent = (categoryEmoji[cat] || '🍽') + ' ' + cat;
+    b.addEventListener('click', () => {
+      haptic('light');
+      const sec = $(slug(cat));
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    box.appendChild(b);
+  });
+}
+
+function setActiveChip(cat){
+  document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+  const el = document.querySelector('.chip.active');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+}
+
+function setupScrollSpy(){
+  if (spy) spy.disconnect();
+  if (searchQuery) return;
+  spy = new IntersectionObserver((entries) => {
+    entries.forEach(en => { if (en.isIntersecting) setActiveChip(en.target.dataset.cat); });
+  }, { rootMargin: '-110px 0px -70% 0px', threshold: 0 });
+  document.querySelectorAll('.category-section').forEach(s => spy.observe(s));
+}
+
+/* ---------- taom kartochkasi ---------- */
 function dishCardHtml(dish){
   const qty = cart[dish.id] || 0;
   const stock = (dish.stock === null || dish.stock === undefined) ? null : dish.stock;
   const soldOut = stock !== null && stock <= 0;
+
   const photoHtml = dish.photo_url
-    ? `<img class="dish-photo" src="${dish.photo_url}" alt="${dish.name}">`
-    : `<div class="dish-photo-fallback">🍲</div>`;
-  let bottomHtml;
-  if(soldOut){
-    bottomHtml = `<span class="sold-out-badge">Tugadi</span>`;
-  }else if(qty > 0){
-    const canAddMore = stock === null || qty < stock;
-    bottomHtml = `<div class="qty-pill">
-         <button data-act="dec" data-id="${dish.id}">−</button>
-         <span>${qty}</span>
-         <button data-act="inc" data-id="${dish.id}" ${canAddMore ? '' : 'disabled'}>+</button>
-       </div>`;
-  }else{
-    bottomHtml = `<button class="add-btn" data-act="inc" data-id="${dish.id}">→</button>`;
+    ? '<div class="ph-wrap"><img class="dish-photo" src="' + esc(dish.photo_url) + '" alt="' + esc(dish.name) + '"' +
+      ' loading="lazy" decoding="async"' +
+      ' onload="this.classList.add(\'in\');this.parentNode.classList.add(\'loaded\')"' +
+      ' onerror="this.parentNode.classList.add(\'loaded\')"></div>'
+    : '<div class="ph-wrap loaded"><div class="dish-photo-fallback">🍲</div></div>';
+
+  let ctl;
+  if (soldOut){
+    ctl = '<span class="sold-out-badge">Tugadi</span>';
+  } else if (qty > 0){
+    const canAdd = stock === null || qty < stock;
+    ctl = '<div class="qty-pill">' +
+            '<button data-act="dec" data-id="' + dish.id + '">−</button>' +
+            '<span>' + qty + '</span>' +
+            '<button data-act="inc" data-id="' + dish.id + '"' + (canAdd ? '' : ' disabled') + '>+</button>' +
+          '</div>';
+  } else {
+    ctl = '<button class="add-btn" data-act="inc" data-id="' + dish.id + '">Qo\'shish</button>';
   }
-  const stockNote = (!soldOut && stock !== null && stock <= 5)
-    ? `<div class="stock-note">Oxirgi ${stock} dona</div>` : '';
-  return `<div class="dish-card${soldOut ? ' sold-out' : ''}">
-      ${photoHtml}
-      <div class="dish-info">
-        <div class="dish-name">${dish.name}</div>
-        ${dish.desc ? `<div class="dish-desc">${dish.desc}</div>` : '<div class="dish-desc">&nbsp;</div>'}
-        ${stockNote}
-        <div class="dish-bottom">
-          <div class="dish-price">${fmtSar(dish.price)}</div>
-          ${bottomHtml}
-        </div>
-      </div>
-    </div>`;
+
+  const note = (!soldOut && stock !== null && stock <= 5)
+    ? '<div class="stock-note">Oxirgi ' + stock + ' dona</div>' : '';
+
+  return '<div class="dish-card' + (soldOut ? ' sold-out' : '') + '">' +
+      photoHtml +
+      '<div class="dish-info">' +
+        '<div class="dish-name">' + esc(dish.name) + '</div>' +
+        note +
+        '<div class="dish-price">' + fmtSar(dish.price) + '</div>' +
+        '<div class="dish-ctl">' + ctl + '</div>' +
+      '</div>' +
+    '</div>';
 }
 
 function renderMenu(){
-  const container = document.getElementById('menu-sections');
-  if(menu.length === 0){
+  const container = $('menu-sections');
+
+  if (menu.length === 0){
     container.innerHTML = '<div class="empty-state">Menyu hozircha bo\'sh.</div>';
     return;
   }
-  const cats = categories.length ? categories : [...new Set(menu.map(d=>d.category))];
-  container.innerHTML = cats.map(cat=>{
-    const items = menu.filter(d=>d.category === cat);
-    if(items.length === 0) return '';
+
+  // qidiruv — hammasi bitta ro'yxatda
+  if (searchQuery){
+    const q = searchQuery.toLowerCase();
+    const found = menu.filter(d =>
+      (d.name || '').toLowerCase().includes(q) || (d.desc || '').toLowerCase().includes(q));
+    container.innerHTML = found.length
+      ? '<div class="category-section">' +
+          '<div class="category-header">' +
+            '<span class="cat-emoji">🔍</span>' +
+            '<div><h2>Qidiruv natijasi</h2><div class="ch-sub">' + found.length + ' ta taom topildi</div></div>' +
+          '</div>' +
+          '<div class="grid">' + found.map(dishCardHtml).join('') + '</div>' +
+        '</div>'
+      : '<div class="empty-state">«' + esc(searchQuery) + '» bo\'yicha hech narsa topilmadi.</div>';
+    bindDishButtons();
+    return;
+  }
+
+  container.innerHTML = activeCategories().map(cat => {
+    const items = menu.filter(d => d.category === cat);
     const emoji = categoryEmoji[cat] || '🍽';
-    return `<div class="category-section">
-        <div class="category-header">
-          <div class="ch-left">
-            <span class="cat-emoji">${emoji}</span>
-            <div><h2>${cat}</h2><div class="ch-sub">${items.length} ta taom</div></div>
-          </div>
-        </div>
-        <div class="grid">${items.map(dishCardHtml).join('')}</div>
-      </div>`;
+    return '<div class="category-section" id="' + slug(cat) + '" data-cat="' + esc(cat) + '">' +
+        '<div class="category-header">' +
+          '<span class="cat-emoji">' + emoji + '</span>' +
+          '<div><h2>' + esc(cat) + '</h2><div class="ch-sub">' + items.length + ' ta taom</div></div>' +
+        '</div>' +
+        '<div class="grid">' + items.map(dishCardHtml).join('') + '</div>' +
+      '</div>';
   }).join('');
 
-  container.querySelectorAll('[data-act]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      if(btn.disabled) return;
+  bindDishButtons();
+  setupScrollSpy();
+}
+
+function bindDishButtons(){
+  document.querySelectorAll('#menu-sections [data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
       const id = btn.getAttribute('data-id');
       const act = btn.getAttribute('data-act');
-      const dish = menu.find(d=>String(d.id)===String(id));
+      const dish = menu.find(d => String(d.id) === String(id));
       const cur = cart[id] || 0;
-      if(act === 'inc' && dish && dish.stock !== null && dish.stock !== undefined && cur + 1 > dish.stock){
-        notify(`"${dish.name}" uchun faqat ${dish.stock} dona qoldi.`);
+      if (act === 'inc' && dish && dish.stock !== null && dish.stock !== undefined && cur + 1 > dish.stock){
+        notify('"' + dish.name + '" uchun faqat ' + dish.stock + ' dona qoldi.');
         return;
       }
+      haptic('light');
       const next = act === 'inc' ? cur + 1 : Math.max(0, cur - 1);
-      if(next === 0) delete cart[id]; else cart[id] = next;
+      if (next === 0) delete cart[id]; else cart[id] = next;
+      const y = window.scrollY;
       renderMenu();
+      window.scrollTo(0, y);
       updateCartBar();
     });
   });
 }
 
+/* ---------- qidiruv ---------- */
+$('search-input').addEventListener('input', (e) => {
+  searchQuery = e.target.value.trim();
+  $('search-clear').classList.toggle('show', searchQuery.length > 0);
+  renderMenu();
+});
+$('search-clear').addEventListener('click', () => {
+  $('search-input').value = '';
+  searchQuery = '';
+  $('search-clear').classList.remove('show');
+  renderMenu();
+});
+
+/* ---------- savat ---------- */
 function cartCount(){ return Object.values(cart).reduce((s,q)=>s+q,0); }
 function cartTotal(){
   return Object.entries(cart).reduce((sum,[id,qty])=>{
@@ -384,62 +530,84 @@ function cartTotal(){
     return sum + (dish ? dish.price*qty : 0);
   },0);
 }
-
 function updateCartBar(){
   const count = cartCount();
-  document.getElementById('cart-count').textContent = count;
-  document.getElementById('cart-bar-total').textContent = fmtSar(cartTotal());
-  document.getElementById('cart-bar').classList.toggle('show', count > 0);
+  $('cart-count').textContent = count;
+  $('cart-bar-total').textContent = fmtSar(cartTotal());
+  $('cart-bar').classList.toggle('show', count > 0);
 }
 
 function openSheet(id){
-  document.getElementById(id + '-overlay').classList.add('show');
-  document.getElementById(id + '-sheet').classList.add('show');
+  $(id + '-overlay').classList.add('show');
+  $(id + '-sheet').classList.add('show');
 }
 function closeSheet(id){
-  document.getElementById(id + '-overlay').classList.remove('show');
-  document.getElementById(id + '-sheet').classList.remove('show');
+  $(id + '-overlay').classList.remove('show');
+  $(id + '-sheet').classList.remove('show');
 }
 
-document.getElementById('cart-bar').addEventListener('click', ()=>{
-  renderCartSheet();
-  openSheet('cart');
-});
-document.getElementById('cart-overlay').addEventListener('click', ()=>closeSheet('cart'));
-document.getElementById('close-cart-btn').addEventListener('click', ()=>closeSheet('cart'));
+$('cart-bar').addEventListener('click', ()=>{ haptic('medium'); renderCartSheet(); openSheet('cart'); });
+$('cart-overlay').addEventListener('click', ()=>closeSheet('cart'));
+$('close-cart-btn').addEventListener('click', ()=>closeSheet('cart'));
 
 function renderCartSheet(){
-  const linesEl = document.getElementById('cart-lines');
+  const linesEl = $('cart-lines');
   const entries = Object.entries(cart);
-  if(entries.length === 0){
+  if (entries.length === 0){
     linesEl.innerHTML = '<div class="loc-status">Savat bo\'sh.</div>';
-  }else{
+  } else {
     linesEl.innerHTML = entries.map(([id,qty])=>{
       const dish = menu.find(d=>String(d.id)===String(id));
-      if(!dish) return '';
-      return `<div class="cart-line">
-        <div><div class="cl-name">${dish.name}</div><div class="cl-sub">× ${qty}</div></div>
-        <div class="cl-name">${fmtSar(dish.price*qty)}</div>
-      </div>`;
+      if (!dish) return '';
+      const canAdd = dish.stock === null || dish.stock === undefined || qty < dish.stock;
+      return '<div class="cart-line">' +
+          '<div class="cl-main">' +
+            '<div class="cl-name">' + esc(dish.name) + '</div>' +
+            '<div class="cl-sub">' + fmtSar(dish.price) + ' / dona</div>' +
+          '</div>' +
+          '<div class="cl-qty">' +
+            '<button data-cact="dec" data-id="' + dish.id + '">−</button>' +
+            '<span>' + qty + '</span>' +
+            '<button data-cact="inc" data-id="' + dish.id + '"' + (canAdd ? '' : ' disabled') + '>+</button>' +
+          '</div>' +
+          '<div class="cl-amt">' + fmtSar(dish.price*qty) + '</div>' +
+        '</div>';
     }).join('');
+
+    linesEl.querySelectorAll('[data-cact]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        if (btn.disabled) return;
+        const id = btn.getAttribute('data-id');
+        const act = btn.getAttribute('data-cact');
+        const cur = cart[id] || 0;
+        const next = act === 'inc' ? cur + 1 : Math.max(0, cur - 1);
+        haptic('light');
+        if (next === 0) delete cart[id]; else cart[id] = next;
+        renderCartSheet();
+        updateCartBar();
+        renderMenu();
+        if (cartCount() === 0) closeSheet('cart');
+      });
+    });
   }
-  document.getElementById('cart-total-amt').textContent = fmtSar(cartTotal());
+  $('cart-total-amt').textContent = fmtSar(cartTotal());
 }
 
-document.getElementById('go-checkout-btn').addEventListener('click', ()=>{
-  if(cartCount() === 0) return;
+/* ---------- checkout ---------- */
+$('go-checkout-btn').addEventListener('click', ()=>{
+  if (cartCount() === 0) return;
   closeSheet('cart');
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
-  if(tgUser && tgUser.first_name){
-    document.getElementById('in-name').value = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
+  if (tgUser && tgUser.first_name && !$('in-name').value){
+    $('in-name').value = tgUser.first_name + (tgUser.last_name ? ' ' + tgUser.last_name : '');
   }
   openSheet('checkout');
 });
-document.getElementById('checkout-overlay').addEventListener('click', ()=>closeSheet('checkout'));
+$('checkout-overlay').addEventListener('click', ()=>closeSheet('checkout'));
 
-document.getElementById('get-location-btn').addEventListener('click', ()=>{
-  const statusEl = document.getElementById('loc-status');
-  if(!navigator.geolocation){
+$('get-location-btn').addEventListener('click', ()=>{
+  const statusEl = $('loc-status');
+  if (!navigator.geolocation){
     statusEl.textContent = "Bu qurilmada joylashuvni aniqlab bo'lmadi. Manzilni yozing.";
     return;
   }
@@ -447,42 +615,31 @@ document.getElementById('get-location-btn').addEventListener('click', ()=>{
   navigator.geolocation.getCurrentPosition(
     (pos)=>{
       userLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      statusEl.style.color = '';
       statusEl.textContent = "✅ Joylashuv aniqlandi.";
     },
-    ()=>{
-      statusEl.textContent = "Joylashuvga ruxsat berilmadi. Manzilni yozing.";
-    }
+    ()=>{ statusEl.textContent = "Joylashuvga ruxsat berilmadi. Manzilni yozing."; }
   );
 });
 
 function notify(msg){
-  const statusEl = document.getElementById('loc-status');
+  const statusEl = $('loc-status');
   statusEl.textContent = msg;
   statusEl.style.color = '#ff6b5b';
   statusEl.style.fontWeight = '600';
-  if(tg && tg.showAlert){ tg.showAlert(msg); }
-  else{ alert(msg); }
+  if (tg && tg.showAlert){ tg.showAlert(msg); } else { alert(msg); }
 }
 
-document.getElementById('submit-order-btn').addEventListener('click', async ()=>{
-  const submitBtn = document.getElementById('submit-order-btn');
-  const name = document.getElementById('in-name').value.trim();
-  const phone = document.getElementById('in-phone').value.trim();
-  const addressText = document.getElementById('in-address').value.trim();
-  const note = document.getElementById('in-note').value.trim();
+$('submit-order-btn').addEventListener('click', async ()=>{
+  const submitBtn = $('submit-order-btn');
+  const name = $('in-name').value.trim();
+  const phone = $('in-phone').value.trim();
+  const addressText = $('in-address').value.trim();
+  const note = $('in-note').value.trim();
 
-  if(cartCount() === 0){
-    notify("Savatingiz bo'sh — avval taom tanlang.");
-    return;
-  }
-  if(!phone){
-    notify("Iltimos, telefon raqamingizni kiriting.");
-    return;
-  }
-  if(!userLocation && !addressText){
-    notify("Iltimos, joylashuvni yuboring yoki manzilni yozing.");
-    return;
-  }
+  if (cartCount() === 0){ notify("Savatingiz bo'sh — avval taom tanlang."); return; }
+  if (!phone){ notify("Iltimos, telefon raqamingizni kiriting."); return; }
+  if (!userLocation && !addressText){ notify("Iltimos, joylashuvni yuboring yoki manzilni yozing."); return; }
 
   const payload = {
     initData: tg ? tg.initData : "",
@@ -510,16 +667,18 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
       body: JSON.stringify(payload)
     });
     const data = await res.json().catch(()=>({}));
-    if(!res.ok){
-      notify(data.error || `Xatolik yuz berdi (kod: ${res.status}).`);
+    if (!res.ok){
+      notify(data.error || ("Xatolik yuz berdi (kod: " + res.status + ")."));
       submitBtn.disabled = false;
       submitBtn.textContent = "Buyurtmani tasdiqlash";
       return;
     }
     cart = {};
     updateCartBar();
+    renderMenu();
     closeSheet('checkout');
     openSheet('confirm');
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
   }catch(e){
     notify("Internet aloqasida muammo. Qayta urinib ko'ring.");
   }
@@ -527,9 +686,9 @@ document.getElementById('submit-order-btn').addEventListener('click', async ()=>
   submitBtn.textContent = "Buyurtmani tasdiqlash";
 });
 
-document.getElementById('close-app-btn').addEventListener('click', ()=>{
+$('close-app-btn').addEventListener('click', ()=>{
   closeSheet('confirm');
-  if(tg) tg.close();
+  if (tg) tg.close();
 });
 
 loadMenu();
