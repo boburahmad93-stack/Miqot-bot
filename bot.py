@@ -1158,6 +1158,8 @@ ADMIN_PAGE_HTML = """<!doctype html>
   .row { display:flex; gap:10px; margin-top:6px; }
   #preview { width:100%; max-height:190px; object-fit:cover; border-radius:10px; margin-bottom:12px; }
   .msg { font-size:14px; margin:12px 0 0; min-height:20px; }
+  label.chk { display:flex; align-items:center; gap:9px; font-size:15px; color:var(--fg); margin:-4px 0 14px; }
+  label.chk input { width:20px; height:20px; margin:0; flex:none; accent-color:var(--accent); }
   .msg.ok { color:var(--accent); } .msg.err { color:var(--danger); }
   .cat { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px; }
   .dish { display:flex; gap:12px; align-items:center; background:var(--card); border:1px solid var(--line);
@@ -1184,6 +1186,7 @@ ADMIN_PAGE_HTML = """<!doctype html>
   <label>Tavsif<textarea id="f_desc" rows="2" placeholder="Qisqacha izoh (majburiy emas)"></textarea></label>
   <label>Kategoriya<select id="f_cat"></select></label>
   <label>Zaxira — bugun nechta bor (0 = tugadi)<input id="f_stock" type="number" value="0" inputmode="numeric"></label>
+  <label class="chk"><input type="checkbox" id="f_unlimited"> Cheksiz — zaxira hisoblanmasin</label>
   <label>Rasm<input id="f_photo" type="file" accept="image/*"></label>
   <div class="row">
     <button id="saveBtn">Saqlash</button>
@@ -1215,11 +1218,17 @@ $('f_photo').addEventListener('change', e => {
   $('preview').src = URL.createObjectURL(f); $('preview').hidden = false;
 });
 
+$('f_unlimited').addEventListener('change', e => {
+  $('f_stock').disabled = e.target.checked;
+  if (e.target.checked) $('f_stock').value = '';
+});
+
 function resetForm() {
   editingId = null;
   $('formTitle').textContent = '➕ Yangi taom';
   $('f_name').value = ''; $('f_price').value = ''; $('f_desc').value = '';
   $('f_stock').value = '0'; $('f_photo').value = ''; $('f_cat').selectedIndex = 0;
+  $('f_unlimited').checked = false; $('f_stock').disabled = false;
   $('preview').hidden = true; $('cancelBtn').hidden = true; say('');
 }
 $('cancelBtn').addEventListener('click', resetForm);
@@ -1321,7 +1330,9 @@ function startEdit(id) {
   editingId = id;
   $('formTitle').textContent = '✏️ Tahrirlash: ' + d.name;
   $('f_name').value = d.name; $('f_price').value = d.price; $('f_desc').value = d.desc || '';
-  $('f_stock').value = d.stock === null ? -1 : d.stock;
+  $('f_stock').value = d.stock === null ? '' : d.stock;
+  $('f_unlimited').checked = d.stock === null;
+  $('f_stock').disabled = d.stock === null;
   $('f_cat').value = d.category; $('f_photo').value = '';
   if (d.photo_url) { $('preview').src = d.photo_url; $('preview').hidden = false; } else { $('preview').hidden = true; }
   $('cancelBtn').hidden = false;
@@ -1345,7 +1356,7 @@ $('saveBtn').addEventListener('click', async () => {
   fd.append('price', price);
   fd.append('desc', $('f_desc').value.trim());
   fd.append('category', $('f_cat').value);
-  fd.append('stock', $('f_stock').value.trim() || '0');
+  fd.append('stock', $('f_unlimited').checked ? '-1' : ($('f_stock').value.trim() || '0'));
   const file = $('f_photo').files[0];
   if (file) fd.append('photo', file);
   $('saveBtn').disabled = true; say('Saqlanmoqda…');
