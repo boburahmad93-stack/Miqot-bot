@@ -50,6 +50,7 @@ os.makedirs(DISH_PHOTOS_DIR, exist_ok=True)
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024  # rasm uchun eng katta hajm: 12 MB
 
 # ---------- fayl bilan ishlash ----------
 
@@ -102,14 +103,23 @@ def renumber_day(orders, day_key):
 carts = {}
 checkout_state = {}
 
-CATEGORIES = ["Nonushta", "Ovqatlar", "Salatlar", "Salqin ichimliklar", "Boshqa mahsulotlar"]
+CATEGORIES = ["Nonushta", "Ovqatlar", "Fast Food", "Salatlar", "Salqin ichimliklar", "Boshqa mahsulotlar"]
 DEFAULT_CATEGORY = "Boshqa mahsulotlar"
 CATEGORY_EMOJI = {
     "Nonushta": "🍳",
     "Ovqatlar": "🍲",
+    "Fast Food": "🍔",
     "Salatlar": "🥗",
     "Salqin ichimliklar": "🥤",
     "Boshqa mahsulotlar": "🍽",
+}
+# Qo'shimcha nomlar — admin "fastfood" yoki "fast-food" deb yozsa ham tushunadi
+CATEGORY_ALIASES = {
+    "fastfood": "Fast Food",
+    "fast-food": "Fast Food",
+    "fast food": "Fast Food",
+    "ichimliklar": "Salqin ichimliklar",
+    "boshqalar": "Boshqa mahsulotlar",
 }
 
 def match_category(raw):
@@ -119,6 +129,8 @@ def match_category(raw):
     for c in CATEGORIES:
         if c.lower() == raw:
             return c
+    if raw in CATEGORY_ALIASES:
+        return CATEGORY_ALIASES[raw]
     return None
 
 def load_admin_ids():
@@ -211,6 +223,9 @@ def main_keyboard(user_id=None, username=None):
         params = f"uid={user_id}&uname={urllib.parse.quote(username or '')}&ts={ts}&sig={sig}&v={ts}"
         fresh_url = f"{WEBAPP_URL}?{params}"
         kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
+        if is_owner(user_id):
+            admin_url = f"{WEBAPP_URL}/admin?{params}"
+            kb.row(types.KeyboardButton("🧑‍🍳 Menyuni boshqarish", web_app=types.WebAppInfo(url=admin_url)))
     kb.row(types.KeyboardButton("💬 Biz bilan bog'lanish"))
     return kb
 
@@ -250,6 +265,37 @@ def group_menu_by_category(menu):
             groups.append((cat, sort_menu_by_availability(items)))
     return groups
 
+def send_dish_card(chat_id, dish, caption, kb):
+    """Taomni rasm bilan yuboradi. Mini App orqali qo'shilgan taomlarda Telegram
+    photo_id bo'lmaydi — u holda rasm sayt manzili orqali yuboriladi va
+    Telegram bergan photo_id keyingi safar uchun saqlab qo'yiladi."""
+    if dish.get("photo_id"):
+        try:
+            bot.send_photo(chat_id, dish["photo_id"], caption=caption, reply_markup=kb)
+            return
+        except Exception as e:
+            print(f"photo_id bilan yuborib bo'lmadi (#{dish.get('id')}): {e}")
+    if dish.get("local_photo") and WEBAPP_URL:
+        try:
+            sent = bot.send_photo(
+                chat_id,
+                f"{WEBAPP_URL}/static/dishes/{dish['local_photo']}",
+                caption=caption, reply_markup=kb
+            )
+            try:
+                new_id = sent.photo[-1].file_id
+                menu = load_menu()
+                target = next((d for d in menu if d["id"] == dish["id"]), None)
+                if target is not None and not target.get("photo_id"):
+                    target["photo_id"] = new_id
+                    save_menu(menu)
+            except Exception:
+                pass
+            return
+        except Exception as e:
+            print(f"Rasmni URL orqali yuborib bo'lmadi (#{dish.get('id')}): {e}")
+    bot.send_message(chat_id, caption, reply_markup=kb)
+
 def send_menu(chat_id):
     menu = load_menu()
     if not menu:
@@ -273,10 +319,7 @@ def send_menu(chat_id):
                 kb.add(types.InlineKeyboardButton("❌ Tugadi", callback_data="noop"))
             else:
                 kb.add(types.InlineKeyboardButton("➕ Savatga qo'shish", callback_data=f"add:{dish['id']}"))
-            if dish.get("photo_id"):
-                bot.send_photo(chat_id, dish["photo_id"], caption=caption, reply_markup=kb)
-            else:
-                bot.send_message(chat_id, caption, reply_markup=kb)
+            send_dish_card(chat_id, dish, caption, kb)
     bot.send_message(chat_id, "Tanlab bo'lgach, pastdagi \"🛒 Savat\" tugmasini bosing.")
 
 @bot.message_handler(func=lambda m: m.text == "🍽 Menyu" and m.from_user.id not in checkout_state)
@@ -757,7 +800,9 @@ def cmd_menu_admin(message):
     bot.send_message(
         message.chat.id,
         "Menyu:\n" + "\n".join(lines) +
-        "\n\nZaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
+        "\n\n🧑‍🍳 Eng oson yo'l: pastdagi \"Menyuni boshqarish\" tugmasi orqali "
+        "taomni rasmi bilan birga qo'shing/tahrirlang.\n\n"
+        "Zaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
         "Barchasini \"Tugadi\" qilish (ishlamagan kun): /reset_stock\n"
         "Cheklovni olib tashlash: /set_stock id -1\n"
         f"Kategoriya o'zgartirish: /set_category id Kategoriya (masalan: /set_category 1 Ovqatlar)\n"
@@ -1079,6 +1124,390 @@ def api_order():
     if error:
         return jsonify({"error": error}), 409
     return jsonify({"ok": True, "order_id": order["daily_number"], "total": order["total"]})
+
+# ---------- admin paneli (Mini App orqali taom qo'shish) ----------
+
+ADMIN_PAGE_HTML = """<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Menyuni boshqarish</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { --bg:#ffffff; --fg:#111418; --muted:#6b7280; --line:#e5e7eb; --accent:#16a34a; --danger:#dc2626; --card:#f9fafb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171a; --fg:#f3f4f6; --muted:#9ca3af; --line:#2b3138; --accent:#22c55e; --danger:#ef4444; --card:#1c2126; }
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; padding:16px 16px 48px; background:var(--bg); color:var(--fg);
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:16px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  .sub { color:var(--muted); font-size:13px; margin:0 0 18px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:18px; }
+  label { display:block; font-size:13px; color:var(--muted); margin-bottom:10px; }
+  input, select, textarea { width:100%; margin-top:5px; padding:11px 12px; font-size:16px; color:var(--fg);
+    background:var(--bg); border:1px solid var(--line); border-radius:10px; font-family:inherit; }
+  textarea { resize:vertical; }
+  button { flex:1; padding:13px 14px; font-size:16px; font-weight:600; border:0; border-radius:10px;
+    background:var(--accent); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); }
+  button.small { flex:none; padding:8px 12px; font-size:14px; font-weight:500; }
+  button.danger { background:var(--danger); }
+  .row { display:flex; gap:10px; margin-top:6px; }
+  #preview { width:100%; max-height:190px; object-fit:cover; border-radius:10px; margin-bottom:12px; }
+  .msg { font-size:14px; margin:12px 0 0; min-height:20px; }
+  .msg.ok { color:var(--accent); } .msg.err { color:var(--danger); }
+  .cat { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:20px 0 8px; }
+  .dish { display:flex; gap:12px; align-items:center; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:10px; margin-bottom:10px; }
+  .dish img, .dish .noimg { width:58px; height:58px; border-radius:9px; object-fit:cover; flex:none;
+    background:var(--line); display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .dish .info { flex:1; min-width:0; }
+  .dish .nm { font-weight:600; font-size:15px; }
+  .dish .meta { font-size:13px; color:var(--muted); margin-top:2px; }
+  .out { color:var(--danger); }
+  .acts { display:flex; gap:8px; margin-top:8px; }
+  .empty { color:var(--muted); text-align:center; padding:26px 0; }
+</style>
+</head>
+<body>
+<h1>🧑‍🍳 Menyuni boshqarish</h1>
+<p class="sub">Taomni rasmi bilan shu yerdan qo'shing — Telegram'ga qaytish shart emas.</p>
+
+<section class="card">
+  <h2 id="formTitle">➕ Yangi taom</h2>
+  <img id="preview" hidden alt="">
+  <label>Nomi<input id="f_name" placeholder="Masalan: Lavash"></label>
+  <label>Narxi (SAR)<input id="f_price" type="number" step="0.5" inputmode="decimal" placeholder="25"></label>
+  <label>Tavsif<textarea id="f_desc" rows="2" placeholder="Qisqacha izoh (majburiy emas)"></textarea></label>
+  <label>Kategoriya<select id="f_cat"></select></label>
+  <label>Zaxira — bugun nechta bor (0 = tugadi)<input id="f_stock" type="number" value="0" inputmode="numeric"></label>
+  <label>Rasm<input id="f_photo" type="file" accept="image/*"></label>
+  <div class="row">
+    <button id="saveBtn">Saqlash</button>
+    <button id="cancelBtn" class="ghost" hidden>Bekor qilish</button>
+  </div>
+  <p class="msg" id="msg"></p>
+</section>
+
+<section id="list"><p class="empty">Yuklanmoqda…</p></section>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+const AUTH = new URLSearchParams(location.search);
+const CATS = __CATEGORIES__;
+const EMOJI = __EMOJI__;
+let editingId = null;
+
+const $ = (id) => document.getElementById(id);
+const url = (p) => p + (p.includes('?') ? '&' : '?') + AUTH.toString();
+
+CATS.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = (EMOJI[c]||'') + ' ' + c; $('f_cat').appendChild(o); });
+
+function say(text, kind) { const m = $('msg'); m.textContent = text; m.className = 'msg ' + (kind||''); }
+
+$('f_photo').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) { $('preview').hidden = true; return; }
+  $('preview').src = URL.createObjectURL(f); $('preview').hidden = false;
+});
+
+function resetForm() {
+  editingId = null;
+  $('formTitle').textContent = '➕ Yangi taom';
+  $('f_name').value = ''; $('f_price').value = ''; $('f_desc').value = '';
+  $('f_stock').value = '0'; $('f_photo').value = ''; $('f_cat').selectedIndex = 0;
+  $('preview').hidden = true; $('cancelBtn').hidden = true; say('');
+}
+$('cancelBtn').addEventListener('click', resetForm);
+
+async function load() {
+  try {
+    const r = await fetch(url('/api/admin/dishes'));
+    if (!r.ok) {
+      $('list').innerHTML = '';
+      const p = document.createElement('p');
+      p.className = 'empty';
+      p.textContent = "Ruxsat yo'q yoki sessiya eskirgan. Telegram'da /start bosib, tugmani qaytadan oching.";
+      $('list').appendChild(p);
+      return;
+    }
+    render((await r.json()).dishes || []);
+  } catch (e) {
+    $('list').innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = "Aloqa uzildi. Qaytadan urinib ko'ring.";
+    $('list').appendChild(p);
+  }
+}
+
+function render(dishes) {
+  const box = $('list');
+  box.innerHTML = '';
+  window.__dishes = dishes;
+  if (!dishes.length) {
+    const p = document.createElement('p');
+    p.className = 'empty'; p.textContent = "Menyu hozircha bo'sh.";
+    box.appendChild(p);
+    return;
+  }
+  CATS.forEach(cat => {
+    const items = dishes.filter(d => d.category === cat);
+    if (!items.length) return;
+    const head = document.createElement('p');
+    head.className = 'cat';
+    head.textContent = (EMOJI[cat] || '') + ' ' + cat;
+    box.appendChild(head);
+    items.forEach(d => box.appendChild(dishRow(d)));
+  });
+}
+
+function dishRow(d) {
+  const row = document.createElement('div');
+  row.className = 'dish';
+
+  if (d.photo_url) {
+    const img = document.createElement('img');
+    img.src = d.photo_url; img.alt = '';
+    row.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'noimg'; ph.textContent = '🍽';
+    row.appendChild(ph);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'info';
+
+  const nm = document.createElement('div');
+  nm.className = 'nm'; nm.textContent = d.name;
+  info.appendChild(nm);
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = d.price + ' SAR · ';
+  const st = document.createElement('span');
+  if (d.stock === null) { st.textContent = 'cheklanmagan'; }
+  else if (d.stock <= 0) { st.textContent = 'tugadi'; st.className = 'out'; }
+  else { st.textContent = d.stock + ' dona'; }
+  meta.appendChild(st);
+  info.appendChild(meta);
+
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+
+  const edit = document.createElement('button');
+  edit.className = 'small ghost'; edit.textContent = 'Tahrirlash';
+  edit.addEventListener('click', () => startEdit(d.id));
+  acts.appendChild(edit);
+
+  const rm = document.createElement('button');
+  rm.className = 'small danger'; rm.textContent = "O'chirish";
+  rm.addEventListener('click', () => del(d.id, d.name));
+  acts.appendChild(rm);
+
+  info.appendChild(acts);
+  row.appendChild(info);
+  return row;
+}
+
+function startEdit(id) {
+  const d = (window.__dishes||[]).find(x => x.id === id);
+  if (!d) return;
+  editingId = id;
+  $('formTitle').textContent = '✏️ Tahrirlash: ' + d.name;
+  $('f_name').value = d.name; $('f_price').value = d.price; $('f_desc').value = d.desc || '';
+  $('f_stock').value = d.stock === null ? -1 : d.stock;
+  $('f_cat').value = d.category; $('f_photo').value = '';
+  if (d.photo_url) { $('preview').src = d.photo_url; $('preview').hidden = false; } else { $('preview').hidden = true; }
+  $('cancelBtn').hidden = false;
+  window.scrollTo({top:0, behavior:'smooth'});
+  say("Rasmni o'zgartirmoqchi bo'lsangiz yangisini tanlang, aks holda eskisi qoladi.");
+}
+
+async function del(id, name) {
+  if (!confirm('"' + name + "\" o'chirilsinmi?")) return;
+  const r = await fetch(url('/api/admin/dish/' + id + '/delete'), { method: 'POST' });
+  if (r.ok) { say("O'chirildi.", 'ok'); resetForm(); load(); } else { say("O'chirib bo'lmadi.", 'err'); }
+}
+
+$('saveBtn').addEventListener('click', async () => {
+  const name = $('f_name').value.trim();
+  const price = $('f_price').value.trim();
+  if (!name) { say('Taom nomini yozing.', 'err'); return; }
+  if (price === '' || isNaN(price)) { say('Narxni raqam bilan yozing.', 'err'); return; }
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('price', price);
+  fd.append('desc', $('f_desc').value.trim());
+  fd.append('category', $('f_cat').value);
+  fd.append('stock', $('f_stock').value.trim() || '0');
+  const file = $('f_photo').files[0];
+  if (file) fd.append('photo', file);
+  $('saveBtn').disabled = true; say('Saqlanmoqda…');
+  try {
+    const path = editingId ? '/api/admin/dish/' + editingId : '/api/admin/dish';
+    const r = await fetch(url(path), { method: 'POST', body: fd });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) {
+      say(editingId ? 'Yangilandi ✅' : "Qo'shildi ✅", 'ok');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      resetForm(); load();
+    } else { say(data.error || "Saqlab bo'lmadi.", 'err'); }
+  } catch (e) { say("Aloqa uzildi. Qaytadan urinib ko'ring.", 'err'); }
+  $('saveBtn').disabled = false;
+});
+
+load();
+</script>
+</body>
+</html>"""
+
+def admin_from_request():
+    """So'rovdagi imzolangan uid/ts/sig ni tekshiradi va admin ekanini aniqlaydi."""
+    src = request.args
+    user = verify_signed_user(src.get("uid"), src.get("uname"), src.get("ts"), src.get("sig"))
+    if not user or not is_owner(user["id"]):
+        return None
+    return user
+
+@app.route("/admin")
+def admin_page():
+    if not admin_from_request():
+        return "<h3 style='font-family:sans-serif;padding:24px'>Ruxsat yo'q.<br><br>" \
+               "Telegram'da botga <b>/start</b> yuboring va \"🧑‍🍳 Menyuni boshqarish\" " \
+               "tugmasini qaytadan bosing.</h3>", 403
+    html = (ADMIN_PAGE_HTML
+            .replace("__CATEGORIES__", json.dumps(CATEGORIES, ensure_ascii=False))
+            .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False)))
+    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+@app.route("/api/admin/dishes")
+def api_admin_dishes():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    out = []
+    for d in load_menu():
+        item = {
+            "id": d["id"], "name": d["name"], "price": d["price"],
+            "desc": d.get("desc", ""), "stock": d.get("stock"),
+            "category": d.get("category", DEFAULT_CATEGORY),
+        }
+        if d.get("local_photo"):
+            item["photo_url"] = f"/static/dishes/{d['local_photo']}"
+        out.append(item)
+    return jsonify({"dishes": out})
+
+def read_dish_form():
+    """Formadan kelgan maydonlarni o'qiydi. Xato bo'lsa (None, xabar) qaytaradi."""
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        return None, "Taom nomi bo'sh."
+    try:
+        price = float((request.form.get("price") or "").strip())
+    except Exception:
+        return None, "Narx noto'g'ri."
+    if price < 0:
+        return None, "Narx manfiy bo'lishi mumkin emas."
+    desc = (request.form.get("desc") or "").strip()
+    category = match_category(request.form.get("category") or "") or DEFAULT_CATEGORY
+    stock_raw = (request.form.get("stock") or "0").strip()
+    try:
+        stock = int(float(stock_raw))
+    except Exception:
+        stock = 0
+    stock = None if stock < 0 else stock
+    return {"name": name, "price": price, "desc": desc, "category": category, "stock": stock}, None
+
+def save_uploaded_photo(dish_id):
+    """Yuklangan rasmni saqlaydi va fayl nomini qaytaradi. Rasm bo'lmasa None."""
+    file = request.files.get("photo")
+    if not file or not file.filename:
+        return None
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+        ext = ".jpg"
+    filename = f"{dish_id}-{int(time.time())}{ext}"
+    file.save(os.path.join(DISH_PHOTOS_DIR, filename))
+    return filename
+
+def delete_local_photo(filename):
+    if not filename:
+        return
+    try:
+        os.remove(os.path.join(DISH_PHOTOS_DIR, filename))
+    except Exception:
+        pass
+
+@app.route("/api/admin/dish", methods=["POST"])
+def api_admin_add_dish():
+    admin = admin_from_request()
+    if not admin:
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    fields, err = read_dish_form()
+    if err:
+        return jsonify({"error": err}), 400
+    menu = load_menu()
+    new_id = (max([d["id"] for d in menu], default=0)) + 1
+    try:
+        local_photo = save_uploaded_photo(new_id)
+    except Exception as e:
+        print(f"Rasmni saqlashda xato: {e}")
+        return jsonify({"error": "Rasmni saqlab bo'lmadi."}), 500
+    menu.append({
+        "id": new_id, "name": fields["name"], "price": fields["price"], "desc": fields["desc"],
+        "photo_id": None, "local_photo": local_photo,
+        "stock": fields["stock"], "category": fields["category"],
+    })
+    save_menu(menu)
+    return jsonify({"ok": True, "id": new_id})
+
+@app.route("/api/admin/dish/<int:dish_id>", methods=["POST"])
+def api_admin_update_dish(dish_id):
+    admin = admin_from_request()
+    if not admin:
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    fields, err = read_dish_form()
+    if err:
+        return jsonify({"error": err}), 400
+    menu = load_menu()
+    dish = next((d for d in menu if d["id"] == dish_id), None)
+    if not dish:
+        return jsonify({"error": "Taom topilmadi."}), 404
+    try:
+        new_photo = save_uploaded_photo(dish_id)
+    except Exception as e:
+        print(f"Rasmni saqlashda xato: {e}")
+        return jsonify({"error": "Rasmni saqlab bo'lmadi."}), 500
+    if new_photo:
+        delete_local_photo(dish.get("local_photo"))
+        dish["local_photo"] = new_photo
+        dish["photo_id"] = None  # yangi rasm Telegram'da ham qaytadan yuklanadi
+    dish["name"] = fields["name"]
+    dish["price"] = fields["price"]
+    dish["desc"] = fields["desc"]
+    dish["category"] = fields["category"]
+    dish["stock"] = fields["stock"]
+    save_menu(menu)
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/dish/<int:dish_id>/delete", methods=["POST"])
+def api_admin_delete_dish(dish_id):
+    admin = admin_from_request()
+    if not admin:
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    menu = load_menu()
+    dish = next((d for d in menu if d["id"] == dish_id), None)
+    if not dish:
+        return jsonify({"error": "Taom topilmadi."}), 404
+    delete_local_photo(dish.get("local_photo"))
+    menu = [d for d in menu if d["id"] != dish_id]
+    save_menu(menu)
+    return jsonify({"ok": True})
 
 # ---------- kunlik hisobot ----------
 
