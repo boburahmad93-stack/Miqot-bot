@@ -1330,7 +1330,7 @@ function startEdit(id) {
 }
 
 async function del(id, name) {
-  if (!confirm('"' + name + "\" o'chirilsinmi?")) return;
+  if (!confirm('«' + name + "» o'chirilsinmi?")) return;
   const r = await fetch(url('/api/admin/dish/' + id + '/delete'), { method: 'POST' });
   if (r.ok) { say("O'chirildi.", 'ok'); resetForm(); load(); } else { say("O'chirib bo'lmadi.", 'err'); }
 }
