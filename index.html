@@ -756,7 +756,7 @@ function renderChips(){
     const b = document.createElement('button');
     b.className = 'chip' + (i === 0 ? ' active' : '');
     b.dataset.cat = cat;
-    b.textContent = (categoryEmoji[cat] || '🍽') + ' ' + cat;
+    b.textContent = (categoryEmoji[cat] || '🍽') + ' ' + catName(cat);
     b.addEventListener('click', () => {
       haptic('light');
       const sec = $(slug(cat));
