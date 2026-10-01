@@ -443,7 +443,25 @@ def location_keyboard():
     kb.add(types.KeyboardButton("📍 Joylashuvimni yuborish", request_location=True))
     return kb
 
-@bot.message_handler(func=lambda m: m.from_user.id in checkout_state, content_types=["text", "location"])
+NO_PHONE_BTN = "📱 Raqamim yo'q — Telegram orqali"
+
+def phone_keyboard():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    kb.add(types.KeyboardButton("📞 Raqamimni yuborish", request_contact=True))
+    kb.add(types.KeyboardButton(NO_PHONE_BTN))
+    return kb
+
+def order_phone_line(order):
+    """Raqam bo'lsa raqam, bo'lmasa Telegram orqali bog'lanish ko'rsatmasi."""
+    phone = (order.get("phone") or "").strip()
+    if phone:
+        return f"📞 {phone}"
+    uname = order.get("username")
+    if uname:
+        return f"📱 Raqam yo'q — Telegram: @{uname}\n   ↩️ Shu xabarga \"Reply\" qilib yozsangiz, mijozga boradi."
+    return "📱 Raqam yo'q — mijozda username ham yo'q\n   ↩️ Shu xabarga \"Reply\" qilib yozsangiz, mijozga boradi."
+
+@bot.message_handler(func=lambda m: m.from_user.id in checkout_state, content_types=["text", "location", "contact"])
 def handle_checkout_steps(message):
     user_id = message.from_user.id
     state = checkout_state[user_id]
@@ -454,13 +472,25 @@ def handle_checkout_steps(message):
             return
         state["name"] = message.text.strip()
         state["step"] = "phone"
-        bot.send_message(message.chat.id, "Telefon raqamingiz:")
+        bot.send_message(
+            message.chat.id,
+            "Telefon raqamingiz:\n\n"
+            "Pastdagi tugma orqali yuborishingiz, qo'lda yozishingiz "
+            "(istalgan davlat raqami bo'ladi), yoki raqamingiz bo'lmasa "
+            "\"Raqamim yo'q\" tugmasini bosishingiz mumkin — "
+            "u holda siz bilan shu bot orqali bog'lanamiz.",
+            reply_markup=phone_keyboard()
+        )
         return
 
     if step == "phone":
-        if message.content_type != "text":
+        if message.content_type == "contact":
+            state["phone"] = (message.contact.phone_number or "").strip()
+        elif message.content_type == "text":
+            txt = message.text.strip()
+            state["phone"] = "" if txt == NO_PHONE_BTN else txt
+        else:
             return
-        state["phone"] = message.text.strip()
         state["step"] = "address"
         bot.send_message(
             message.chat.id,
@@ -580,6 +610,8 @@ def build_customer_receipt_text(order):
     )
     if order.get("note"):
         text += f"📝 {order['note']}\n"
+    if not (order.get("phone") or "").strip():
+        text += "\n📱 Telefon raqami kiritilmadi — siz bilan shu bot orqali bog'lanamiz. Xabarlarni kuzatib turing."
     text += "\nTez orada siz bilan bog'lanamiz. Holat o'zgarganda sizga xabar boradi."
     return text
 
@@ -612,7 +644,7 @@ def notify_owner_new_order(order):
         text = (
             f"🆕 Yangi buyurtma #{order['daily_number']}\n\n"
             f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
-            f"📞 {order['phone']}\n"
+            f"{order_phone_line(order)}\n"
             f"{order_address_line(order)}\n"
             + (f"📝 {order['note']}\n" if order.get('note') else "")
             + f"\n{order_items_text(order)}\n\n"
@@ -632,15 +664,25 @@ def notify_owner_new_order(order):
             except Exception as e:
                 print(f"Joylashuv yuborishda xato ({recipient_id}): {e}")
         try:
-            bot.send_message(recipient_id, text, reply_markup=kb)
+            sent = bot.send_message(recipient_id, text, reply_markup=kb)
+            register_order_reply_target(recipient_id, sent, order)
         except Exception as e:
             print(f"Buyurtma matnini yuborishda xato ({recipient_id}): {e}")
             if "BUTTON_USER_PRIVACY_RESTRICTED" in str(e):
                 try:
                     fallback_kb = status_keyboard(order, include_contact=False) if kb is not None else None
-                    bot.send_message(recipient_id, text, reply_markup=fallback_kb)
+                    sent = bot.send_message(recipient_id, text, reply_markup=fallback_kb)
+                    register_order_reply_target(recipient_id, sent, order)
                 except Exception as e2:
                     print(f"Qayta urinishda ham xato ({recipient_id}): {e2}")
+
+def register_order_reply_target(recipient_id, sent_message, order):
+    """Buyurtma xabariga Reply qilinganda javob mijozga borishi uchun eslab qo'yamiz."""
+    try:
+        if order.get("user_id") and sent_message is not None:
+            support_message_map[(recipient_id, sent_message.message_id)] = order["user_id"]
+    except Exception as e:
+        print(f"Reply manzilini eslab qolishda xato: {e}")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -660,7 +702,7 @@ def cb_update_status(call):
     text = (
         f"📦 Buyurtma #{order['daily_number']}\n\n"
         f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
-        f"📞 {order['phone']}\n"
+        f"{order_phone_line(order)}\n"
         f"{order_address_line(order)}\n"
         + (f"📝 {order['note']}\n" if order.get('note') else "")
         + f"\n{order_items_text(order)}\n\n"
@@ -1107,8 +1149,12 @@ def api_order():
     note = (body.get("note") or "").strip()
     customer_name = (body.get("name") or "").strip() or user.get("first_name") or "Mijoz"
 
-    if not phone or not items_cart:
-        return jsonify({"error": "Ma'lumotlar to'liq emas"}), 400
+    if not items_cart:
+        return jsonify({"error": "Savatingiz bo'sh."}), 400
+    # Raqam majburiy emas: raqami bo'lmagan mijoz bilan bot orqali bog'lanamiz.
+    # Lekin raqam ham, Telegram hisobi ham bo'lmasa — bog'lanishning iloji yo'q.
+    if not phone and not user.get("id"):
+        return jsonify({"error": "Telefon raqamingizni kiriting — aks holda siz bilan bog'lana olmaymiz."}), 400
 
     order, error = create_order(
         items_cart=items_cart,
