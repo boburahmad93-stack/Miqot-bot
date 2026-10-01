@@ -258,11 +258,45 @@
   }
   .confirm{text-align:center;padding:20px 0;}
   .confirm .big{font-size:44px;margin-bottom:8px;}
+
+  /* ---------- til tanlash ---------- */
+  .lang-btn{
+    position:absolute;top:12px;right:12px;z-index:3;
+    display:flex;align-items:center;gap:5px;
+    padding:6px 10px;border-radius:999px;cursor:pointer;
+    background:rgba(255,255,255,0.07);border:1px solid var(--line);
+    color:var(--ink);font-size:12.5px;font-weight:600;font-family:'Inter',sans-serif;
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  }
+  html[dir="rtl"] .lang-btn{right:auto;left:12px;}
+  .lang-list{display:flex;flex-direction:column;gap:8px;}
+  .lang-item{
+    display:flex;align-items:center;gap:11px;width:100%;
+    padding:13px 14px;border-radius:13px;cursor:pointer;
+    background:var(--card);border:1.5px solid var(--line);
+    color:var(--ink);font-size:15px;font-weight:600;font-family:'Inter',sans-serif;
+    text-align:start;
+  }
+  .lang-item .lf{font-size:21px;line-height:1;}
+  .lang-item.active{
+    border-color:var(--accent1);background:var(--accent-soft);color:var(--accent1);
+  }
+  .lang-item .tick{margin-inline-start:auto;font-size:15px;opacity:0;}
+  .lang-item.active .tick{opacity:1;}
+
+  /* RTL tuzatishlari */
+  html[dir="rtl"] body{direction:rtl;}
+  html[dir="rtl"] .category-header,
+  html[dir="rtl"] .cart-line{text-align:right;}
+  html[dir="rtl"] .search-wrap .si{left:auto;right:26px;}
+  html[dir="rtl"] #search-input{padding:10px 34px 10px 36px;}
+  html[dir="rtl"] #search-clear{right:auto;left:22px;}
 </style>
 </head>
 <body>
 
 <div class="hero" id="hero">
+  <button class="lang-btn" id="lang-btn" aria-label="Language"><span id="lang-flag">🇺🇿</span> <span id="lang-code">UZ</span> ▾</button>
   <div class="hero-inner">
     <div id="logo-slot"></div>
     <h1 id="business-name">Yuklanmoqda...</h1>
@@ -282,7 +316,7 @@
 <div id="menu-sections"></div>
 
 <div class="cart-bar" id="cart-bar">
-  <div class="cb-left"><span id="cart-count">0</span> ta mahsulot</div>
+  <div class="cb-left"><span id="cart-count">0</span> <span id="cart-label">ta mahsulot</span></div>
   <div class="cb-total" id="cart-bar-total">0 SAR</div>
 </div>
 
@@ -290,9 +324,9 @@
 <div class="sheet-overlay" id="cart-overlay"></div>
 <div class="sheet" id="cart-sheet">
   <div class="sheet-handle"></div>
-  <h2>Savatingiz</h2>
+  <h2 id="t-cartTitle">Savatingiz</h2>
   <div id="cart-lines"></div>
-  <div class="cart-total-row"><span>Jami</span><span id="cart-total-amt">0 SAR</span></div>
+  <div class="cart-total-row"><span id="t-total">Jami</span><span id="cart-total-amt">0 SAR</span></div>
   <button class="primary-btn" id="go-checkout-btn">Buyurtma berish</button>
   <button class="ghost-btn" id="close-cart-btn">Yopish</button>
 </div>
@@ -301,21 +335,29 @@
 <div class="sheet-overlay" id="checkout-overlay"></div>
 <div class="sheet" id="checkout-sheet">
   <div class="sheet-handle"></div>
-  <h2>Ma'lumotlaringiz</h2>
-  <label for="in-name">Ismingiz</label>
+  <h2 id="t-infoTitle">Ma'lumotlaringiz</h2>
+  <label for="in-name" id="t-nameLabel">Ismingiz</label>
   <input type="text" id="in-name" placeholder="Ismingiz">
-  <label for="in-phone">Telefon raqami</label>
+  <label for="in-phone" id="t-phoneLabel">Telefon raqami</label>
   <input type="tel" id="in-phone" placeholder="05xxxxxxxx yoki +998...">
-  <label class="chk"><input type="checkbox" id="no-phone"> Raqamim yo'q — Telegram orqali bog'lanishingiz mumkin</label>
+  <label class="chk"><input type="checkbox" id="no-phone"> <span id="t-noPhone">Raqamim yo'q — Telegram orqali bog'lanishingiz mumkin</span></label>
   <div class="hint" id="no-phone-hint" hidden>Buyurtma shu Telegram hisobingizga bog'lanadi. Biz sizga shu bot orqali yozamiz — xabarlarni kuzatib turing.</div>
   <button class="loc-btn" id="get-location-btn">📍 Joylashuvimni aniqlash</button>
   <div class="loc-status" id="loc-status"></div>
-  <label for="in-address">Yoki manzilni yozing</label>
+  <label for="in-address" id="t-addrLabel">Yoki manzilni yozing</label>
   <textarea id="in-address" rows="2" placeholder="Shahar, mahalla, uy..."></textarea>
-  <label for="in-note">Izoh (ixtiyoriy)</label>
+  <label for="in-note" id="t-noteLabel">Izoh (ixtiyoriy)</label>
   <input type="text" id="in-note" placeholder="Masalan: achchiq bo'lmasin">
-  <div class="loc-status">To'lov: naqd — kuryer yetkazib berganda olinadi.</div>
+  <div class="loc-status" id="t-payNote">To'lov: naqd — kuryer yetkazib berganda olinadi.</div>
   <button class="primary-btn" id="submit-order-btn">Buyurtmani tasdiqlash</button>
+</div>
+
+<!-- TIL TANLASH -->
+<div class="sheet-overlay" id="lang-overlay"></div>
+<div class="sheet" id="lang-sheet">
+  <div class="sheet-handle"></div>
+  <h2 id="lang-title">Til / Language</h2>
+  <div class="lang-list" id="lang-list"></div>
 </div>
 
 <!-- TASDIQ -->
@@ -324,13 +366,244 @@
   <div class="sheet-handle"></div>
   <div class="confirm">
     <div class="big">✅</div>
-    <h3>Buyurtmangiz qabul qilindi!</h3>
-    <p class="loc-status">Tez orada siz bilan bog'lanamiz.</p>
+    <h3 id="t-okTitle">Buyurtmangiz qabul qilindi!</h3>
+    <p class="loc-status" id="t-okSub">Tez orada siz bilan bog'lanamiz.</p>
     <button class="primary-btn" id="close-app-btn">Yopish</button>
   </div>
 </div>
 
 <script>
+/* Miqot Food — tarjimalar. Faqat ilova matnlari; taom nomlari admin kiritgan holicha qoladi. */
+const LANGS = [
+  { code:'uz', name:"O'zbekcha",  flag:'🇺🇿' },
+  { code:'ar', name:'العربية',    flag:'🇸🇦', rtl:true },
+  { code:'en', name:'English',    flag:'🇬🇧' },
+  { code:'ru', name:'Русский',    flag:'🇷🇺' },
+  { code:'tr', name:'Türkçe',     flag:'🇹🇷' },
+  { code:'ur', name:'اردو',       flag:'🇵🇰', rtl:true },
+  { code:'id', name:'Indonesia',  flag:'🇮🇩' }
+];
+
+const I18N = {
+  uz:{
+    tagline:"Taom tanlang va buyurtma bering",
+    search:"Taom qidirish...", add:"Qo'shish", soldOut:"Tugadi",
+    lastN:(n)=>`Oxirgi ${n} dona`, dishCount:(n)=>`${n} ta taom`, itemCount:(n)=>`${n} ta mahsulot`,
+    cartTitle:"Savatingiz", cartEmpty:"Savat bo'sh.", perUnit:"dona", total:"Jami",
+    order:"Buyurtma berish", close:"Yopish",
+    infoTitle:"Ma'lumotlaringiz", nameLabel:"Ismingiz", namePh:"Ismingiz",
+    phoneLabel:"Telefon raqami", phonePh:"05xxxxxxxx yoki +998...",
+    noPhone:"Raqamim yo'q — Telegram orqali bog'lanishingiz mumkin",
+    noPhoneHint:"Buyurtma shu Telegram hisobingizga bog'lanadi. Biz sizga shu bot orqali yozamiz — xabarlarni kuzatib turing.",
+    locBtn:"📍 Joylashuvimni aniqlash", locDetecting:"Aniqlanmoqda...",
+    locOk:"✅ Joylashuv aniqlandi.", locDenied:"Joylashuvga ruxsat berilmadi. Manzilni yozing.",
+    locNoSupport:"Bu qurilmada joylashuvni aniqlab bo'lmadi. Manzilni yozing.",
+    addrLabel:"Yoki manzilni yozing", addrPh:"Shahar, mahalla, uy...",
+    noteLabel:"Izoh (ixtiyoriy)", notePh:"Masalan: achchiq bo'lmasin",
+    payNote:"To'lov: naqd — kuryer yetkazib berganda olinadi.",
+    confirmBtn:"Buyurtmani tasdiqlash", sending:"Yuborilmoqda...",
+    okTitle:"Buyurtmangiz qabul qilindi!", okSub:"Tez orada siz bilan bog'lanamiz.",
+    emptyMenu:"Menyu hozircha bo'sh.", loadFail:"Menyuni yuklab bo'lmadi. Qaytadan urinib ko'ring.",
+    searchTitle:"Qidiruv natijasi", searchFound:(n)=>`${n} ta taom topildi`,
+    searchNone:(q)=>`«${q}» bo'yicha hech narsa topilmadi.`,
+    errEmptyCart:"Savatingiz bo'sh — avval taom tanlang.",
+    errPhone:"Telefon raqamingizni kiriting — yoki raqamingiz bo'lmasa, pastdagi belgini qo'ying.",
+    errNoContact:"Siz bilan bog'lana olmaymiz. Iltimos, botni Telegram orqali oching yoki raqam kiriting.",
+    errAddr:"Iltimos, joylashuvni yuboring yoki manzilni yozing.",
+    errStock:(n,s)=>`"${n}" uchun faqat ${s} dona qoldi.`,
+    errNet:"Internet aloqasida muammo. Qayta urinib ko'ring.",
+    errCode:(c)=>`Xatolik yuz berdi (kod: ${c}).`,
+    langTitle:"Til / Language",
+    cats:{"Nonushta":"Nonushta","Ovqatlar":"Ovqatlar","Fast Food":"Fast Food","Salatlar":"Salatlar","Salqin ichimliklar":"Salqin ichimliklar","Boshqa mahsulotlar":"Boshqa mahsulotlar"}
+  },
+  ar:{
+    tagline:"اختر طعامك واطلب الآن",
+    search:"ابحث عن طبق...", add:"أضف", soldOut:"نفد",
+    lastN:(n)=>`آخر ${n} قطعة`, dishCount:(n)=>`${n} طبق`, itemCount:(n)=>`${n} منتج`,
+    cartTitle:"سلتك", cartEmpty:"السلة فارغة.", perUnit:"للقطعة", total:"الإجمالي",
+    order:"إتمام الطلب", close:"إغلاق",
+    infoTitle:"بياناتك", nameLabel:"الاسم", namePh:"اسمك",
+    phoneLabel:"رقم الهاتف", phonePh:"05xxxxxxxx",
+    noPhone:"ليس لدي رقم — تواصلوا معي عبر تيليجرام",
+    noPhoneHint:"سيُربط الطلب بحساب تيليجرام هذا. سنراسلك عبر البوت — تابع الرسائل من فضلك.",
+    locBtn:"📍 تحديد موقعي", locDetecting:"جاري التحديد...",
+    locOk:"✅ تم تحديد الموقع.", locDenied:"لم يُسمح بالوصول للموقع. اكتب العنوان.",
+    locNoSupport:"تعذّر تحديد الموقع على هذا الجهاز. اكتب العنوان.",
+    addrLabel:"أو اكتب العنوان", addrPh:"المدينة، الحي، المنزل...",
+    noteLabel:"ملاحظة (اختياري)", notePh:"مثال: بدون حار",
+    payNote:"الدفع: نقدًا عند الاستلام.",
+    confirmBtn:"تأكيد الطلب", sending:"جاري الإرسال...",
+    okTitle:"تم استلام طلبك!", okSub:"سنتواصل معك قريبًا.",
+    emptyMenu:"القائمة فارغة حاليًا.", loadFail:"تعذّر تحميل القائمة. حاول مرة أخرى.",
+    searchTitle:"نتائج البحث", searchFound:(n)=>`تم العثور على ${n} طبق`,
+    searchNone:(q)=>`لا توجد نتائج لـ «${q}».`,
+    errEmptyCart:"سلتك فارغة — اختر طبقًا أولًا.",
+    errPhone:"أدخل رقم هاتفك — أو فعّل الخيار أدناه إذا لم يكن لديك رقم.",
+    errNoContact:"لا يمكننا التواصل معك. افتح البوت عبر تيليجرام أو أدخل رقمًا.",
+    errAddr:"أرسل موقعك أو اكتب العنوان من فضلك.",
+    errStock:(n,s)=>`لم يتبقَّ من "${n}" سوى ${s} قطعة.`,
+    errNet:"مشكلة في الاتصال. حاول مرة أخرى.",
+    errCode:(c)=>`حدث خطأ (رمز: ${c}).`,
+    langTitle:"اللغة / Language",
+    cats:{"Nonushta":"الإفطار","Ovqatlar":"الأطباق الرئيسية","Fast Food":"الوجبات السريعة","Salatlar":"السلطات","Salqin ichimliklar":"المشروبات الباردة","Boshqa mahsulotlar":"منتجات أخرى"}
+  },
+  en:{
+    tagline:"Pick your food and place an order",
+    search:"Search dishes...", add:"Add", soldOut:"Sold out",
+    lastN:(n)=>`Only ${n} left`, dishCount:(n)=>`${n} dishes`, itemCount:(n)=>`${n} items`,
+    cartTitle:"Your cart", cartEmpty:"Your cart is empty.", perUnit:"each", total:"Total",
+    order:"Place order", close:"Close",
+    infoTitle:"Your details", nameLabel:"Your name", namePh:"Your name",
+    phoneLabel:"Phone number", phonePh:"05xxxxxxxx or +...",
+    noPhone:"I don't have a number — contact me on Telegram",
+    noPhoneHint:"Your order will be linked to this Telegram account. We'll message you through the bot — please watch for messages.",
+    locBtn:"📍 Detect my location", locDetecting:"Detecting...",
+    locOk:"✅ Location detected.", locDenied:"Location access denied. Please type your address.",
+    locNoSupport:"Location isn't available on this device. Please type your address.",
+    addrLabel:"Or type your address", addrPh:"City, district, building...",
+    noteLabel:"Note (optional)", notePh:"e.g. not spicy",
+    payNote:"Payment: cash on delivery.",
+    confirmBtn:"Confirm order", sending:"Sending...",
+    okTitle:"Your order is received!", okSub:"We'll contact you shortly.",
+    emptyMenu:"The menu is empty right now.", loadFail:"Couldn't load the menu. Please try again.",
+    searchTitle:"Search results", searchFound:(n)=>`${n} dishes found`,
+    searchNone:(q)=>`Nothing found for "${q}".`,
+    errEmptyCart:"Your cart is empty — pick a dish first.",
+    errPhone:"Enter your phone number — or tick the box below if you don't have one.",
+    errNoContact:"We can't reach you. Please open the bot in Telegram or enter a number.",
+    errAddr:"Please send your location or type your address.",
+    errStock:(n,s)=>`Only ${s} left of "${n}".`,
+    errNet:"Connection problem. Please try again.",
+    errCode:(c)=>`Something went wrong (code: ${c}).`,
+    langTitle:"Language",
+    cats:{"Nonushta":"Breakfast","Ovqatlar":"Main dishes","Fast Food":"Fast food","Salatlar":"Salads","Salqin ichimliklar":"Cold drinks","Boshqa mahsulotlar":"Other items"}
+  },
+  ru:{
+    tagline:"Выберите блюдо и оформите заказ",
+    search:"Поиск блюда...", add:"Добавить", soldOut:"Закончилось",
+    lastN:(n)=>`Осталось ${n} шт.`, dishCount:(n)=>`${n} блюд`, itemCount:(n)=>`${n} товаров`,
+    cartTitle:"Ваша корзина", cartEmpty:"Корзина пуста.", perUnit:"за шт.", total:"Итого",
+    order:"Оформить заказ", close:"Закрыть",
+    infoTitle:"Ваши данные", nameLabel:"Ваше имя", namePh:"Ваше имя",
+    phoneLabel:"Номер телефона", phonePh:"05xxxxxxxx или +998...",
+    noPhone:"У меня нет номера — свяжитесь через Telegram",
+    noPhoneHint:"Заказ будет привязан к этому аккаунту Telegram. Мы напишем вам через бота — следите за сообщениями.",
+    locBtn:"📍 Определить местоположение", locDetecting:"Определяем...",
+    locOk:"✅ Местоположение определено.", locDenied:"Доступ к геолокации запрещён. Напишите адрес.",
+    locNoSupport:"На этом устройстве геолокация недоступна. Напишите адрес.",
+    addrLabel:"Или напишите адрес", addrPh:"Город, район, дом...",
+    noteLabel:"Комментарий (необязательно)", notePh:"Например: не острое",
+    payNote:"Оплата: наличными при доставке.",
+    confirmBtn:"Подтвердить заказ", sending:"Отправляем...",
+    okTitle:"Заказ принят!", okSub:"Мы скоро с вами свяжемся.",
+    emptyMenu:"Меню пока пустое.", loadFail:"Не удалось загрузить меню. Попробуйте ещё раз.",
+    searchTitle:"Результаты поиска", searchFound:(n)=>`Найдено блюд: ${n}`,
+    searchNone:(q)=>`По запросу «${q}» ничего не найдено.`,
+    errEmptyCart:"Корзина пуста — сначала выберите блюдо.",
+    errPhone:"Введите номер телефона — или поставьте галочку ниже, если номера нет.",
+    errNoContact:"Мы не сможем с вами связаться. Откройте бота в Telegram или введите номер.",
+    errAddr:"Отправьте местоположение или напишите адрес.",
+    errStock:(n,s)=>`«${n}» осталось только ${s} шт.`,
+    errNet:"Проблема со связью. Попробуйте ещё раз.",
+    errCode:(c)=>`Произошла ошибка (код: ${c}).`,
+    langTitle:"Язык / Language",
+    cats:{"Nonushta":"Завтрак","Ovqatlar":"Основные блюда","Fast Food":"Фастфуд","Salatlar":"Салаты","Salqin ichimliklar":"Холодные напитки","Boshqa mahsulotlar":"Другое"}
+  },
+  tr:{
+    tagline:"Yemeğinizi seçin ve sipariş verin",
+    search:"Yemek ara...", add:"Ekle", soldOut:"Tükendi",
+    lastN:(n)=>`Son ${n} adet`, dishCount:(n)=>`${n} yemek`, itemCount:(n)=>`${n} ürün`,
+    cartTitle:"Sepetiniz", cartEmpty:"Sepet boş.", perUnit:"adet", total:"Toplam",
+    order:"Sipariş ver", close:"Kapat",
+    infoTitle:"Bilgileriniz", nameLabel:"Adınız", namePh:"Adınız",
+    phoneLabel:"Telefon numarası", phonePh:"05xxxxxxxx veya +90...",
+    noPhone:"Numaram yok — Telegram'dan ulaşın",
+    noPhoneHint:"Sipariş bu Telegram hesabına bağlanacak. Size bot üzerinden yazacağız — mesajları takip edin.",
+    locBtn:"📍 Konumumu bul", locDetecting:"Bulunuyor...",
+    locOk:"✅ Konum bulundu.", locDenied:"Konum izni verilmedi. Adresi yazın.",
+    locNoSupport:"Bu cihazda konum bulunamadı. Adresi yazın.",
+    addrLabel:"Veya adresi yazın", addrPh:"Şehir, mahalle, bina...",
+    noteLabel:"Not (isteğe bağlı)", notePh:"Örn: acı olmasın",
+    payNote:"Ödeme: teslimatta nakit.",
+    confirmBtn:"Siparişi onayla", sending:"Gönderiliyor...",
+    okTitle:"Siparişiniz alındı!", okSub:"Kısa süre içinde sizinle iletişime geçeceğiz.",
+    emptyMenu:"Menü şu an boş.", loadFail:"Menü yüklenemedi. Tekrar deneyin.",
+    searchTitle:"Arama sonucu", searchFound:(n)=>`${n} yemek bulundu`,
+    searchNone:(q)=>`"${q}" için sonuç bulunamadı.`,
+    errEmptyCart:"Sepetiniz boş — önce bir yemek seçin.",
+    errPhone:"Telefon numaranızı girin — numaranız yoksa aşağıdaki kutuyu işaretleyin.",
+    errNoContact:"Size ulaşamayız. Botu Telegram'dan açın veya numara girin.",
+    errAddr:"Lütfen konumunuzu gönderin veya adresi yazın.",
+    errStock:(n,s)=>`"${n}" için sadece ${s} adet kaldı.`,
+    errNet:"Bağlantı sorunu. Tekrar deneyin.",
+    errCode:(c)=>`Bir hata oluştu (kod: ${c}).`,
+    langTitle:"Dil / Language",
+    cats:{"Nonushta":"Kahvaltı","Ovqatlar":"Ana yemekler","Fast Food":"Fast food","Salatlar":"Salatalar","Salqin ichimliklar":"Soğuk içecekler","Boshqa mahsulotlar":"Diğer ürünler"}
+  },
+  ur:{
+    tagline:"اپنا کھانا منتخب کریں اور آرڈر دیں",
+    search:"کھانا تلاش کریں...", add:"شامل کریں", soldOut:"ختم",
+    lastN:(n)=>`صرف ${n} باقی`, dishCount:(n)=>`${n} کھانے`, itemCount:(n)=>`${n} اشیاء`,
+    cartTitle:"آپ کی ٹوکری", cartEmpty:"ٹوکری خالی ہے۔", perUnit:"فی عدد", total:"کل",
+    order:"آرڈر دیں", close:"بند کریں",
+    infoTitle:"آپ کی معلومات", nameLabel:"آپ کا نام", namePh:"آپ کا نام",
+    phoneLabel:"فون نمبر", phonePh:"05xxxxxxxx یا +92...",
+    noPhone:"میرے پاس نمبر نہیں — ٹیلیگرام پر رابطہ کریں",
+    noPhoneHint:"آرڈر اسی ٹیلیگرام اکاؤنٹ سے منسلک ہوگا۔ ہم آپ کو بوٹ کے ذریعے پیغام بھیجیں گے۔",
+    locBtn:"📍 میری لوکیشن معلوم کریں", locDetecting:"معلوم کیا جا رہا ہے...",
+    locOk:"✅ لوکیشن مل گئی۔", locDenied:"لوکیشن کی اجازت نہیں ملی۔ پتہ لکھیں۔",
+    locNoSupport:"اس ڈیوائس پر لوکیشن دستیاب نہیں۔ پتہ لکھیں۔",
+    addrLabel:"یا اپنا پتہ لکھیں", addrPh:"شہر، محلہ، مکان...",
+    noteLabel:"نوٹ (اختیاری)", notePh:"مثلاً: تیز مرچ نہ ہو",
+    payNote:"ادائیگی: ڈیلیوری پر نقد۔",
+    confirmBtn:"آرڈر کی تصدیق کریں", sending:"بھیجا جا رہا ہے...",
+    okTitle:"آپ کا آرڈر موصول ہو گیا!", okSub:"ہم جلد آپ سے رابطہ کریں گے۔",
+    emptyMenu:"مینو ابھی خالی ہے۔", loadFail:"مینو لوڈ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+    searchTitle:"تلاش کا نتیجہ", searchFound:(n)=>`${n} کھانے ملے`,
+    searchNone:(q)=>`«${q}» کے لیے کچھ نہیں ملا۔`,
+    errEmptyCart:"ٹوکری خالی ہے — پہلے کھانا منتخب کریں۔",
+    errPhone:"اپنا فون نمبر درج کریں — یا نیچے والا خانہ منتخب کریں۔",
+    errNoContact:"ہم آپ سے رابطہ نہیں کر سکتے۔ بوٹ کو ٹیلیگرام میں کھولیں یا نمبر درج کریں۔",
+    errAddr:"براہ کرم لوکیشن بھیجیں یا پتہ لکھیں۔",
+    errStock:(n,s)=>`"${n}" کے صرف ${s} باقی ہیں۔`,
+    errNet:"رابطے میں مسئلہ۔ دوبارہ کوشش کریں۔",
+    errCode:(c)=>`کوئی مسئلہ ہوا (کوڈ: ${c})۔`,
+    langTitle:"زبان / Language",
+    cats:{"Nonushta":"ناشتہ","Ovqatlar":"اہم کھانے","Fast Food":"فاسٹ فوڈ","Salatlar":"سلاد","Salqin ichimliklar":"ٹھنڈے مشروبات","Boshqa mahsulotlar":"دیگر اشیاء"}
+  },
+  id:{
+    tagline:"Pilih makanan dan pesan sekarang",
+    search:"Cari menu...", add:"Tambah", soldOut:"Habis",
+    lastN:(n)=>`Sisa ${n}`, dishCount:(n)=>`${n} menu`, itemCount:(n)=>`${n} item`,
+    cartTitle:"Keranjang Anda", cartEmpty:"Keranjang kosong.", perUnit:"per porsi", total:"Total",
+    order:"Pesan sekarang", close:"Tutup",
+    infoTitle:"Data Anda", nameLabel:"Nama Anda", namePh:"Nama Anda",
+    phoneLabel:"Nomor telepon", phonePh:"05xxxxxxxx atau +62...",
+    noPhone:"Saya tidak punya nomor — hubungi lewat Telegram",
+    noPhoneHint:"Pesanan akan terhubung ke akun Telegram ini. Kami akan menghubungi Anda lewat bot — mohon pantau pesannya.",
+    locBtn:"📍 Deteksi lokasi saya", locDetecting:"Mendeteksi...",
+    locOk:"✅ Lokasi terdeteksi.", locDenied:"Akses lokasi ditolak. Silakan tulis alamat.",
+    locNoSupport:"Lokasi tidak tersedia di perangkat ini. Silakan tulis alamat.",
+    addrLabel:"Atau tulis alamat", addrPh:"Kota, kelurahan, rumah...",
+    noteLabel:"Catatan (opsional)", notePh:"Misal: jangan pedas",
+    payNote:"Pembayaran: tunai saat pengantaran.",
+    confirmBtn:"Konfirmasi pesanan", sending:"Mengirim...",
+    okTitle:"Pesanan Anda diterima!", okSub:"Kami akan segera menghubungi Anda.",
+    emptyMenu:"Menu masih kosong.", loadFail:"Gagal memuat menu. Coba lagi.",
+    searchTitle:"Hasil pencarian", searchFound:(n)=>`${n} menu ditemukan`,
+    searchNone:(q)=>`Tidak ada hasil untuk "${q}".`,
+    errEmptyCart:"Keranjang kosong — pilih menu dulu.",
+    errPhone:"Masukkan nomor telepon — atau centang kotak di bawah bila tidak punya.",
+    errNoContact:"Kami tidak bisa menghubungi Anda. Buka bot di Telegram atau masukkan nomor.",
+    errAddr:"Kirim lokasi atau tulis alamat Anda.",
+    errStock:(n,s)=>`"${n}" tersisa ${s} saja.`,
+    errNet:"Masalah koneksi. Coba lagi.",
+    errCode:(c)=>`Terjadi kesalahan (kode: ${c}).`,
+    langTitle:"Bahasa / Language",
+    cats:{"Nonushta":"Sarapan","Ovqatlar":"Menu utama","Fast Food":"Makanan cepat saji","Salatlar":"Salad","Salqin ichimliklar":"Minuman dingin","Boshqa mahsulotlar":"Produk lain"}
+  }
+};
+
 const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) { tg.ready(); tg.expand(); }
 
@@ -349,6 +622,7 @@ let categoryEmoji = {};
 let cart = {};            // id -> qty
 let userLocation = null;
 let searchQuery = '';
+let serverTagline = '';
 let spy = null;
 
 const $ = (id) => document.getElementById(id);
@@ -356,6 +630,97 @@ function fmtSar(n){ return Math.round(n).toLocaleString('en-US') + " SAR"; }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function haptic(kind){ try{ if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(kind || 'light'); }catch(e){} }
 function slug(cat){ return 'cat-' + cat.replace(/[^a-zA-Z0-9]/g, '-'); }
+
+/* ================= TIL ================= */
+let lang = 'uz';
+const T = () => I18N[lang] || I18N.uz;
+function catName(cat){ return (T().cats && T().cats[cat]) || cat; }
+
+function detectLang(){
+  try{
+    const saved = localStorage.getItem('miqot_lang');
+    if (saved && I18N[saved]) return saved;
+  }catch(e){}
+  let code = '';
+  try{ code = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || ''; }catch(e){}
+  if (!code){ try{ code = (navigator.language || '').toLowerCase(); }catch(e){} }
+  code = String(code).toLowerCase().split('-')[0];
+  const map = { uz:'uz', ar:'ar', en:'en', ru:'ru', tr:'tr', ur:'ur', id:'id', ms:'id',
+                az:'tr', kk:'ru', ky:'ru', tg:'ru', tk:'ru', hi:'ur', pa:'ur', fa:'ar' };
+  return map[code] || 'en';
+}
+
+function applyLang(code, redraw){
+  lang = I18N[code] ? code : 'uz';
+  try{ localStorage.setItem('miqot_lang', lang); }catch(e){}
+
+  const info = LANGS.find(l => l.code === lang) || LANGS[0];
+  document.documentElement.setAttribute('lang', lang);
+  document.documentElement.setAttribute('dir', info.rtl ? 'rtl' : 'ltr');
+  $('lang-flag').textContent = info.flag;
+  $('lang-code').textContent = lang.toUpperCase();
+
+  const t = T();
+  const txt = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  const ph  = (id, val) => { const el = $(id); if (el) el.placeholder = val; };
+
+  txt('business-tagline', serverTagline || t.tagline);
+  ph('search-input', t.search);
+  txt('t-cartTitle', t.cartTitle);
+  txt('t-total', t.total);
+  txt('go-checkout-btn', t.order);
+  txt('close-cart-btn', t.close);
+  txt('t-infoTitle', t.infoTitle);
+  txt('t-nameLabel', t.nameLabel);        ph('in-name', t.namePh);
+  txt('t-phoneLabel', t.phoneLabel);      ph('in-phone', t.phonePh);
+  txt('t-noPhone', t.noPhone);
+  txt('no-phone-hint', t.noPhoneHint);
+  txt('get-location-btn', t.locBtn);
+  txt('t-addrLabel', t.addrLabel);        ph('in-address', t.addrPh);
+  txt('t-noteLabel', t.noteLabel);        ph('in-note', t.notePh);
+  txt('t-payNote', t.payNote);
+  txt('submit-order-btn', t.confirmBtn);
+  txt('t-okTitle', t.okTitle);
+  txt('t-okSub', t.okSub);
+  txt('close-app-btn', t.close);
+  txt('lang-title', t.langTitle);
+
+  renderLangList();
+  if (redraw){ renderChips(); renderMenu(); updateCartBar(); }
+  saveLangToServer();
+}
+
+function renderLangList(){
+  const box = $('lang-list');
+  if (!box) return;
+  box.innerHTML = '';
+  LANGS.forEach(l => {
+    const b = document.createElement('button');
+    b.className = 'lang-item' + (l.code === lang ? ' active' : '');
+    b.innerHTML = '<span class="lf">' + l.flag + '</span><span>' + l.name + '</span><span class="tick">✓</span>';
+    b.addEventListener('click', ()=>{
+      haptic('light');
+      applyLang(l.code, true);
+      closeSheet('lang');
+    });
+    box.appendChild(b);
+  });
+}
+
+/* Tanlangan tilni botga ham bildiramiz — chat xabarlari ham shu tilda bo'lsin */
+let lastSentLang = null;
+function saveLangToServer(){
+  if (lang === lastSentLang) return;
+  if (!signedUser.uid) return;
+  lastSentLang = lang;
+  try{
+    fetch('/api/lang', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ lang: lang, uid: signedUser.uid, uname: signedUser.uname,
+                             ts: signedUser.ts, sig: signedUser.sig })
+    }).catch(()=>{});
+  }catch(e){}
+}
 
 async function loadMenu(){
   try{
@@ -365,7 +730,8 @@ async function loadMenu(){
     categories = data.categories || [];
     categoryEmoji = data.category_emoji || {};
     $('business-name').textContent = data.business_name || "Uy oshxonasi";
-    $('business-tagline').textContent = data.tagline || "Taom tanlang va buyurtma bering";
+    serverTagline = (data.tagline || '').trim();
+    $('business-tagline').textContent = serverTagline || T().tagline;
     const logoSlot = $('logo-slot');
     logoSlot.innerHTML = data.logo_url
       ? '<img class="logo" src="' + esc(data.logo_url) + '" alt="logo">'
@@ -373,7 +739,7 @@ async function loadMenu(){
     renderChips();
     renderMenu();
   }catch(e){
-    $('menu-sections').innerHTML = '<div class="empty-state">Menyuni yuklab bo\'lmadi.<br>Qaytadan urinib ko\'ring.</div>';
+    $('menu-sections').innerHTML = '<div class="empty-state">' + esc(T().loadFail) + '</div>';
   }
 }
 
@@ -430,7 +796,7 @@ function dishCardHtml(dish){
 
   let ctl;
   if (soldOut){
-    ctl = '<span class="sold-out-badge">Tugadi</span>';
+    ctl = '<span class="sold-out-badge">' + esc(T().soldOut) + '</span>';
   } else if (qty > 0){
     const canAdd = stock === null || qty < stock;
     ctl = '<div class="qty-pill">' +
@@ -439,11 +805,11 @@ function dishCardHtml(dish){
             '<button data-act="inc" data-id="' + dish.id + '"' + (canAdd ? '' : ' disabled') + '>+</button>' +
           '</div>';
   } else {
-    ctl = '<button class="add-btn" data-act="inc" data-id="' + dish.id + '">Qo\'shish</button>';
+    ctl = '<button class="add-btn" data-act="inc" data-id="' + dish.id + '">' + esc(T().add) + '</button>';
   }
 
   const note = (!soldOut && stock !== null && stock <= 5)
-    ? '<div class="stock-note">Oxirgi ' + stock + ' dona</div>' : '';
+    ? '<div class="stock-note">' + esc(T().lastN(stock)) + '</div>' : '';
 
   return '<div class="dish-card' + (soldOut ? ' sold-out' : '') + '">' +
       photoHtml +
@@ -460,7 +826,7 @@ function renderMenu(){
   const container = $('menu-sections');
 
   if (menu.length === 0){
-    container.innerHTML = '<div class="empty-state">Menyu hozircha bo\'sh.</div>';
+    container.innerHTML = '<div class="empty-state">' + esc(T().emptyMenu) + '</div>';
     return;
   }
 
@@ -473,11 +839,11 @@ function renderMenu(){
       ? '<div class="category-section">' +
           '<div class="category-header">' +
             '<span class="cat-emoji">🔍</span>' +
-            '<div><h2>Qidiruv natijasi</h2><div class="ch-sub">' + found.length + ' ta taom topildi</div></div>' +
+            '<div><h2>' + esc(T().searchTitle) + '</h2><div class="ch-sub">' + esc(T().searchFound(found.length)) + '</div></div>' +
           '</div>' +
           '<div class="grid">' + found.map(dishCardHtml).join('') + '</div>' +
         '</div>'
-      : '<div class="empty-state">«' + esc(searchQuery) + '» bo\'yicha hech narsa topilmadi.</div>';
+      : '<div class="empty-state">' + esc(T().searchNone(searchQuery)) + '</div>';
     bindDishButtons();
     return;
   }
@@ -488,7 +854,7 @@ function renderMenu(){
     return '<div class="category-section" id="' + slug(cat) + '" data-cat="' + esc(cat) + '">' +
         '<div class="category-header">' +
           '<span class="cat-emoji">' + emoji + '</span>' +
-          '<div><h2>' + esc(cat) + '</h2><div class="ch-sub">' + items.length + ' ta taom</div></div>' +
+          '<div><h2>' + esc(catName(cat)) + '</h2><div class="ch-sub">' + esc(T().dishCount(items.length)) + '</div></div>' +
         '</div>' +
         '<div class="grid">' + items.map(dishCardHtml).join('') + '</div>' +
       '</div>';
@@ -507,7 +873,7 @@ function bindDishButtons(){
       const dish = menu.find(d => String(d.id) === String(id));
       const cur = cart[id] || 0;
       if (act === 'inc' && dish && dish.stock !== null && dish.stock !== undefined && cur + 1 > dish.stock){
-        notify('"' + dish.name + '" uchun faqat ' + dish.stock + ' dona qoldi.');
+        notify(T().errStock(dish.name, dish.stock));
         return;
       }
       haptic('light');
@@ -545,6 +911,7 @@ function cartTotal(){
 function updateCartBar(){
   const count = cartCount();
   $('cart-count').textContent = count;
+  $('cart-label').textContent = T().itemCount(count).replace(String(count), '').trim();
   $('cart-bar-total').textContent = fmtSar(cartTotal());
   $('cart-bar').classList.toggle('show', count > 0);
 }
@@ -560,13 +927,15 @@ function closeSheet(id){
 
 $('cart-bar').addEventListener('click', ()=>{ haptic('medium'); renderCartSheet(); openSheet('cart'); });
 $('cart-overlay').addEventListener('click', ()=>closeSheet('cart'));
+$('lang-btn').addEventListener('click', ()=>{ haptic('light'); renderLangList(); openSheet('lang'); });
+$('lang-overlay').addEventListener('click', ()=>closeSheet('lang'));
 $('close-cart-btn').addEventListener('click', ()=>closeSheet('cart'));
 
 function renderCartSheet(){
   const linesEl = $('cart-lines');
   const entries = Object.entries(cart);
   if (entries.length === 0){
-    linesEl.innerHTML = '<div class="loc-status">Savat bo\'sh.</div>';
+    linesEl.innerHTML = '<div class="loc-status">' + esc(T().cartEmpty) + '</div>';
   } else {
     linesEl.innerHTML = entries.map(([id,qty])=>{
       const dish = menu.find(d=>String(d.id)===String(id));
@@ -575,7 +944,7 @@ function renderCartSheet(){
       return '<div class="cart-line">' +
           '<div class="cl-main">' +
             '<div class="cl-name">' + esc(dish.name) + '</div>' +
-            '<div class="cl-sub">' + fmtSar(dish.price) + ' / dona</div>' +
+            '<div class="cl-sub">' + fmtSar(dish.price) + ' / ' + esc(T().perUnit) + '</div>' +
           '</div>' +
           '<div class="cl-qty">' +
             '<button data-cact="dec" data-id="' + dish.id + '">−</button>' +
@@ -627,17 +996,17 @@ $('no-phone').addEventListener('change', (e)=>{
 $('get-location-btn').addEventListener('click', ()=>{
   const statusEl = $('loc-status');
   if (!navigator.geolocation){
-    statusEl.textContent = "Bu qurilmada joylashuvni aniqlab bo'lmadi. Manzilni yozing.";
+    statusEl.textContent = T().locNoSupport;
     return;
   }
-  statusEl.textContent = "Aniqlanmoqda...";
+  statusEl.textContent = T().locDetecting;
   navigator.geolocation.getCurrentPosition(
     (pos)=>{
       userLocation = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
       statusEl.style.color = '';
-      statusEl.textContent = "✅ Joylashuv aniqlandi.";
+      statusEl.textContent = T().locOk;
     },
-    ()=>{ statusEl.textContent = "Joylashuvga ruxsat berilmadi. Manzilni yozing."; }
+    ()=>{ statusEl.textContent = T().locDenied; }
   );
 });
 
@@ -658,16 +1027,16 @@ $('submit-order-btn').addEventListener('click', async ()=>{
 
   const noPhone = $('no-phone').checked;
 
-  if (cartCount() === 0){ notify("Savatingiz bo'sh — avval taom tanlang."); return; }
+  if (cartCount() === 0){ notify(T().errEmptyCart); return; }
   if (!phone && !noPhone){
-    notify("Telefon raqamingizni kiriting — yoki raqamingiz bo'lmasa, pastdagi belgini qo'ying.");
+    notify(T().errPhone);
     return;
   }
   if (!phone && noPhone && !signedUser.uid && !(tg && tg.initDataUnsafe && tg.initDataUnsafe.user)){
-    notify("Siz bilan bog'lana olmaymiz. Iltimos, botni Telegram orqali oching yoki raqam kiriting.");
+    notify(T().errNoContact);
     return;
   }
-  if (!userLocation && !addressText){ notify("Iltimos, joylashuvni yuboring yoki manzilni yozing."); return; }
+  if (!userLocation && !addressText){ notify(T().errAddr); return; }
 
   const payload = {
     initData: tg ? tg.initData : "",
@@ -686,7 +1055,7 @@ $('submit-order-btn').addEventListener('click', async ()=>{
   };
 
   submitBtn.disabled = true;
-  submitBtn.textContent = "Yuborilmoqda...";
+  submitBtn.textContent = T().sending;
 
   try{
     const res = await fetch('/api/order', {
@@ -696,9 +1065,9 @@ $('submit-order-btn').addEventListener('click', async ()=>{
     });
     const data = await res.json().catch(()=>({}));
     if (!res.ok){
-      notify(data.error || ("Xatolik yuz berdi (kod: " + res.status + ")."));
+      notify(data.error || T().errCode(res.status));
       submitBtn.disabled = false;
-      submitBtn.textContent = "Buyurtmani tasdiqlash";
+      submitBtn.textContent = T().confirmBtn;
       return;
     }
     cart = {};
@@ -708,10 +1077,10 @@ $('submit-order-btn').addEventListener('click', async ()=>{
     openSheet('confirm');
     if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
   }catch(e){
-    notify("Internet aloqasida muammo. Qayta urinib ko'ring.");
+    notify(T().errNet);
   }
   submitBtn.disabled = false;
-  submitBtn.textContent = "Buyurtmani tasdiqlash";
+  submitBtn.textContent = T().confirmBtn;
 });
 
 $('close-app-btn').addEventListener('click', ()=>{
@@ -719,6 +1088,7 @@ $('close-app-btn').addEventListener('click', ()=>{
   if (tg) tg.close();
 });
 
+applyLang(detectLang(), false);
 loadMenu();
 </script>
 </body>
