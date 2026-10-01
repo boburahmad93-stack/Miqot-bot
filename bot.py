@@ -172,6 +172,193 @@ def remove_staff_id(rem_id):
     settings["staff_ids"] = list(ids)
     save_settings(settings)
 
+# ---------- tillar ----------
+
+LANG_FILE = os.path.join(DATA_DIR, "user_lang.json")
+SUPPORTED_LANGS = ["uz", "ar", "en", "ru", "tr", "ur", "id"]
+LANG_NAMES = {
+    "uz": "🇺🇿 O'zbekcha", "ar": "🇸🇦 العربية", "en": "🇬🇧 English",
+    "ru": "🇷🇺 Русский", "tr": "🇹🇷 Türkçe", "ur": "🇵🇰 اردو", "id": "🇮🇩 Indonesia",
+}
+# Telegram til kodini bizdagi tilga moslash
+LANG_ALIASES = {
+    "ms": "id", "az": "tr", "kk": "ru", "ky": "ru", "tg": "ru", "tk": "ru",
+    "hi": "ur", "pa": "ur", "fa": "ar",
+}
+
+def load_user_langs():
+    return load_json(LANG_FILE, {})
+
+def set_user_lang(user_id, lang):
+    if lang not in SUPPORTED_LANGS:
+        return
+    data = load_user_langs()
+    data[str(user_id)] = lang
+    save_json(LANG_FILE, data)
+
+def get_user_lang(user_id, tg_code=None):
+    """Avval mijoz tanlagan til, bo'lmasa Telegram tilidan taxmin, bo'lmasa inglizcha."""
+    if user_id:
+        saved = load_user_langs().get(str(user_id))
+        if saved in SUPPORTED_LANGS:
+            return saved
+    code = (tg_code or "").lower().split("-")[0]
+    if code in SUPPORTED_LANGS:
+        return code
+    if code in LANG_ALIASES:
+        return LANG_ALIASES[code]
+    return "uz"
+
+TEXTS = {
+    "welcome": {
+        "uz": "Assalomu alaykum! 👋\n{biz}ga xush kelibsiz.\nPastdagi tugma orqali buyurtma bera boshlang:",
+        "ar": "السلام عليكم! 👋\nمرحبًا بك في {biz}.\nابدأ طلبك من الزر بالأسفل:",
+        "en": "Hello! 👋\nWelcome to {biz}.\nStart your order with the button below:",
+        "ru": "Здравствуйте! 👋\nДобро пожаловать в {biz}.\nНачните заказ кнопкой ниже:",
+        "tr": "Merhaba! 👋\n{biz}'a hoş geldiniz.\nAşağıdaki butondan siparişe başlayın:",
+        "ur": "السلام علیکم! 👋\n{biz} میں خوش آمدید۔\nنیچے والے بٹن سے آرڈر شروع کریں:",
+        "id": "Halo! 👋\nSelamat datang di {biz}.\nMulai pesanan lewat tombol di bawah:",
+    },
+    "btn_order": {
+        "uz": "🛍 Buyurtma berish", "ar": "🛍 اطلب الآن", "en": "🛍 Place an order",
+        "ru": "🛍 Сделать заказ", "tr": "🛍 Sipariş ver", "ur": "🛍 آرڈر دیں", "id": "🛍 Pesan sekarang",
+    },
+    "btn_contact": {
+        "uz": "💬 Biz bilan bog'lanish", "ar": "💬 تواصل معنا", "en": "💬 Contact us",
+        "ru": "💬 Связаться с нами", "tr": "💬 Bize ulaşın", "ur": "💬 ہم سے رابطہ", "id": "💬 Hubungi kami",
+    },
+    "btn_lang": {
+        "uz": "🌐 Til", "ar": "🌐 اللغة", "en": "🌐 Language",
+        "ru": "🌐 Язык", "tr": "🌐 Dil", "ur": "🌐 زبان", "id": "🌐 Bahasa",
+    },
+    "contact_prompt": {
+        "uz": "✍️ Savolingiz yoki fikringizni shu yerga yozing — tez orada javob beramiz.",
+        "ar": "✍️ اكتب سؤالك أو ملاحظتك هنا — سنرد عليك قريبًا.",
+        "en": "✍️ Write your question or feedback here — we'll reply shortly.",
+        "ru": "✍️ Напишите ваш вопрос или отзыв здесь — мы скоро ответим.",
+        "tr": "✍️ Sorunuzu veya görüşünüzü buraya yazın — kısa sürede yanıtlayacağız.",
+        "ur": "✍️ اپنا سوال یا رائے یہاں لکھیں — ہم جلد جواب دیں گے۔",
+        "id": "✍️ Tulis pertanyaan atau masukan Anda di sini — kami akan segera membalas.",
+    },
+    "msg_received": {
+        "uz": "✅ Xabaringiz qabul qilindi, tez orada javob beramiz.",
+        "ar": "✅ تم استلام رسالتك، سنرد قريبًا.",
+        "en": "✅ We got your message, we'll reply shortly.",
+        "ru": "✅ Сообщение получено, скоро ответим.",
+        "tr": "✅ Mesajınız alındı, kısa sürede yanıtlayacağız.",
+        "ur": "✅ آپ کا پیغام موصول ہوا، ہم جلد جواب دیں گے۔",
+        "id": "✅ Pesan Anda kami terima, segera kami balas.",
+    },
+    "reply_from": {
+        "uz": "💬 {biz}dan javob:", "ar": "💬 رد من {biz}:", "en": "💬 Reply from {biz}:",
+        "ru": "💬 Ответ от {biz}:", "tr": "💬 {biz}'dan yanıt:", "ur": "💬 {biz} کی طرف سے جواب:",
+        "id": "💬 Balasan dari {biz}:",
+    },
+    "ask_name": {
+        "uz": "Ismingizni kiriting:", "ar": "اكتب اسمك:", "en": "Enter your name:",
+        "ru": "Введите ваше имя:", "tr": "Adınızı girin:", "ur": "اپنا نام لکھیں:", "id": "Masukkan nama Anda:",
+    },
+    "ask_phone": {
+        "uz": "Telefon raqamingiz:\n\nPastdagi tugma orqali yuborishingiz, qo'lda yozishingiz (istalgan davlat raqami bo'ladi), yoki raqamingiz bo'lmasa \"Raqamim yo'q\" tugmasini bosishingiz mumkin — u holda siz bilan shu bot orqali bog'lanamiz.",
+        "ar": "رقم هاتفك:\n\nيمكنك إرساله بالزر بالأسفل، أو كتابته يدويًا (أي دولة)، أو الضغط على \"ليس لدي رقم\" — وعندها سنتواصل معك عبر هذا البوت.",
+        "en": "Your phone number:\n\nSend it with the button below, type it manually (any country), or tap \"No number\" — then we'll reach you through this bot.",
+        "ru": "Ваш номер телефона:\n\nОтправьте кнопкой ниже, напишите вручную (любая страна) или нажмите «Нет номера» — тогда свяжемся через этого бота.",
+        "tr": "Telefon numaranız:\n\nAşağıdaki butonla gönderin, elle yazın (herhangi bir ülke) veya \"Numaram yok\" deyin — o zaman bu bot üzerinden ulaşırız.",
+        "ur": "آپ کا فون نمبر:\n\nنیچے والے بٹن سے بھیجیں، خود لکھیں (کوئی بھی ملک)، یا \"نمبر نہیں ہے\" دبائیں — پھر ہم اسی بوٹ سے رابطہ کریں گے۔",
+        "id": "Nomor telepon Anda:\n\nKirim lewat tombol di bawah, ketik manual (negara mana pun), atau pilih \"Tidak punya nomor\" — kami akan menghubungi lewat bot ini.",
+    },
+    "btn_send_phone": {
+        "uz": "📞 Raqamimni yuborish", "ar": "📞 إرسال رقمي", "en": "📞 Send my number",
+        "ru": "📞 Отправить номер", "tr": "📞 Numaramı gönder", "ur": "📞 میرا نمبر بھیجیں", "id": "📞 Kirim nomor saya",
+    },
+    "btn_no_phone": {
+        "uz": "📱 Raqamim yo'q — Telegram orqali", "ar": "📱 ليس لدي رقم — عبر تيليجرام",
+        "en": "📱 No number — via Telegram", "ru": "📱 Нет номера — через Telegram",
+        "tr": "📱 Numaram yok — Telegram'dan", "ur": "📱 نمبر نہیں — ٹیلیگرام پر",
+        "id": "📱 Tidak punya nomor — via Telegram",
+    },
+    "ask_address": {
+        "uz": "Endi joylashuvingizni yuboring 📍\nPastdagi tugmani bosing (eng aniq usul) — yoki manzilni yozib yuborishingiz ham mumkin.",
+        "ar": "الآن أرسل موقعك 📍\nاضغط الزر بالأسفل (الأدق) — أو اكتب العنوان.",
+        "en": "Now send your location 📍\nTap the button below (most accurate) — or type your address.",
+        "ru": "Теперь отправьте местоположение 📍\nНажмите кнопку ниже (точнее всего) — или напишите адрес.",
+        "tr": "Şimdi konumunuzu gönderin 📍\nAşağıdaki butona basın (en doğrusu) — veya adresi yazın.",
+        "ur": "اب اپنی لوکیشن بھیجیں 📍\nنیچے والا بٹن دبائیں (سب سے درست) — یا پتہ لکھیں۔",
+        "id": "Sekarang kirim lokasi Anda 📍\nTekan tombol di bawah (paling akurat) — atau tulis alamat.",
+    },
+    "btn_location": {
+        "uz": "📍 Joylashuvimni yuborish", "ar": "📍 إرسال موقعي", "en": "📍 Send my location",
+        "ru": "📍 Отправить местоположение", "tr": "📍 Konumumu gönder",
+        "ur": "📍 میری لوکیشن بھیجیں", "id": "📍 Kirim lokasi saya",
+    },
+    "receipt_title": {
+        "uz": "✅ Buyurtmangiz qabul qilindi! (#{no})", "ar": "✅ تم استلام طلبك! (رقم {no})",
+        "en": "✅ Your order is received! (#{no})", "ru": "✅ Заказ принят! (№{no})",
+        "tr": "✅ Siparişiniz alındı! (#{no})", "ur": "✅ آپ کا آرڈر موصول ہوا! (#{no})",
+        "id": "✅ Pesanan Anda diterima! (#{no})",
+    },
+    "receipt_total": {
+        "uz": "💰 Jami: {sum} (naqd — yetkazib berilganda)",
+        "ar": "💰 الإجمالي: {sum} (نقدًا عند الاستلام)",
+        "en": "💰 Total: {sum} (cash on delivery)",
+        "ru": "💰 Итого: {sum} (наличными при доставке)",
+        "tr": "💰 Toplam: {sum} (teslimatta nakit)",
+        "ur": "💰 کل: {sum} (ڈیلیوری پر نقد)",
+        "id": "💰 Total: {sum} (tunai saat pengantaran)",
+    },
+    "receipt_nophone": {
+        "uz": "\n📱 Telefon raqami kiritilmadi — siz bilan shu bot orqali bog'lanamiz. Xabarlarni kuzatib turing.",
+        "ar": "\n📱 لم يُدخل رقم هاتف — سنتواصل معك عبر هذا البوت. تابع الرسائل.",
+        "en": "\n📱 No phone number given — we'll reach you through this bot. Please watch for messages.",
+        "ru": "\n📱 Номер не указан — свяжемся через этого бота. Следите за сообщениями.",
+        "tr": "\n📱 Numara girilmedi — bu bot üzerinden ulaşacağız. Mesajları takip edin.",
+        "ur": "\n📱 فون نمبر نہیں دیا گیا — ہم اسی بوٹ سے رابطہ کریں گے۔ پیغامات دیکھتے رہیں۔",
+        "id": "\n📱 Nomor tidak diisi — kami hubungi lewat bot ini. Pantau pesannya.",
+    },
+    "receipt_tail": {
+        "uz": "\nTez orada siz bilan bog'lanamiz. Holat o'zgarganda sizga xabar boradi.",
+        "ar": "\nسنتواصل معك قريبًا. وسنخبرك عند تغيّر حالة الطلب.",
+        "en": "\nWe'll contact you shortly. You'll be notified when the status changes.",
+        "ru": "\nСкоро свяжемся с вами. Сообщим об изменении статуса.",
+        "tr": "\nKısa sürede sizinle iletişime geçeceğiz. Durum değişince haber vereceğiz.",
+        "ur": "\nہم جلد رابطہ کریں گے۔ حالت بدلنے پر آپ کو اطلاع دی جائے گی۔",
+        "id": "\nKami akan segera menghubungi. Anda akan diberi tahu bila status berubah.",
+    },
+    "status_update": {
+        "uz": "Buyurtmangiz #{no} holati: {st}", "ar": "حالة طلبك #{no}: {st}",
+        "en": "Your order #{no} status: {st}", "ru": "Статус заказа №{no}: {st}",
+        "tr": "Sipariş #{no} durumu: {st}", "ur": "آپ کے آرڈر #{no} کی حالت: {st}",
+        "id": "Status pesanan #{no}: {st}",
+    },
+    "lang_choose": {
+        "uz": "Tilni tanlang:", "ar": "اختر اللغة:", "en": "Choose your language:",
+        "ru": "Выберите язык:", "tr": "Dil seçin:", "ur": "زبان منتخب کریں:", "id": "Pilih bahasa:",
+    },
+    "lang_saved": {
+        "uz": "✅ Til o'zgartirildi.", "ar": "✅ تم تغيير اللغة.", "en": "✅ Language changed.",
+        "ru": "✅ Язык изменён.", "tr": "✅ Dil değiştirildi.", "ur": "✅ زبان تبدیل ہو گئی۔",
+        "id": "✅ Bahasa diubah.",
+    },
+}
+
+STATUS_NAMES = {
+    "Tayyorlanmoqda": {"uz":"Tayyorlanmoqda","ar":"قيد التحضير","en":"Being prepared","ru":"Готовится","tr":"Hazırlanıyor","ur":"تیار ہو رہا ہے","id":"Sedang disiapkan"},
+    "Yo'lda":         {"uz":"Yo'lda","ar":"في الطريق","en":"On the way","ru":"В пути","tr":"Yolda","ur":"راستے میں","id":"Dalam perjalanan"},
+    "Yetkazildi":     {"uz":"Yetkazildi","ar":"تم التوصيل","en":"Delivered","ru":"Доставлено","tr":"Teslim edildi","ur":"پہنچا دیا گیا","id":"Terkirim"},
+    "Yangi":          {"uz":"Yangi","ar":"جديد","en":"New","ru":"Новый","tr":"Yeni","ur":"نیا","id":"Baru"},
+}
+
+def t(key, lang, **kw):
+    entry = TEXTS.get(key, {})
+    text = entry.get(lang) or entry.get("uz") or ""
+    try:
+        return text.format(**kw) if kw else text
+    except Exception:
+        return text
+
+def status_name(status, lang):
+    return STATUS_NAMES.get(status, {}).get(lang, status)
+
 def is_owner(chat_id):
     """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
     return chat_id in load_admin_ids()
@@ -216,17 +403,37 @@ def sign_user_params(user_id, username):
     sig = hmac.new(BOT_TOKEN.encode(), payload.encode(), hashlib.sha256).hexdigest()
     return ts, sig
 
-def main_keyboard(user_id=None, username=None):
+def main_keyboard(user_id=None, username=None, lang=None):
+    lang = lang or get_user_lang(user_id)
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     if WEBAPP_URL and user_id:
         ts, sig = sign_user_params(user_id, username)
         params = f"uid={user_id}&uname={urllib.parse.quote(username or '')}&ts={ts}&sig={sig}&v={ts}"
         fresh_url = f"{WEBAPP_URL}?{params}"
-        kb.row(types.KeyboardButton("🛍 Buyurtma berish", web_app=types.WebAppInfo(url=fresh_url)))
+        kb.row(types.KeyboardButton(t("btn_order", lang), web_app=types.WebAppInfo(url=fresh_url)))
         if is_owner(user_id):
             admin_url = f"{WEBAPP_URL}/admin?{params}"
             kb.row(types.KeyboardButton("🧑‍🍳 Menyuni boshqarish", web_app=types.WebAppInfo(url=admin_url)))
-    kb.row(types.KeyboardButton("💬 Biz bilan bog'lanish"))
+    kb.row(types.KeyboardButton(t("btn_contact", lang)), types.KeyboardButton(t("btn_lang", lang)))
+    return kb
+
+def is_contact_button(text):
+    return any(text == TEXTS["btn_contact"][l] for l in SUPPORTED_LANGS)
+
+def is_lang_button(text):
+    return any(text == TEXTS["btn_lang"][l] for l in SUPPORTED_LANGS)
+
+def is_no_phone_button(text):
+    return any(text == TEXTS["btn_no_phone"][l] for l in SUPPORTED_LANGS)
+
+def is_any_bot_button(text):
+    return is_contact_button(text) or is_lang_button(text) or is_no_phone_button(text)
+
+def lang_keyboard():
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    buttons = [types.InlineKeyboardButton(LANG_NAMES[c], callback_data=f"setlang:{c}") for c in SUPPORTED_LANGS]
+    for i in range(0, len(buttons), 2):
+        kb.row(*buttons[i:i+2])
     return kb
 
 # ---------- /start ----------
@@ -235,12 +442,10 @@ def main_keyboard(user_id=None, username=None):
 def cmd_start(message):
     carts.pop(message.from_user.id, None)
     checkout_state.pop(message.from_user.id, None)
-    welcome = (
-        f"Assalomu alaykum! 👋\n{BUSINESS_NAME}ga xush kelibsiz.\n"
-        "Pastdagi tugma orqali buyurtma bera boshlang:"
-    )
+    lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
+    welcome = t("welcome", lang, biz=BUSINESS_NAME)
     settings = load_settings()
-    kb = main_keyboard(message.from_user.id, message.from_user.username)
+    kb = main_keyboard(message.from_user.id, message.from_user.username, lang)
     if settings.get("logo_photo_id"):
         bot.send_photo(message.chat.id, settings["logo_photo_id"], caption=welcome, reply_markup=kb)
     else:
@@ -435,20 +640,18 @@ def cb_checkout(call):
         bot.answer_callback_query(call.id, "Savatingiz bo'sh.")
         return
     checkout_state[user_id] = {"step": "name"}
-    bot.send_message(call.message.chat.id, "Ismingizni kiriting:", reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(call.message.chat.id, t("ask_name", get_user_lang(user_id)), reply_markup=types.ReplyKeyboardRemove())
     bot.answer_callback_query(call.id)
 
-def location_keyboard():
+def location_keyboard(lang):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    kb.add(types.KeyboardButton("📍 Joylashuvimni yuborish", request_location=True))
+    kb.add(types.KeyboardButton(t("btn_location", lang), request_location=True))
     return kb
 
-NO_PHONE_BTN = "📱 Raqamim yo'q — Telegram orqali"
-
-def phone_keyboard():
+def phone_keyboard(lang):
     kb = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    kb.add(types.KeyboardButton("📞 Raqamimni yuborish", request_contact=True))
-    kb.add(types.KeyboardButton(NO_PHONE_BTN))
+    kb.add(types.KeyboardButton(t("btn_send_phone", lang), request_contact=True))
+    kb.add(types.KeyboardButton(t("btn_no_phone", lang)))
     return kb
 
 def order_phone_line(order):
@@ -466,21 +669,14 @@ def handle_checkout_steps(message):
     user_id = message.from_user.id
     state = checkout_state[user_id]
     step = state["step"]
+    lang = get_user_lang(user_id, getattr(message.from_user, "language_code", None))
 
     if step == "name":
         if message.content_type != "text":
             return
         state["name"] = message.text.strip()
         state["step"] = "phone"
-        bot.send_message(
-            message.chat.id,
-            "Telefon raqamingiz:\n\n"
-            "Pastdagi tugma orqali yuborishingiz, qo'lda yozishingiz "
-            "(istalgan davlat raqami bo'ladi), yoki raqamingiz bo'lmasa "
-            "\"Raqamim yo'q\" tugmasini bosishingiz mumkin — "
-            "u holda siz bilan shu bot orqali bog'lanamiz.",
-            reply_markup=phone_keyboard()
-        )
+        bot.send_message(message.chat.id, t("ask_phone", lang), reply_markup=phone_keyboard(lang))
         return
 
     if step == "phone":
@@ -488,16 +684,11 @@ def handle_checkout_steps(message):
             state["phone"] = (message.contact.phone_number or "").strip()
         elif message.content_type == "text":
             txt = message.text.strip()
-            state["phone"] = "" if txt == NO_PHONE_BTN else txt
+            state["phone"] = "" if is_no_phone_button(txt) else txt
         else:
             return
         state["step"] = "address"
-        bot.send_message(
-            message.chat.id,
-            "Endi joylashuvingizni yuboring 📍\n"
-            "Pastdagi tugmani bosing (eng aniq usul) — yoki manzilni yozib yuborishingiz ham mumkin.",
-            reply_markup=location_keyboard()
-        )
+        bot.send_message(message.chat.id, t("ask_address", lang), reply_markup=location_keyboard(lang))
         return
 
     if step == "address":
@@ -601,18 +792,19 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
             pass
     return order, None
 
-def build_customer_receipt_text(order):
+def build_customer_receipt_text(order, lang=None):
+    lang = lang or get_user_lang(order.get("user_id"))
     text = (
-        f"✅ Buyurtmangiz qabul qilindi! (#{order['daily_number']})\n\n"
+        t("receipt_title", lang, no=order["daily_number"]) + "\n\n"
         f"{order_items_text(order)}\n\n"
-        f"💰 Jami: {fmt_sum(order['total'])} (naqd — yetkazib berilganda)\n"
+        + t("receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
         f"{order_address_line(order)}\n"
     )
     if order.get("note"):
         text += f"📝 {order['note']}\n"
     if not (order.get("phone") or "").strip():
-        text += "\n📱 Telefon raqami kiritilmadi — siz bilan shu bot orqali bog'lanamiz. Xabarlarni kuzatib turing."
-    text += "\nTez orada siz bilan bog'lanamiz. Holat o'zgarganda sizga xabar boradi."
+        text += t("receipt_nophone", lang)
+    text += t("receipt_tail", lang)
     return text
 
 def order_items_text(order):
@@ -723,7 +915,9 @@ def cb_update_status(call):
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
     try:
-        bot.send_message(order["user_id"], f"Buyurtmangiz #{order['daily_number']} holati: {new_status}")
+        clang = get_user_lang(order["user_id"])
+        bot.send_message(order["user_id"], t("status_update", clang,
+                                             no=order["daily_number"], st=status_name(new_status, clang)))
     except Exception:
         pass
 
@@ -1121,6 +1315,20 @@ def verify_signed_user(uid, uname, ts, sig):
     if not hmac.compare_digest(expected, sig):
         return None
     return {"id": int(uid), "username": uname or None}
+
+@app.route("/api/lang", methods=["POST"])
+def api_set_lang():
+    """Mini App'da tanlangan tilni saqlaymiz — bot xabarlari ham shu tilda bo'ladi."""
+    body = request.get_json(force=True, silent=True) or {}
+    lang = (body.get("lang") or "").strip()
+    if lang not in SUPPORTED_LANGS:
+        return jsonify({"error": "noma'lum til"}), 400
+    user = validate_init_data(body.get("initData", "")) or verify_signed_user(
+        body.get("uid"), body.get("uname"), body.get("ts"), body.get("sig"))
+    if not user or not user.get("id"):
+        return jsonify({"error": "foydalanuvchi aniqlanmadi"}), 400
+    set_user_lang(user["id"], lang)
+    return jsonify({"ok": True})
 
 @app.route("/api/order", methods=["POST"])
 def api_order():
@@ -1643,12 +1851,35 @@ def daily_report_scheduler():
 
 support_message_map = {}  # (admin_chat_id, message_id) -> mijoz_user_id
 
-@bot.message_handler(func=lambda m: m.text == "💬 Biz bilan bog'lanish")
+@bot.message_handler(func=lambda m: m.text and is_contact_button(m.text))
 def handle_contact_button(message):
-    bot.send_message(
-        message.chat.id,
-        "✍️ Savolingiz yoki fikringizni shu yerga yozing — tez orada javob beramiz."
-    )
+    lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
+    bot.send_message(message.chat.id, t("contact_prompt", lang))
+
+@bot.message_handler(commands=["til", "lang", "language"])
+def cmd_lang(message):
+    lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
+    bot.send_message(message.chat.id, t("lang_choose", lang), reply_markup=lang_keyboard())
+
+@bot.message_handler(func=lambda m: m.text and is_lang_button(m.text))
+def handle_lang_button(message):
+    cmd_lang(message)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("setlang:"))
+def cb_set_lang(call):
+    code = call.data.split(":", 1)[1]
+    if code not in SUPPORTED_LANGS:
+        bot.answer_callback_query(call.id)
+        return
+    set_user_lang(call.from_user.id, code)
+    bot.answer_callback_query(call.id, t("lang_saved", code))
+    try:
+        bot.edit_message_text(t("lang_saved", code) + " " + LANG_NAMES[code],
+                              call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    bot.send_message(call.message.chat.id, t("welcome", code, biz=BUSINESS_NAME),
+                     reply_markup=main_keyboard(call.from_user.id, call.from_user.username, code))
 
 @bot.message_handler(
     func=lambda m: (
@@ -1662,7 +1893,8 @@ def handle_admin_reply(message):
     if not customer_id:
         return
     try:
-        bot.send_message(customer_id, f"💬 Miqot Food'dan javob:\n{message.text}")
+        clang = get_user_lang(customer_id)
+        bot.send_message(customer_id, t("reply_from", clang, biz=BUSINESS_NAME) + f"\n{message.text}")
         bot.send_message(message.chat.id, "✅ Javobingiz mijozga yuborildi.")
     except Exception:
         bot.send_message(message.chat.id, "❌ Yuborib bo'lmadi — mijoz botni bloklagan bo'lishi mumkin.")
@@ -1673,7 +1905,7 @@ def handle_admin_reply(message):
         and not m.text.startswith("/")
         and m.from_user.id not in checkout_state
         and not is_staff_or_admin(m.from_user.id)
-        and m.text != "💬 Biz bilan bog'lanish"
+        and not is_any_bot_button(m.text)
     )
 )
 def handle_customer_free_text(message):
@@ -1689,7 +1921,7 @@ def handle_customer_free_text(message):
             support_message_map[(recipient_id, sent.message_id)] = sender.id
         except Exception:
             pass
-    bot.send_message(message.chat.id, "✅ Xabaringiz qabul qilindi, tez orada javob beramiz.")
+    bot.send_message(message.chat.id, t("msg_received", get_user_lang(sender.id, getattr(sender, "language_code", None))))
 
 # ---------- ishga tushirish ----------
 
