@@ -337,6 +337,33 @@ TEXTS = {
         "uz": "AKSIYA", "ar": "خصم", "en": "SALE", "ru": "АКЦИЯ",
         "tr": "İNDİRİM", "ur": "رعایت", "id": "DISKON",
     },
+    "closed_today": {
+        "uz": "Assalomu alaykum! 🌙\nBugun ish kunimiz emas — buyurtma qabul qilinmaydi.\n\nIsh faoliyatimiz tiklanganda sizni yangi buyurtmalar bilan kutib qolamiz. Rahmat!",
+        "ar": "السلام عليكم! 🌙\nاليوم إجازة — لا نستقبل الطلبات.\n\nننتظر طلباتكم عند استئناف العمل. شكرًا لكم!",
+        "en": "Hello! 🌙\nWe're closed today — orders aren't being accepted.\n\nWe'll be glad to welcome your orders when we reopen. Thank you!",
+        "ru": "Здравствуйте! 🌙\nСегодня у нас выходной — заказы не принимаются.\n\nБудем рады вашим заказам, когда снова откроемся. Спасибо!",
+        "tr": "Merhaba! 🌙\nBugün kapalıyız — sipariş alınmıyor.\n\nYeniden açıldığımızda siparişlerinizi bekliyoruz. Teşekkürler!",
+        "ur": "السلام علیکم! 🌙\nآج ہماری چھٹی ہے — آرڈر وصول نہیں کیے جا رہے۔\n\nدوبارہ کھلنے پر آپ کے آرڈرز کے منتظر رہیں گے۔ شکریہ!",
+        "id": "Halo! 🌙\nHari ini kami tutup — pesanan tidak diterima.\n\nKami menanti pesanan Anda saat buka kembali. Terima kasih!",
+    },
+    "closed_hours": {
+        "uz": "Assalomu alaykum! 🌙\nIsh vaqtimiz tugadi — hozircha buyurtma qabul qilinmaydi.\n\n🕒 Ish vaqtimiz: {open} — {close}\nSizdan {open} dan boshlab yangi buyurtmalar kutib qolamiz. Rahmat!",
+        "ar": "السلام عليكم! 🌙\nانتهى دوام العمل — لا نستقبل الطلبات حاليًا.\n\n🕒 ساعات العمل: {open} — {close}\nننتظر طلباتكم ابتداءً من {open}. شكرًا لكم!",
+        "en": "Hello! 🌙\nWe're closed for the day — orders aren't being accepted right now.\n\n🕒 Working hours: {open} — {close}\nWe'll welcome your orders from {open}. Thank you!",
+        "ru": "Здравствуйте! 🌙\nРабочий день закончился — заказы сейчас не принимаются.\n\n🕒 Часы работы: {open} — {close}\nЖдём ваши заказы с {open}. Спасибо!",
+        "tr": "Merhaba! 🌙\nÇalışma saatimiz sona erdi — şu an sipariş alınmıyor.\n\n🕒 Çalışma saatleri: {open} — {close}\nSiparişlerinizi {open}'dan itibaren bekliyoruz. Teşekkürler!",
+        "ur": "السلام علیکم! 🌙\nہمارا کام کا وقت ختم ہو گیا — فی الحال آرڈر وصول نہیں کیے جا رہے۔\n\n🕒 اوقاتِ کار: {open} — {close}\n{open} سے آپ کے آرڈرز کے منتظر ہیں۔ شکریہ!",
+        "id": "Halo! 🌙\nJam kerja kami sudah berakhir — pesanan belum diterima saat ini.\n\n🕒 Jam buka: {open} — {close}\nKami menanti pesanan Anda mulai {open}. Terima kasih!",
+    },
+    "closed_short": {
+        "uz": "Hozir yopiqmiz — buyurtma qabul qilinmaydi.",
+        "ar": "نحن مغلقون الآن — لا نستقبل الطلبات.",
+        "en": "We're closed right now — orders aren't accepted.",
+        "ru": "Сейчас закрыто — заказы не принимаются.",
+        "tr": "Şu an kapalıyız — sipariş alınmıyor.",
+        "ur": "ہم اس وقت بند ہیں — آرڈر وصول نہیں کیے جا رہے۔",
+        "id": "Kami sedang tutup — pesanan tidak diterima.",
+    },
     "status_update": {
         "uz": "Buyurtmangiz #{no} holati: {st}", "ar": "حالة طلبك #{no}: {st}",
         "en": "Your order #{no} status: {st}", "ru": "Статус заказа №{no}: {st}",
@@ -371,6 +398,73 @@ def t(key, lang, **kw):
 
 def status_name(status, lang):
     return STATUS_NAMES.get(status, {}).get(lang, status)
+
+# ---------- ish vaqti ----------
+
+def get_hours():
+    """Ish vaqti sozlamasi:
+       closed_today — qo'lda yopish (dam olish kuni)
+       schedule_on  — kunlik jadval yoqilganmi
+       open/close   — 'HH:MM' ko'rinishida"""
+    s = load_settings()
+    h = s.get("hours") or {}
+    return {
+        "closed_today": bool(h.get("closed_today")),
+        "schedule_on": bool(h.get("schedule_on")),
+        "open": h.get("open") or "06:00",
+        "close": h.get("close") or "22:00",
+    }
+
+def set_hours(closed_today=None, schedule_on=None, open_time=None, close_time=None):
+    s = load_settings()
+    h = s.get("hours") or {}
+    if closed_today is not None:
+        h["closed_today"] = bool(closed_today)
+    if schedule_on is not None:
+        h["schedule_on"] = bool(schedule_on)
+    if open_time is not None and valid_hhmm(open_time):
+        h["open"] = open_time
+    if close_time is not None and valid_hhmm(close_time):
+        h["close"] = close_time
+    s["hours"] = h
+    save_settings(s)
+    return get_hours()
+
+def valid_hhmm(value):
+    try:
+        hh, mm = str(value).split(":")
+        return 0 <= int(hh) <= 23 and 0 <= int(mm) <= 59
+    except Exception:
+        return False
+
+def _minutes(hhmm):
+    hh, mm = str(hhmm).split(":")
+    return int(hh) * 60 + int(mm)
+
+def shop_status():
+    """Hozir buyurtma qabul qilinadimi. {'open': bool, 'reason': 'closed_today'|'schedule'|None, ...}"""
+    h = get_hours()
+    if h["closed_today"]:
+        return {"open": False, "reason": "closed_today", "open_time": h["open"], "close_time": h["close"]}
+    if h["schedule_on"] and valid_hhmm(h["open"]) and valid_hhmm(h["close"]):
+        now = datetime.now(TIMEZONE)
+        cur = now.hour * 60 + now.minute
+        start, end = _minutes(h["open"]), _minutes(h["close"])
+        if start == end:
+            is_open = True                      # 24 soat
+        elif start < end:
+            is_open = start <= cur < end        # masalan 06:00–22:00
+        else:
+            is_open = cur >= start or cur < end  # yarim tundan oshadigan jadval
+        if not is_open:
+            return {"open": False, "reason": "schedule", "open_time": h["open"], "close_time": h["close"]}
+    return {"open": True, "reason": None, "open_time": h["open"], "close_time": h["close"]}
+
+def closed_message(lang, st=None):
+    st = st or shop_status()
+    if st["reason"] == "closed_today":
+        return t("closed_today", lang)
+    return t("closed_hours", lang, open=st["open_time"], close=st["close_time"])
 
 # ---------- aksiya (chegirma) ----------
 
@@ -490,7 +584,13 @@ def cmd_start(message):
     carts.pop(message.from_user.id, None)
     checkout_state.pop(message.from_user.id, None)
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
-    welcome = t("welcome", lang, biz=BUSINESS_NAME)
+    st = shop_status()
+    if st["open"] or is_owner(message.chat.id):
+        welcome = t("welcome", lang, biz=BUSINESS_NAME)
+        if not st["open"]:
+            welcome = closed_message(lang, st) + "\n\n— — —\n(Siz adminsiz, shuning uchun buyurtma bera olasiz.)"
+    else:
+        welcome = closed_message(lang, st)
     settings = load_settings()
     kb = main_keyboard(message.from_user.id, message.from_user.username, lang)
     if settings.get("logo_photo_id"):
@@ -700,8 +800,14 @@ def cb_checkout(call):
     if not carts.get(user_id):
         bot.answer_callback_query(call.id, "Savatingiz bo'sh.")
         return
+    lang = get_user_lang(user_id)
+    st = shop_status()
+    if not st["open"] and not is_owner(call.message.chat.id):
+        bot.answer_callback_query(call.id, t("closed_short", lang), show_alert=True)
+        bot.send_message(call.message.chat.id, closed_message(lang, st))
+        return
     checkout_state[user_id] = {"step": "name"}
-    bot.send_message(call.message.chat.id, t("ask_name", get_user_lang(user_id)), reply_markup=types.ReplyKeyboardRemove())
+    bot.send_message(call.message.chat.id, t("ask_name", lang), reply_markup=types.ReplyKeyboardRemove())
     bot.answer_callback_query(call.id)
 
 def location_keyboard(lang):
@@ -1127,6 +1233,7 @@ def cmd_menu_admin(message):
         message.chat.id,
         "Menyu:\n" + "\n".join(lines) +
         "\n\n🏷 Aksiya: /aksiya 17 (yoqish) | /aksiya off (o'chirish)\n"
+        "🕒 Ish vaqti: /yopiq | /ochiq | /ish_vaqti 06:00 22:00\n"
         "\n\n🧑‍🍳 Eng oson yo'l: pastdagi \"Menyuni boshqarish\" tugmasi orqali "
         "taomni rasmi bilan birga qo'shing/tahrirlang.\n\n"
         "Zaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
@@ -1139,6 +1246,55 @@ def cmd_menu_admin(message):
         "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id\n"
         "Buyurtmani o'chirish (faqat bugungi): /delete_order kunlik_raqami"
     )
+
+@bot.message_handler(commands=["yopiq", "ochiq", "ish_vaqti"])
+def cmd_hours(message):
+    if not is_owner(message.chat.id):
+        return
+    cmd = message.text.split()[0].lstrip("/").split("@")[0].lower()
+    parts = message.text.split()
+
+    if cmd == "yopiq":
+        set_hours(closed_today=True)
+        bot.send_message(message.chat.id, "🔴 Bot yopildi — mijozlarga \"ish vaqtimiz tugadi\" xabari chiqadi.\n"
+                                           "Ochish uchun: /ochiq")
+        return
+    if cmd == "ochiq":
+        set_hours(closed_today=False)
+        st = shop_status()
+        extra = "" if st["open"] else f"\n\n⚠️ Lekin jadval bo'yicha hozir yopiq ({st['open_time']}–{st['close_time']}). Jadvalni o'chirish: /ish_vaqti off"
+        bot.send_message(message.chat.id, "🟢 Bot ochildi — buyurtmalar qabul qilinadi." + extra)
+        return
+
+    # /ish_vaqti
+    h = get_hours()
+    st = shop_status()
+    if len(parts) == 1:
+        holat = "🟢 OCHIQ" if st["open"] else "🔴 YOPIQ"
+        jadval = f"yoniq ({h['open']} – {h['close']})" if h["schedule_on"] else "o'chiq (kecha-kunduz)"
+        bot.send_message(
+            message.chat.id,
+            f"Hozirgi holat: {holat}\n"
+            f"Bugun yopiq: {'ha' if h['closed_today'] else 'yo‘q'}\n"
+            f"Kunlik jadval: {jadval}\n\n"
+            "Jadval belgilash: /ish_vaqti 06:00 22:00\n"
+            "Jadvalni o'chirish: /ish_vaqti off\n"
+            "Bugunga yopish: /yopiq | ochish: /ochiq\n\n"
+            "Bularni \"🧑‍🍳 Menyuni boshqarish\" panelidan ham qilish mumkin."
+        )
+        return
+    if parts[1].lower() in ("off", "o'chir", "ochir"):
+        set_hours(schedule_on=False)
+        bot.send_message(message.chat.id, "🕒 Kunlik jadval o'chirildi — bot kecha-kunduz buyurtma qabul qiladi.")
+        return
+    if len(parts) >= 3 and valid_hhmm(parts[1]) and valid_hhmm(parts[2]):
+        h = set_hours(schedule_on=True, open_time=parts[1], close_time=parts[2])
+        st = shop_status()
+        bot.send_message(message.chat.id,
+            f"🕒 Ish vaqti belgilandi: {h['open']} – {h['close']}\n"
+            f"Hozir: {'🟢 ochiq' if st['open'] else '🔴 yopiq'}")
+        return
+    bot.send_message(message.chat.id, "Format: /ish_vaqti 06:00 22:00\nYoki: /ish_vaqti off")
 
 @bot.message_handler(commands=["aksiya", "sale"])
 def cmd_sale(message):
@@ -1433,6 +1589,7 @@ def api_menu():
         "business_name": BUSINESS_NAME,
         "tagline": BUSINESS_TAGLINE,
         "discount": disc,
+        "shop": shop_status(),
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
 
@@ -1485,6 +1642,12 @@ def api_order():
     longitude = body.get("longitude")
     note = (body.get("note") or "").strip()
     customer_name = (body.get("name") or "").strip() or user.get("first_name") or "Mijoz"
+
+    st = shop_status()
+    # Admin yopiq paytda ham buyurtma bera oladi (sinab ko'rish uchun)
+    if not st["open"] and not (user.get("id") and is_owner(user["id"])):
+        lang = get_user_lang(user.get("id")) if user else "uz"
+        return jsonify({"error": closed_message(lang, st), "closed": True}), 423
 
     if not items_cart:
         return jsonify({"error": "Savatingiz bo'sh."}), 400
@@ -1570,11 +1733,32 @@ ADMIN_PAGE_HTML = """<!doctype html>
   .saleState.on { color:var(--accent); }
   .saleState.off { color:var(--muted); }
   .dish .sale-tag { display:inline-block; margin-top:3px; font-size:12px; font-weight:700; color:var(--accent); }
+  .card.hours.shut { border-color:var(--danger); background:linear-gradient(135deg, rgba(220,38,38,0.1), transparent); }
+  .timeRow { display:flex; gap:12px; margin:4px 0 16px; }
+  .timeRow label { flex:1; margin:0; }
+  .timeRow.off { opacity:0.42; pointer-events:none; }
+  .card.hours .saleBtn { width:100%; }
 </style>
 </head>
 <body>
 <h1>🧑‍🍳 Menyuni boshqarish</h1>
 <p class="sub">Taomni rasmi bilan shu yerdan qo'shing — Telegram'ga qaytish shart emas.</p>
+
+<section class="card hours" id="hoursCard">
+  <h2>🕒 Ish vaqti</h2>
+  <p class="saleNote">Yopiq paytda mijozlarga "ish vaqtimiz tugadi" xabari chiqadi va buyurtma qabul qilinmaydi. Siz admin sifatida baribir buyurtma bera olasiz.</p>
+
+  <label class="chk"><input type="checkbox" id="h_closed"> Bugun yopiq (dam olish kuni)</label>
+
+  <label class="chk"><input type="checkbox" id="h_sched"> Kunlik jadval bo'yicha ishlash</label>
+  <div class="timeRow" id="timeRow">
+    <label>Ochilish<input id="h_open" type="time" value="06:00"></label>
+    <label>Yopilish<input id="h_close" type="time" value="22:00"></label>
+  </div>
+
+  <button id="hoursSave" class="saleBtn off">Saqlash</button>
+  <p class="saleState" id="hoursState">Hozir: ochiq</p>
+</section>
 
 <section class="card sale" id="saleCard">
   <h2>🏷 Juma aksiyasi</h2>
@@ -1643,6 +1827,64 @@ function resetForm() {
 }
 $('cancelBtn').addEventListener('click', resetForm);
 
+/* ---------- ish vaqti ---------- */
+let hours = { closed_today:false, schedule_on:false, open:'06:00', close:'22:00' };
+let shopOpen = true;
+
+function renderHours() {
+  $('h_closed').checked = !!hours.closed_today;
+  $('h_sched').checked = !!hours.schedule_on;
+  $('h_open').value = hours.open || '06:00';
+  $('h_close').value = hours.close || '22:00';
+  $('timeRow').className = 'timeRow' + (hours.schedule_on ? '' : ' off');
+
+  const st = $('hoursState');
+  const card = $('hoursCard');
+  if (!shopOpen) {
+    st.textContent = hours.closed_today
+      ? '🔴 Hozir: YOPIQ (bugun dam olish kuni)'
+      : '🔴 Hozir: YOPIQ (ish vaqtidan tashqari)';
+    st.className = 'saleState off';
+    card.classList.add('shut');
+  } else {
+    st.textContent = hours.schedule_on
+      ? '🟢 Hozir: ochiq — jadval ' + hours.open + ' – ' + hours.close
+      : '🟢 Hozir: ochiq — kecha-kunduz';
+    st.className = 'saleState on';
+    card.classList.remove('shut');
+  }
+}
+
+$('h_sched').addEventListener('change', (e)=>{
+  $('timeRow').className = 'timeRow' + (e.target.checked ? '' : ' off');
+});
+
+async function saveHours() {
+  $('hoursSave').disabled = true;
+  try {
+    const r = await fetch(url('/api/admin/hours'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        closed_today: $('h_closed').checked,
+        schedule_on: $('h_sched').checked,
+        open: $('h_open').value,
+        close: $('h_close').value
+      })
+    });
+    const data = await r.json().catch(()=>({}));
+    if (r.ok) {
+      hours = data.hours || hours;
+      shopOpen = data.shop ? data.shop.open : true;
+      renderHours();
+      say(shopOpen ? '✅ Saqlandi — hozir buyurtma qabul qilinyapti.'
+                   : '✅ Saqlandi — hozir buyurtma qabul qilinmaydi.', 'ok');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    } else { say(data.error || 'Saqlab bo‘lmadi.', 'err'); }
+  } catch (e) { say('Aloqa uzildi. Qaytadan urinib ko‘ring.', 'err'); }
+  $('hoursSave').disabled = false;
+}
+$('hoursSave').addEventListener('click', saveHours);
+
 /* ---------- aksiya ---------- */
 let sale = { active:false, percent:17 };
 
@@ -1695,6 +1937,11 @@ async function saveSale(active) {
 $('saleToggle').addEventListener('click', ()=> saveSale(!sale.active));
 
 async function load() {
+  try {
+    const rh = await fetch(url('/api/admin/hours'));
+    if (rh.ok) { const d = await rh.json(); hours = d.hours || hours; shopOpen = d.shop ? d.shop.open : true; }
+  } catch (e) {}
+  renderHours();
   try {
     const rs = await fetch(url('/api/admin/discount'));
     if (rs.ok) { sale = (await rs.json()).discount || sale; }
@@ -1869,6 +2116,32 @@ def admin_page():
             .replace("__CATEGORIES__", json.dumps(CATEGORIES, ensure_ascii=False))
             .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False)))
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+@app.route("/api/admin/hours", methods=["GET", "POST"])
+def api_admin_hours():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    if request.method == "GET":
+        return jsonify({"hours": get_hours(), "shop": shop_status()})
+    body = request.get_json(force=True, silent=True) or {}
+    open_t = body.get("open")
+    close_t = body.get("close")
+    if body.get("schedule_on"):
+        if not (valid_hhmm(open_t) and valid_hhmm(close_t)):
+            return jsonify({"error": "Vaqtni HH:MM ko'rinishida kiriting."}), 400
+    was_open = shop_status()["open"]
+    h = set_hours(closed_today=body.get("closed_today"), schedule_on=body.get("schedule_on"),
+                  open_time=open_t, close_time=close_t)
+    st = shop_status()
+    if st["open"] != was_open:
+        msg = ("🟢 Bot buyurtma qabul qila boshladi."
+               if st["open"] else "🔴 Bot buyurtma qabul qilishni to'xtatdi — mijozlarga yopiq xabari chiqadi.")
+        for admin_id in load_admin_ids():
+            try:
+                bot.send_message(admin_id, msg)
+            except Exception:
+                pass
+    return jsonify({"ok": True, "hours": h, "shop": st})
 
 @app.route("/api/admin/discount", methods=["GET", "POST"])
 def api_admin_discount():
