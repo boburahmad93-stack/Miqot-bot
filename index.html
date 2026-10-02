@@ -37,9 +37,9 @@
   /* ---------- hero ---------- */
   .hero{
     position:relative;overflow:hidden;
-    padding:26px 18px 20px;text-align:center;
+    padding:14px 16px 13px;
     background:
-      radial-gradient(ellipse 600px 380px at 50% -60px, rgba(227,179,74,0.22), transparent 70%),
+      radial-gradient(ellipse 600px 260px at 20% -40px, rgba(227,179,74,0.2), transparent 70%),
       linear-gradient(180deg, var(--card) 0%, var(--bg) 100%);
     border-bottom:1px solid var(--line);
   }
@@ -48,19 +48,31 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cg fill='none' stroke='%23e3b34a' stroke-width='1'%3E%3Cpath d='M32 2 L62 32 L32 62 L2 32 Z'/%3E%3Cpath d='M32 18 L46 32 L32 46 L18 32 Z'/%3E%3C/g%3E%3C/svg%3E");
     background-size:64px 64px;opacity:0.14;pointer-events:none;
   }
-  .hero-inner{position:relative;z-index:1;}
-  #logo-slot{margin:0 auto 14px;display:flex;justify-content:center;}
+  .hero-inner{
+    position:relative;z-index:1;
+    display:flex;align-items:center;gap:13px;
+    padding-inline-end:76px;   /* til tugmasiga joy */
+  }
+  #logo-slot{flex:none;display:flex;}
   #logo-slot img.logo{
-    width:104px;height:104px;border-radius:24px;object-fit:cover;
-    box-shadow:0 14px 34px rgba(0,0,0,0.5), 0 0 0 1px rgba(227,179,74,0.25);
+    width:56px;height:56px;border-radius:15px;object-fit:cover;
+    box-shadow:0 6px 16px rgba(0,0,0,0.45), 0 0 0 1px rgba(227,179,74,0.25);
   }
   #logo-slot .logo-fallback{
-    width:104px;height:104px;border-radius:24px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
-    display:flex;align-items:center;justify-content:center;font-size:44px;
-    box-shadow:0 14px 34px rgba(0,0,0,0.5);
+    width:56px;height:56px;border-radius:15px;background:linear-gradient(135deg,var(--accent1),var(--accent2));
+    display:flex;align-items:center;justify-content:center;font-size:26px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.45);
   }
-  .hero h1{font-size:21px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;}
-  .hero p{margin:6px 0 0;font-size:12.5px;color:var(--accent1);font-weight:600;letter-spacing:0.3px;}
+  .hero-text{min-width:0;flex:1;}
+  .hero h1{
+    font-size:16.5px;font-weight:700;letter-spacing:0.9px;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .hero p{
+    margin:3px 0 0;font-size:11.5px;color:var(--accent1);font-weight:600;letter-spacing:0.2px;
+    line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
 
   /* ---------- sticky qidiruv + kategoriya ---------- */
   .sticky-bar{
@@ -161,6 +173,13 @@
     background:#e0392f;color:#fff;font-size:10.5px;font-weight:700;
     padding:3px 7px;border-radius:7px;box-shadow:0 2px 7px rgba(0,0,0,0.35);
   }
+  .closed-strip{
+    margin:12px 14px 0;padding:15px 16px;border-radius:14px;
+    background:var(--card);border:1px solid var(--line);
+    border-inline-start:3px solid #e0392f;
+  }
+  .closed-strip .cs-title{font-size:14.5px;font-weight:700;margin-bottom:5px;}
+  .closed-strip .cs-body{font-size:12.5px;color:var(--ink-soft);line-height:1.55;white-space:pre-line;}
   .sale-strip{
     margin:12px 14px 0;padding:11px 14px;border-radius:13px;
     background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#1a1305;
@@ -276,14 +295,14 @@
 
   /* ---------- til tanlash ---------- */
   .lang-btn{
-    position:absolute;top:12px;right:12px;z-index:3;
+    position:absolute;top:50%;transform:translateY(-50%);right:14px;z-index:3;
     display:flex;align-items:center;gap:5px;
     padding:6px 10px;border-radius:999px;cursor:pointer;
     background:rgba(255,255,255,0.07);border:1px solid var(--line);
     color:var(--ink);font-size:12.5px;font-weight:600;font-family:'Inter',sans-serif;
     backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   }
-  html[dir="rtl"] .lang-btn{right:auto;left:12px;}
+  html[dir="rtl"] .lang-btn{right:auto;left:14px;}
   .lang-list{display:flex;flex-direction:column;gap:8px;}
   .lang-item{
     display:flex;align-items:center;gap:11px;width:100%;
@@ -314,8 +333,10 @@
   <button class="lang-btn" id="lang-btn" aria-label="Language"><span id="lang-flag">🇺🇿</span> <span id="lang-code">UZ</span> ▾</button>
   <div class="hero-inner">
     <div id="logo-slot"></div>
-    <h1 id="business-name">Yuklanmoqda...</h1>
-    <p id="business-tagline">Taom tanlang va buyurtma bering</p>
+    <div class="hero-text">
+      <h1 id="business-name">Yuklanmoqda...</h1>
+      <p id="business-tagline">Taom tanlang va buyurtma bering</p>
+    </div>
   </div>
 </div>
 
@@ -430,6 +451,11 @@ const I18N = {
     errNet:"Internet aloqasida muammo. Qayta urinib ko'ring.",
     errCode:(c)=>`Xatolik yuz berdi (kod: ${c}).`,
     saleStrip:(p)=>`Aksiya! Barcha taomga −${p}% chegirma`,
+    closedTitle:'Ish vaqtimiz tugadi',
+    closedToday:'Bugun ish kunimiz emas — buyurtma qabul qilinmaydi. Ish faoliyatimiz tiklanganda sizni yangi buyurtmalar bilan kutib qolamiz. Rahmat!',
+    closedHours:(o,c)=>`Hozircha buyurtma qabul qilinmaydi.\n🕒 Ish vaqtimiz: ${o} — ${c}\nSizdan ${o} dan boshlab yangi buyurtmalar kutib qolamiz. Rahmat!`,
+    closedBadge:'Yopiq',
+    closedShort:'Hozir yopiqmiz — buyurtma qabul qilinmaydi.',
     langTitle:"Til / Language",
     cats:{"Nonushta":"Nonushta","Ovqatlar":"Ovqatlar","Fast Food":"Fast Food","Salatlar":"Salatlar","Salqin ichimliklar":"Salqin ichimliklar","Boshqa mahsulotlar":"Boshqa mahsulotlar"}
   },
@@ -462,6 +488,11 @@ const I18N = {
     errNet:"مشكلة في الاتصال. حاول مرة أخرى.",
     errCode:(c)=>`حدث خطأ (رمز: ${c}).`,
     saleStrip:(p)=>`عرض خاص! خصم ${p}% على جميع الأطباق`,
+    closedTitle:'انتهى دوام العمل',
+    closedToday:'اليوم إجازة — لا نستقبل الطلبات. ننتظر طلباتكم عند استئناف العمل. شكرًا لكم!',
+    closedHours:(o,c)=>`لا نستقبل الطلبات حاليًا.\n🕒 ساعات العمل: ${o} — ${c}\nننتظر طلباتكم ابتداءً من ${o}. شكرًا لكم!`,
+    closedBadge:'مغلق',
+    closedShort:'نحن مغلقون الآن — لا نستقبل الطلبات.',
     langTitle:"اللغة / Language",
     cats:{"Nonushta":"الإفطار","Ovqatlar":"الأطباق الرئيسية","Fast Food":"الوجبات السريعة","Salatlar":"السلطات","Salqin ichimliklar":"المشروبات الباردة","Boshqa mahsulotlar":"منتجات أخرى"}
   },
@@ -494,6 +525,11 @@ const I18N = {
     errNet:"Connection problem. Please try again.",
     errCode:(c)=>`Something went wrong (code: ${c}).`,
     saleStrip:(p)=>`Sale! ${p}% off everything on the menu`,
+    closedTitle:"We're closed",
+    closedToday:"We're closed today — orders aren't being accepted. We'll be glad to welcome your orders when we reopen. Thank you!",
+    closedHours:(o,c)=>`Orders aren't being accepted right now.\n🕒 Working hours: ${o} — ${c}\nWe'll welcome your orders from ${o}. Thank you!`,
+    closedBadge:'Closed',
+    closedShort:"We're closed right now — orders aren't accepted.",
     langTitle:"Language",
     cats:{"Nonushta":"Breakfast","Ovqatlar":"Main dishes","Fast Food":"Fast food","Salatlar":"Salads","Salqin ichimliklar":"Cold drinks","Boshqa mahsulotlar":"Other items"}
   },
@@ -526,6 +562,11 @@ const I18N = {
     errNet:"Проблема со связью. Попробуйте ещё раз.",
     errCode:(c)=>`Произошла ошибка (код: ${c}).`,
     saleStrip:(p)=>`Акция! Скидка ${p}% на всё меню`,
+    closedTitle:'Рабочий день закончился',
+    closedToday:'Сегодня у нас выходной — заказы не принимаются. Будем рады вашим заказам, когда снова откроемся. Спасибо!',
+    closedHours:(o,c)=>`Заказы сейчас не принимаются.\n🕒 Часы работы: ${o} — ${c}\nЖдём ваши заказы с ${o}. Спасибо!`,
+    closedBadge:'Закрыто',
+    closedShort:'Сейчас закрыто — заказы не принимаются.',
     langTitle:"Язык / Language",
     cats:{"Nonushta":"Завтрак","Ovqatlar":"Основные блюда","Fast Food":"Фастфуд","Salatlar":"Салаты","Salqin ichimliklar":"Холодные напитки","Boshqa mahsulotlar":"Другое"}
   },
@@ -558,6 +599,11 @@ const I18N = {
     errNet:"Bağlantı sorunu. Tekrar deneyin.",
     errCode:(c)=>`Bir hata oluştu (kod: ${c}).`,
     saleStrip:(p)=>`Kampanya! Tüm menüde %${p} indirim`,
+    closedTitle:'Çalışma saatimiz sona erdi',
+    closedToday:'Bugün kapalıyız — sipariş alınmıyor. Yeniden açıldığımızda siparişlerinizi bekliyoruz. Teşekkürler!',
+    closedHours:(o,c)=>`Şu an sipariş alınmıyor.\n🕒 Çalışma saatleri: ${o} — ${c}\nSiparişlerinizi ${o}'dan itibaren bekliyoruz. Teşekkürler!`,
+    closedBadge:'Kapalı',
+    closedShort:'Şu an kapalıyız — sipariş alınmıyor.',
     langTitle:"Dil / Language",
     cats:{"Nonushta":"Kahvaltı","Ovqatlar":"Ana yemekler","Fast Food":"Fast food","Salatlar":"Salatalar","Salqin ichimliklar":"Soğuk içecekler","Boshqa mahsulotlar":"Diğer ürünler"}
   },
@@ -590,6 +636,11 @@ const I18N = {
     errNet:"رابطے میں مسئلہ۔ دوبارہ کوشش کریں۔",
     errCode:(c)=>`کوئی مسئلہ ہوا (کوڈ: ${c})۔`,
     saleStrip:(p)=>`خصوصی پیشکش! پورے مینو پر ${p}% رعایت`,
+    closedTitle:'ہمارا کام کا وقت ختم ہو گیا',
+    closedToday:'آج ہماری چھٹی ہے — آرڈر وصول نہیں کیے جا رہے۔ دوبارہ کھلنے پر آپ کے آرڈرز کے منتظر رہیں گے۔ شکریہ!',
+    closedHours:(o,c)=>`فی الحال آرڈر وصول نہیں کیے جا رہے۔\n🕒 اوقاتِ کار: ${o} — ${c}\n${o} سے آپ کے آرڈرز کے منتظر ہیں۔ شکریہ!`,
+    closedBadge:'بند',
+    closedShort:'ہم اس وقت بند ہیں — آرڈر وصول نہیں کیے جا رہے۔',
     langTitle:"زبان / Language",
     cats:{"Nonushta":"ناشتہ","Ovqatlar":"اہم کھانے","Fast Food":"فاسٹ فوڈ","Salatlar":"سلاد","Salqin ichimliklar":"ٹھنڈے مشروبات","Boshqa mahsulotlar":"دیگر اشیاء"}
   },
@@ -622,6 +673,11 @@ const I18N = {
     errNet:"Masalah koneksi. Coba lagi.",
     errCode:(c)=>`Terjadi kesalahan (kode: ${c}).`,
     saleStrip:(p)=>`Promo! Diskon ${p}% untuk semua menu`,
+    closedTitle:'Jam kerja kami sudah berakhir',
+    closedToday:'Hari ini kami tutup — pesanan tidak diterima. Kami menanti pesanan Anda saat buka kembali. Terima kasih!',
+    closedHours:(o,c)=>`Pesanan belum diterima saat ini.\n🕒 Jam buka: ${o} — ${c}\nKami menanti pesanan Anda mulai ${o}. Terima kasih!`,
+    closedBadge:'Tutup',
+    closedShort:'Kami sedang tutup — pesanan tidak diterima.',
     langTitle:"Bahasa / Language",
     cats:{"Nonushta":"Sarapan","Ovqatlar":"Menu utama","Fast Food":"Makanan cepat saji","Salatlar":"Salad","Salqin ichimliklar":"Minuman dingin","Boshqa mahsulotlar":"Produk lain"}
   }
@@ -647,6 +703,7 @@ let userLocation = null;
 let searchQuery = '';
 let serverTagline = '';
 let saleInfo = {active:false, percent:0};
+let shopInfo = {open:true, reason:null, open_time:'', close_time:''};
 let spy = null;
 
 const $ = (id) => document.getElementById(id);
@@ -754,6 +811,7 @@ async function loadMenu(){
     categories = data.categories || [];
     categoryEmoji = data.category_emoji || {};
     saleInfo = data.discount || {active:false, percent:0};
+    shopInfo = data.shop || {open:true, reason:null};
     $('business-name').textContent = data.business_name || "Uy oshxonasi";
     serverTagline = (data.tagline || '').trim();
     $('business-tagline').textContent = serverTagline || T().tagline;
@@ -820,7 +878,9 @@ function dishCardHtml(dish){
     : '<div class="ph-wrap loaded"><div class="dish-photo-fallback">🍲</div></div>';
 
   let ctl;
-  if (soldOut){
+  if (shopInfo.open === false){
+    ctl = '<span class="sold-out-badge">' + esc(T().closedBadge) + '</span>';
+  } else if (soldOut){
     ctl = '<span class="sold-out-badge">' + esc(T().soldOut) + '</span>';
   } else if (qty > 0){
     const canAdd = stock === null || qty < stock;
@@ -854,6 +914,15 @@ function dishCardHtml(dish){
 function renderSaleStrip(){
   const el = $('sale-strip');
   if (!el) return;
+  if (shopInfo && shopInfo.open === false){
+    const t = T();
+    const msg = shopInfo.reason === 'closed_today'
+      ? t.closedToday
+      : t.closedHours(shopInfo.open_time, shopInfo.close_time);
+    el.innerHTML = '<div class="closed-strip"><div class="cs-title">🌙 ' + esc(t.closedTitle) + '</div>' +
+                   '<div class="cs-body">' + esc(msg) + '</div></div>';
+    return;
+  }
   if (saleInfo && saleInfo.active && saleInfo.percent > 0){
     el.innerHTML = '<div class="sale-strip">🏷 ' + esc(T().saleStrip(saleInfo.percent)) + '</div>';
   } else {
@@ -953,7 +1022,7 @@ function updateCartBar(){
   $('cart-count').textContent = count;
   $('cart-label').textContent = T().itemCount(count).replace(String(count), '').trim();
   $('cart-bar-total').textContent = fmtSar(cartTotal());
-  $('cart-bar').classList.toggle('show', count > 0);
+  $('cart-bar').classList.toggle('show', count > 0 && shopInfo.open !== false);
 }
 
 function openSheet(id){
@@ -1068,6 +1137,7 @@ $('submit-order-btn').addEventListener('click', async ()=>{
 
   const noPhone = $('no-phone').checked;
 
+  if (shopInfo.open === false){ notify(T().closedShort); return; }
   if (cartCount() === 0){ notify(T().errEmptyCart); return; }
   if (!phone && !noPhone){
     notify(T().errPhone);
@@ -1106,6 +1176,7 @@ $('submit-order-btn').addEventListener('click', async ()=>{
     });
     const data = await res.json().catch(()=>({}));
     if (!res.ok){
+      if (res.status === 423){ shopInfo.open = false; renderMenu(); updateCartBar(); }
       notify(data.error || T().errCode(res.status));
       submitBtn.disabled = false;
       submitBtn.textContent = T().confirmBtn;
