@@ -324,6 +324,19 @@ TEXTS = {
         "ur": "\nہم جلد رابطہ کریں گے۔ حالت بدلنے پر آپ کو اطلاع دی جائے گی۔",
         "id": "\nKami akan segera menghubungi. Anda akan diberi tahu bila status berubah.",
     },
+    "discount_line": {
+        "uz": "🏷 Aksiya −{pct}%: {old} → {new}\n",
+        "ar": "🏷 خصم −{pct}%: {old} ← {new}\n",
+        "en": "🏷 Discount −{pct}%: {old} → {new}\n",
+        "ru": "🏷 Акция −{pct}%: {old} → {new}\n",
+        "tr": "🏷 İndirim −{pct}%: {old} → {new}\n",
+        "ur": "🏷 رعایت −{pct}%: {old} ← {new}\n",
+        "id": "🏷 Diskon −{pct}%: {old} → {new}\n",
+    },
+    "sale_badge": {
+        "uz": "AKSIYA", "ar": "خصم", "en": "SALE", "ru": "АКЦИЯ",
+        "tr": "İNDİRİM", "ur": "رعایت", "id": "DISKON",
+    },
     "status_update": {
         "uz": "Buyurtmangiz #{no} holati: {st}", "ar": "حالة طلبك #{no}: {st}",
         "en": "Your order #{no} status: {st}", "ru": "Статус заказа №{no}: {st}",
@@ -358,6 +371,40 @@ def t(key, lang, **kw):
 
 def status_name(status, lang):
     return STATUS_NAMES.get(status, {}).get(lang, status)
+
+# ---------- aksiya (chegirma) ----------
+
+def get_discount():
+    """Hozirgi aksiya: {'active': bool, 'percent': int}."""
+    s = load_settings()
+    d = s.get("discount") or {}
+    try:
+        percent = int(d.get("percent", 0))
+    except Exception:
+        percent = 0
+    percent = max(0, min(90, percent))
+    return {"active": bool(d.get("active")) and percent > 0, "percent": percent}
+
+def set_discount(active=None, percent=None):
+    s = load_settings()
+    d = s.get("discount") or {}
+    if percent is not None:
+        try:
+            d["percent"] = max(0, min(90, int(percent)))
+        except Exception:
+            pass
+    if active is not None:
+        d["active"] = bool(active)
+    s["discount"] = d
+    save_settings(s)
+    return get_discount()
+
+def discounted_price(price, disc=None):
+    """Aksiya yoqilgan bo'lsa chegirmali narx, aks holda o'zi. Natija butun songa yaxlitlanadi."""
+    disc = disc if disc is not None else get_discount()
+    if not disc["active"]:
+        return price
+    return round(price * (100 - disc["percent"]) / 100)
 
 def is_owner(chat_id):
     """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
@@ -506,13 +553,20 @@ def send_menu(chat_id):
     if not menu:
         bot.send_message(chat_id, "Menyu hozircha bo'sh.")
         return
+    disc = get_discount()
+    if disc["active"]:
+        bot.send_message(chat_id, f"🏷 Bugun aksiya: barcha taomga −{disc['percent']}% chegirma!")
     for category, dishes in group_menu_by_category(menu):
         emoji = CATEGORY_EMOJI.get(category, "🍽")
         bot.send_message(chat_id, f"{emoji} {category.upper()}")
         for dish in dishes:
             stock = dish.get("stock")
             sold_out = stock is not None and stock <= 0
-            caption = f"{dish['name']} — {fmt_sum(dish['price'])}"
+            unit = discounted_price(dish["price"], disc)
+            if unit != dish["price"]:
+                caption = f"{dish['name']} — {fmt_sum(unit)}  (eski narx: {fmt_sum(dish['price'])})"
+            else:
+                caption = f"{dish['name']} — {fmt_sum(dish['price'])}"
             if dish.get("desc"):
                 caption += f"\n{dish['desc']}"
             if sold_out:
@@ -563,14 +617,21 @@ def cart_summary_text(user_id):
         return "Savatingiz bo'sh.", 0
     lines = []
     total = 0
+    original = 0
+    disc = get_discount()
     for dish_id, qty in cart.items():
         dish = menu.get(dish_id)
         if not dish:
             continue
-        line_total = dish["price"] * qty
+        unit = discounted_price(dish["price"], disc)
+        line_total = unit * qty
         total += line_total
+        original += dish["price"] * qty
         lines.append(f"{dish['name']} × {qty} = {fmt_sum(line_total)}")
-    text = "🛒 Savatingiz:\n" + "\n".join(lines) + f"\n\nJami: {fmt_sum(total)}"
+    text = "🛒 Savatingiz:\n" + "\n".join(lines)
+    if disc["active"] and original > total:
+        text += f"\n\n🏷 Aksiya −{disc['percent']}%: {fmt_sum(original)} → {fmt_sum(total)}"
+    text += f"\n\nJami: {fmt_sum(total)}"
     return text, total
 
 def build_cart_keyboard(user_id):
@@ -731,6 +792,8 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     menu = {d["id"]: d for d in full_menu}
     items = []
     total = 0
+    original_total = 0
+    disc = get_discount()
     parsed_cart = []
     for dish_id, qty in items_cart.items():
         dish_id = int(dish_id)
@@ -744,8 +807,13 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
                 return None, f"\"{dish['name']}\" tugagan. Iltimos, savatdan olib tashlang."
             return None, f"\"{dish['name']}\" uchun faqat {stock} dona qoldi (siz {qty} dona so'ragansiz)."
         parsed_cart.append((dish, qty))
-        items.append({"name": dish["name"], "price": dish["price"], "qty": qty})
-        total += dish["price"] * qty
+        unit = discounted_price(dish["price"], disc)
+        item = {"name": dish["name"], "price": unit, "qty": qty}
+        if unit != dish["price"]:
+            item["old_price"] = dish["price"]
+        items.append(item)
+        total += unit * qty
+        original_total += dish["price"] * qty
 
     if not items:
         return None, "Savat bo'sh."
@@ -771,6 +839,8 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
         "note": note,
         "items": items,
         "total": total,
+        "original_total": original_total,
+        "discount_percent": disc["percent"] if disc["active"] else 0,
         "status": "Yangi",
         "payment": "naqd",
         "created_at": created_at,
@@ -797,6 +867,7 @@ def build_customer_receipt_text(order, lang=None):
     text = (
         t("receipt_title", lang, no=order["daily_number"]) + "\n\n"
         f"{order_items_text(order)}\n\n"
+        + discount_line_for_customer(order, lang)
         + t("receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
         f"{order_address_line(order)}\n"
     )
@@ -807,8 +878,25 @@ def build_customer_receipt_text(order, lang=None):
     text += t("receipt_tail", lang)
     return text
 
+def discount_line_for_customer(order, lang):
+    pct = order.get("discount_percent") or 0
+    old = order.get("original_total")
+    if not pct or not old or old <= order.get("total", 0):
+        return ""
+    return t("discount_line", lang, pct=pct,
+             old=fmt_sum(old), new=fmt_sum(order["total"]))
+
 def order_items_text(order):
     return "\n".join([f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}" for it in order["items"]])
+
+def order_discount_line(order):
+    """Aksiya bo'lgan buyurtmada eski summa va chegirma qatorini qaytaradi."""
+    pct = order.get("discount_percent") or 0
+    old = order.get("original_total")
+    if not pct or not old or old <= order.get("total", 0):
+        return ""
+    saved = old - order["total"]
+    return f"🏷 Aksiya −{pct}%: {fmt_sum(old)} → {fmt_sum(order['total'])} (−{fmt_sum(saved)})\n"
 
 def order_address_line(order):
     if order.get("latitude") is not None:
@@ -840,7 +928,8 @@ def notify_owner_new_order(order):
             f"{order_address_line(order)}\n"
             + (f"📝 {order['note']}\n" if order.get('note') else "")
             + f"\n{order_items_text(order)}\n\n"
-            f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
+            + order_discount_line(order)
+            + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
             f"Holat: {order['status']}"
         )
         kb = status_keyboard(order)
@@ -898,7 +987,8 @@ def cb_update_status(call):
         f"{order_address_line(order)}\n"
         + (f"📝 {order['note']}\n" if order.get('note') else "")
         + f"\n{order_items_text(order)}\n\n"
-        f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
+        + order_discount_line(order)
+        + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
         f"Holat: {new_status}"
     )
     try:
@@ -1036,6 +1126,7 @@ def cmd_menu_admin(message):
     bot.send_message(
         message.chat.id,
         "Menyu:\n" + "\n".join(lines) +
+        "\n\n🏷 Aksiya: /aksiya 17 (yoqish) | /aksiya off (o'chirish)\n"
         "\n\n🧑‍🍳 Eng oson yo'l: pastdagi \"Menyuni boshqarish\" tugmasi orqali "
         "taomni rasmi bilan birga qo'shing/tahrirlang.\n\n"
         "Zaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
@@ -1048,6 +1139,39 @@ def cmd_menu_admin(message):
         "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id\n"
         "Buyurtmani o'chirish (faqat bugungi): /delete_order kunlik_raqami"
     )
+
+@bot.message_handler(commands=["aksiya", "sale"])
+def cmd_sale(message):
+    if not is_owner(message.chat.id):
+        return
+    parts = message.text.split()
+    disc = get_discount()
+    if len(parts) == 1:
+        holat = f"YONIQ — barcha narx −{disc['percent']}%" if disc["active"] else "o'chiq"
+        bot.send_message(
+            message.chat.id,
+            f"🏷 Aksiya holati: {holat}\n\n"
+            "Yoqish: /aksiya 17  (17% chegirma)\n"
+            "O'chirish: /aksiya off\n\n"
+            "Buni \"🧑‍🍳 Menyuni boshqarish\" panelidan bir bosishda ham qilish mumkin."
+        )
+        return
+    arg = parts[1].strip().lower()
+    if arg in ("off", "o'chir", "ochir", "0", "yo'q", "yoq"):
+        set_discount(active=False)
+        bot.send_message(message.chat.id, "🏷 Aksiya o'chirildi — narxlar odatiyga qaytdi.")
+        return
+    try:
+        pct = int(arg.rstrip("%"))
+    except Exception:
+        bot.send_message(message.chat.id, "Format: /aksiya 17  yoki  /aksiya off")
+        return
+    if not (1 <= pct <= 90):
+        bot.send_message(message.chat.id, "Chegirma foizi 1 dan 90 gacha bo'lishi kerak.")
+        return
+    d = set_discount(active=True, percent=pct)
+    bot.send_message(message.chat.id, f"🏷 Aksiya yoqildi — barcha taom narxi −{d['percent']}%.\n"
+                                       "O'chirish uchun: /aksiya off")
 
 @bot.message_handler(commands=["set_category"])
 def cmd_set_category(message):
@@ -1282,14 +1406,18 @@ def serve_logo():
 @app.route("/api/menu")
 def api_menu():
     menu = load_menu()
+    disc = get_discount()
     grouped = group_menu_by_category(menu)
     out = []
     for d in menu:
+        unit = discounted_price(d["price"], disc)
         item = {
-            "id": d["id"], "name": d["name"], "price": d["price"],
+            "id": d["id"], "name": d["name"], "price": unit,
             "desc": d.get("desc", ""), "stock": d.get("stock"),
             "category": d.get("category", DEFAULT_CATEGORY)
         }
+        if unit != d["price"]:
+            item["old_price"] = d["price"]
         if d.get("local_photo"):
             item["photo_url"] = f"/static/dishes/{d['local_photo']}"
         out.append(item)
@@ -1304,6 +1432,7 @@ def api_menu():
         "category_emoji": CATEGORY_EMOJI,
         "business_name": BUSINESS_NAME,
         "tagline": BUSINESS_TAGLINE,
+        "discount": disc,
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
 
@@ -1426,11 +1555,38 @@ ADMIN_PAGE_HTML = """<!doctype html>
   .out { color:var(--danger); }
   .acts { display:flex; gap:8px; margin-top:8px; }
   .empty { color:var(--muted); text-align:center; padding:26px 0; }
+  .card.sale { border-color:var(--accent); }
+  .card.sale.on { background:linear-gradient(135deg, rgba(22,163,74,0.12), transparent); }
+  .saleNote { font-size:13px; color:var(--muted); margin:0 0 14px; line-height:1.5; }
+  .saleRow { display:flex; gap:12px; align-items:flex-end; }
+  .pctWrap { flex:1; margin:0; }
+  .pctBox { display:flex; align-items:center; gap:6px; }
+  .pctBox input { margin-top:5px; }
+  .pctBox span { font-size:17px; color:var(--muted); padding-top:5px; }
+  .saleBtn { flex:none; min-width:116px; padding:11px 14px; }
+  .saleBtn.off { background:var(--accent); }
+  .saleBtn.on { background:var(--danger); }
+  .saleState { font-size:14px; font-weight:600; margin:13px 0 0; }
+  .saleState.on { color:var(--accent); }
+  .saleState.off { color:var(--muted); }
+  .dish .sale-tag { display:inline-block; margin-top:3px; font-size:12px; font-weight:700; color:var(--accent); }
 </style>
 </head>
 <body>
 <h1>🧑‍🍳 Menyuni boshqarish</h1>
 <p class="sub">Taomni rasmi bilan shu yerdan qo'shing — Telegram'ga qaytish shart emas.</p>
+
+<section class="card sale" id="saleCard">
+  <h2>🏷 Juma aksiyasi</h2>
+  <p class="saleNote">Yoqsangiz barcha taom narxi shu foizga tushadi. O'chirsangiz — darhol odatiy narxga qaytadi.</p>
+  <div class="saleRow">
+    <label class="pctWrap">Chegirma foizi
+      <div class="pctBox"><input id="s_percent" type="number" min="1" max="90" inputmode="numeric" value="17"><span>%</span></div>
+    </label>
+    <button id="saleToggle" class="saleBtn off">Yoqish</button>
+  </div>
+  <p class="saleState" id="saleState">Hozir: o'chiq</p>
+</section>
 
 <section class="card">
   <h2 id="formTitle">➕ Yangi taom</h2>
@@ -1487,7 +1643,63 @@ function resetForm() {
 }
 $('cancelBtn').addEventListener('click', resetForm);
 
+/* ---------- aksiya ---------- */
+let sale = { active:false, percent:17 };
+
+function renderSale() {
+  $('s_percent').value = sale.percent || 17;
+  const btn = $('saleToggle');
+  const st = $('saleState');
+  const card = $('saleCard');
+  if (sale.active) {
+    btn.textContent = "O'chirish";
+    btn.className = 'saleBtn on';
+    st.textContent = 'Hozir: YONIQ — barcha narx −' + sale.percent + '%';
+    st.className = 'saleState on';
+    card.classList.add('on');
+  } else {
+    btn.textContent = 'Yoqish';
+    btn.className = 'saleBtn off';
+    st.textContent = "Hozir: o'chiq — odatiy narxlar";
+    st.className = 'saleState off';
+    card.classList.remove('on');
+  }
+}
+
+async function saveSale(active) {
+  let pct = parseInt($('s_percent').value, 10);
+  if (isNaN(pct) || pct < 1 || pct > 90) {
+    if (active) { say('Chegirma foizi 1 dan 90 gacha bo‘lsin.', 'err'); return; }
+    pct = sale.percent || 17;
+  }
+  $('saleToggle').disabled = true;
+  try {
+    const r = await fetch(url('/api/admin/discount'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ active: active, percent: pct })
+    });
+    const data = await r.json().catch(()=>({}));
+    if (r.ok) {
+      sale = data.discount || sale;
+      renderSale();
+      say(active ? ('✅ Aksiya yoqildi — barcha narx −' + sale.percent + '%') : '✅ Aksiya o‘chirildi, narxlar odatiyga qaytdi.', 'ok');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+      load();
+    } else {
+      say(data.error || 'Saqlab bo‘lmadi.', 'err');
+    }
+  } catch (e) { say('Aloqa uzildi. Qaytadan urinib ko‘ring.', 'err'); }
+  $('saleToggle').disabled = false;
+}
+
+$('saleToggle').addEventListener('click', ()=> saveSale(!sale.active));
+
 async function load() {
+  try {
+    const rs = await fetch(url('/api/admin/discount'));
+    if (rs.ok) { sale = (await rs.json()).discount || sale; }
+  } catch (e) {}
+  renderSale();
   try {
     const r = await fetch(url('/api/admin/dishes'));
     if (!r.ok) {
@@ -1559,6 +1771,13 @@ function dishRow(d) {
   else { st.textContent = d.stock + ' dona'; }
   meta.appendChild(st);
   info.appendChild(meta);
+
+  if (sale.active) {
+    const tag = document.createElement('div');
+    tag.className = 'sale-tag';
+    tag.textContent = '🏷 Aksiyada: ' + Math.round(d.price * (100 - sale.percent) / 100) + ' SAR';
+    info.appendChild(tag);
+  }
 
   const acts = document.createElement('div');
   acts.className = 'acts';
@@ -1650,6 +1869,28 @@ def admin_page():
             .replace("__CATEGORIES__", json.dumps(CATEGORIES, ensure_ascii=False))
             .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False)))
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+@app.route("/api/admin/discount", methods=["GET", "POST"])
+def api_admin_discount():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    if request.method == "GET":
+        return jsonify({"discount": get_discount()})
+    body = request.get_json(force=True, silent=True) or {}
+    percent = body.get("percent")
+    active = body.get("active")
+    if active and (percent is None or not (1 <= int(percent) <= 90)):
+        return jsonify({"error": "Chegirma foizi 1 dan 90 gacha bo'lishi kerak."}), 400
+    disc = set_discount(active=active, percent=percent)
+    # adminlarga xabar beramiz — kim yoqqani/o'chirgani bilinib tursin
+    msg = (f"🏷 Aksiya YOQILDI — barcha taom narxi −{disc['percent']}%"
+           if disc["active"] else "🏷 Aksiya o'chirildi — narxlar odatiyga qaytdi.")
+    for admin_id in load_admin_ids():
+        try:
+            bot.send_message(admin_id, msg)
+        except Exception:
+            pass
+    return jsonify({"ok": True, "discount": disc})
 
 @app.route("/api/admin/dishes")
 def api_admin_dishes():
