@@ -211,17 +211,27 @@ def get_user_lang(user_id, tg_code=None):
 
 TEXTS = {
     "welcome": {
-        "uz": "Assalomu alaykum! 👋\n{biz}ga xush kelibsiz.\nPastdagi tugma orqali buyurtma bera boshlang:",
-        "ar": "السلام عليكم! 👋\nمرحبًا بك في {biz}.\nابدأ طلبك من الزر بالأسفل:",
-        "en": "Hello! 👋\nWelcome to {biz}.\nStart your order with the button below:",
-        "ru": "Здравствуйте! 👋\nДобро пожаловать в {biz}.\nНачните заказ кнопкой ниже:",
-        "tr": "Merhaba! 👋\n{biz}'a hoş geldiniz.\nAşağıdaki butondan siparişe başlayın:",
-        "ur": "السلام علیکم! 👋\n{biz} میں خوش آمدید۔\nنیچے والے بٹن سے آرڈر شروع کریں:",
-        "id": "Halo! 👋\nSelamat datang di {biz}.\nMulai pesanan lewat tombol di bawah:",
+        "uz": "Assalomu alaykum! 👋\n{biz}ga xush kelibsiz.\n\n🍽 Menyu va narxlarni ko'rish uchun pastdagi tugmani bosing 👇\nTanlab, o'sha yerning o'zidan buyurtma berasiz.",
+        "ar": "السلام عليكم! 👋\nمرحبًا بك في {biz}.\n\n🍽 لعرض القائمة والأسعار اضغط الزر بالأسفل 👇\nاختر ما تريد وأرسل طلبك من نفس المكان.",
+        "en": "Hello! 👋\nWelcome to {biz}.\n\n🍽 Tap the button below to see the menu and prices 👇\nPick what you want and order right there.",
+        "ru": "Здравствуйте! 👋\nДобро пожаловать в {biz}.\n\n🍽 Нажмите кнопку ниже, чтобы посмотреть меню и цены 👇\nВыбирайте и заказывайте прямо там.",
+        "tr": "Merhaba! 👋\n{biz}'a hoş geldiniz.\n\n🍽 Menü ve fiyatları görmek için aşağıdaki butona basın 👇\nSeçin ve siparişinizi oradan verin.",
+        "ur": "السلام علیکم! 👋\n{biz} میں خوش آمدید۔\n\n🍽 مینو اور قیمتیں دیکھنے کے لیے نیچے والا بٹن دبائیں 👇\nپسند کریں اور وہیں سے آرڈر دیں۔",
+        "id": "Halo! 👋\nSelamat datang di {biz}.\n\n🍽 Tekan tombol di bawah untuk melihat menu dan harga 👇\nPilih dan pesan langsung di sana.",
     },
     "btn_order": {
-        "uz": "🛍 Buyurtma berish", "ar": "🛍 اطلب الآن", "en": "🛍 Place an order",
-        "ru": "🛍 Сделать заказ", "tr": "🛍 Sipariş ver", "ur": "🛍 آرڈر دیں", "id": "🛍 Pesan sekarang",
+        "uz": "🍽 Menyu va narxlar", "ar": "🍽 القائمة والأسعار", "en": "🍽 Menu & prices",
+        "ru": "🍽 Меню и цены", "tr": "🍽 Menü ve fiyatlar", "ur": "🍽 مینو اور قیمتیں",
+        "id": "🍽 Menu & harga",
+    },
+    "menu_hint": {
+        "uz": "🍽 Menyu va narxlar pastdagi tugmada 👇\nUni bosing — taomlar rasmi va narxi bilan chiqadi, o'sha yerdan buyurtma berasiz.",
+        "ar": "🍽 القائمة والأسعار في الزر بالأسفل 👇\nاضغط عليه — ستظهر الأطباق بالصور والأسعار، وتطلب من هناك مباشرة.",
+        "en": "🍽 The menu and prices are in the button below 👇\nTap it — you'll see the dishes with photos and prices, and you order right there.",
+        "ru": "🍽 Меню и цены — в кнопке ниже 👇\nНажмите её: блюда с фото и ценами, оттуда же и заказ.",
+        "tr": "🍽 Menü ve fiyatlar aşağıdaki butonda 👇\nBasın — yemekler fotoğraf ve fiyatlarıyla görünür, siparişi oradan verirsiniz.",
+        "ur": "🍽 مینو اور قیمتیں نیچے والے بٹن میں ہیں 👇\nاسے دبائیں — کھانے تصویر اور قیمت کے ساتھ نظر آئیں گے، وہیں سے آرڈر کریں۔",
+        "id": "🍽 Menu dan harga ada di tombol bawah 👇\nTekan — menu tampil dengan foto dan harga, pesan langsung di sana.",
     },
     "btn_contact": {
         "uz": "💬 Biz bilan bog'lanish", "ar": "💬 تواصل معنا", "en": "💬 Contact us",
@@ -2413,6 +2423,37 @@ def handle_admin_reply(message):
     except Exception:
         bot.send_message(message.chat.id, "❌ Yuborib bo'lmadi — mijoz botni bloklagan bo'lishi mumkin.")
 
+# "menyu?" degan so'rovni tanish uchun so'zlar.
+# KUCHLI — bu so'z bo'lsa aniq menyu so'ralgan.
+MENU_WORDS_STRONG = [
+    "menyu", "menu", "menyusi", "menyuni", "menyular",
+    "меню", "менью", "миню",
+    "narx", "narxi", "narxlar", "narxlari", "necha pul", "qancha turadi",
+    "цена", "цены", "почем", "почём", "price", "prices", "how much",
+    "منيو", "المنيو", "قائمة", "القائمة", "الاسعار", "الأسعار", "اسعار",
+    "مینو", "قیمت", "قیمتیں", "ریٹ",
+    "fiyat", "fiyatlar", "harga", "daftar menu",
+]
+# KUCHSIZ — faqat juda qisqa xabarda hisobga olinadi.
+# ("buyurtma" so'zi shikoyatda ham uchraydi: "buyurtmam qayerda qoldi?")
+MENU_WORDS_WEAK = [
+    "zakaz", "zakas", "buyurtma", "заказ", "order", "sipariş", "siparis", "pesan",
+    "qancha", "nechchi", "nechi", "сколько", "كم السعر",
+]
+
+def looks_like_menu_request(text):
+    """Mijoz menyu yoki narx so'rayaptimi. Shikoyat va savollarni tegmay qoldiradi."""
+    low = (text or "").strip().lower()
+    if not low or len(low) > 60:
+        return False
+    if any(w in low for w in MENU_WORDS_STRONG):
+        return True
+    # kuchsiz so'zlar: faqat 1-2 so'zlik juda qisqa xabarda
+    # ("buyurtmam qayerda qoldi?" kabi savol adminga borishi kerak)
+    if len(low.split()) <= 2 and any(w in low for w in MENU_WORDS_WEAK):
+        return True
+    return False
+
 @bot.message_handler(
     func=lambda m: (
         m.content_type == "text"
@@ -2424,6 +2465,14 @@ def handle_admin_reply(message):
 )
 def handle_customer_free_text(message):
     sender = message.from_user
+    lang = get_user_lang(sender.id, getattr(sender, "language_code", None))
+
+    # "menyu?" degan xabarga bot o'zi javob beradi — adminni bezovta qilmaymiz
+    if looks_like_menu_request(message.text):
+        bot.send_message(message.chat.id, t("menu_hint", lang),
+                         reply_markup=main_keyboard(sender.id, sender.username, lang))
+        return
+
     label = f"{sender.first_name or ''} (@{sender.username})" if sender.username else (sender.first_name or "Mijoz")
     forward_text = (
         f"📩 Mijozdan xabar\n👤 {label} (ID: {sender.id})\n\n{message.text}\n\n"
