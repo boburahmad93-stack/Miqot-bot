@@ -374,6 +374,33 @@ TEXTS = {
         "ur": "ہم اس وقت بند ہیں — آرڈر وصول نہیں کیے جا رہے۔",
         "id": "Kami sedang tutup — pesanan tidak diterima.",
     },
+    "order_cancelled": {
+        "uz": "❌ Buyurtmangiz #{no} bekor qilindi.\n\nNoqulaylik uchun uzr so'raymiz. Savolingiz bo'lsa shu yerga yozing — javob beramiz.",
+        "ar": "❌ تم إلغاء طلبك رقم {no}.\n\nنعتذر عن الإزعاج. إذا كان لديك سؤال اكتب لنا هنا.",
+        "en": "❌ Your order #{no} has been cancelled.\n\nSorry for the inconvenience. Write to us here if you have any questions.",
+        "ru": "❌ Ваш заказ №{no} отменён.\n\nПриносим извинения. Если есть вопросы — напишите нам сюда.",
+        "tr": "❌ #{no} numaralı siparişiniz iptal edildi.\n\nVerdiğimiz rahatsızlık için özür dileriz. Sorunuz olursa buraya yazın.",
+        "ur": "❌ آپ کا آرڈر #{no} منسوخ کر دیا گیا ہے۔\n\nتکلیف کے لیے معذرت۔ کوئی سوال ہو تو یہیں لکھیں۔",
+        "id": "❌ Pesanan Anda #{no} dibatalkan.\n\nMohon maaf atas ketidaknyamanannya. Ada pertanyaan? Tulis di sini.",
+    },
+    "order_restored": {
+        "uz": "♻️ Buyurtmangiz #{no} qayta tiklandi — tayyorlanmoqda.",
+        "ar": "♻️ تمت إعادة طلبك رقم {no} — جارٍ التحضير.",
+        "en": "♻️ Your order #{no} has been restored — we're preparing it.",
+        "ru": "♻️ Ваш заказ №{no} восстановлен — готовим.",
+        "tr": "♻️ #{no} numaralı siparişiniz geri alındı — hazırlanıyor.",
+        "ur": "♻️ آپ کا آرڈر #{no} بحال کر دیا گیا — تیار ہو رہا ہے۔",
+        "id": "♻️ Pesanan Anda #{no} dipulihkan — sedang disiapkan.",
+    },
+    "item_cancelled": {
+        "uz": "ℹ️ Buyurtmangiz #{no} o'zgardi.\n\n«{dish}» olib tashlandi.\n💰 Yangi summa: {sum}\n\nSavolingiz bo'lsa shu yerga yozing.",
+        "ar": "ℹ️ تم تعديل طلبك رقم {no}.\n\nتمت إزالة «{dish}».\n💰 المبلغ الجديد: {sum}\n\nإذا كان لديك سؤال اكتب لنا هنا.",
+        "en": "ℹ️ Your order #{no} has changed.\n\n\"{dish}\" was removed.\n💰 New total: {sum}\n\nWrite to us here if you have questions.",
+        "ru": "ℹ️ Ваш заказ №{no} изменён.\n\n«{dish}» удалено.\n💰 Новая сумма: {sum}\n\nЕсли есть вопросы — напишите сюда.",
+        "tr": "ℹ️ #{no} numaralı siparişiniz değişti.\n\n\"{dish}\" çıkarıldı.\n💰 Yeni tutar: {sum}\n\nSorunuz olursa buraya yazın.",
+        "ur": "ℹ️ آپ کا آرڈر #{no} تبدیل ہو گیا۔\n\n«{dish}» نکال دیا گیا۔\n💰 نئی رقم: {sum}\n\nکوئی سوال ہو تو یہیں لکھیں۔",
+        "id": "ℹ️ Pesanan Anda #{no} berubah.\n\n\"{dish}\" dihapus.\n💰 Total baru: {sum}\n\nAda pertanyaan? Tulis di sini.",
+    },
     "status_update": {
         "uz": "Buyurtmangiz #{no} holati: {st}", "ar": "حالة طلبك #{no}: {st}",
         "en": "Your order #{no} status: {st}", "ru": "Статус заказа №{no}: {st}",
@@ -396,6 +423,7 @@ STATUS_NAMES = {
     "Yo'lda":         {"uz":"Yo'lda","ar":"في الطريق","en":"On the way","ru":"В пути","tr":"Yolda","ur":"راستے میں","id":"Dalam perjalanan"},
     "Yetkazildi":     {"uz":"Yetkazildi","ar":"تم التوصيل","en":"Delivered","ru":"Доставлено","tr":"Teslim edildi","ur":"پہنچا دیا گیا","id":"Terkirim"},
     "Yangi":          {"uz":"Yangi","ar":"جديد","en":"New","ru":"Новый","tr":"Yeni","ur":"نیا","id":"Baru"},
+    "Bekor qilindi":  {"uz":"Bekor qilindi","ar":"ملغى","en":"Cancelled","ru":"Отменён","tr":"İptal edildi","ur":"منسوخ","id":"Dibatalkan"},
 }
 
 def t(key, lang, **kw):
@@ -1003,7 +1031,13 @@ def discount_line_for_customer(order, lang):
              old=fmt_sum(old), new=fmt_sum(order["total"]))
 
 def order_items_text(order):
-    return "\n".join([f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}" for it in order["items"]])
+    lines = []
+    for it in order["items"]:
+        line = f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}"
+        if it.get("cancelled"):
+            line = f"❌ {line}  (bekor qilindi)"
+        lines.append(line)
+    return "\n".join(lines)
 
 def order_discount_line(order):
     """Aksiya bo'lgan buyurtmada eski summa va chegirma qatorini qaytaradi."""
@@ -1024,13 +1058,65 @@ def order_contact_line(order):
         return f"@{order['username']}"
     return "username yo'q"
 
+CANCELLED = "Bekor qilindi"
+
+def is_cancelled(order):
+    return order.get("status") == CANCELLED
+
+def active_items(order):
+    """Bekor qilinmagan taomlar."""
+    return [it for it in order.get("items", []) if not it.get("cancelled")]
+
+def recalc_order_total(order):
+    """Bekor qilinmagan taomlar bo'yicha summani qayta hisoblaydi."""
+    total = 0
+    original = 0
+    for it in active_items(order):
+        total += it["price"] * it["qty"]
+        original += (it.get("old_price") or it["price"]) * it["qty"]
+    order["total"] = total
+    order["original_total"] = original
+    return total
+
+def restore_stock(items):
+    """Bekor qilingan taomlarning zaxirasini menyuga qaytaradi."""
+    if not items:
+        return
+    menu = load_menu()
+    by_name = {}
+    for d in menu:
+        by_name.setdefault(d["name"], d)
+    changed = False
+    for it in items:
+        dish = by_name.get(it["name"])
+        if dish is not None and dish.get("stock") is not None:
+            dish["stock"] = dish["stock"] + it["qty"]
+            changed = True
+    if changed:
+        save_menu(menu)
+
 def status_keyboard(order, include_contact=True):
     kb = types.InlineKeyboardMarkup(row_width=2)
+    if is_cancelled(order):
+        kb.add(types.InlineKeyboardButton("♻️ Bekorni qaytarish", callback_data=f"uncancel:{order['id']}"))
+        return kb
     kb.add(
         types.InlineKeyboardButton("👨‍🍳 Tayyorlanmoqda", callback_data=f"status:{order['id']}:Tayyorlanmoqda"),
         types.InlineKeyboardButton("🚴 Yo'lda", callback_data=f"status:{order['id']}:Yo'lda"),
     )
     kb.add(types.InlineKeyboardButton("✅ Yetkazildi", callback_data=f"status:{order['id']}:Yetkazildi"))
+
+    items = order.get("items", [])
+    live = active_items(order)
+    # Bitta taomni olib tashlash — faqat bir nechta taom bo'lsa ma'noga ega
+    if len(live) > 1:
+        for idx, it in enumerate(items):
+            if it.get("cancelled"):
+                continue
+            nom = it["name"] if len(it["name"]) <= 18 else it["name"][:17] + "…"
+            kb.add(types.InlineKeyboardButton(f"➖ {nom} ({it['qty']}) olib tashlash",
+                                              callback_data=f"rmitem:{order['id']}:{idx}"))
+    kb.add(types.InlineKeyboardButton("❌ Buyurtmani bekor qilish", callback_data=f"cancel:{order['id']}"))
     if include_contact and order.get("user_id"):
         kb.add(types.InlineKeyboardButton("✉️ Mijozga yozish", url=f"tg://user?id={order['user_id']}"))
     return kb
@@ -1081,6 +1167,126 @@ def register_order_reply_target(recipient_id, sent_message, order):
     except Exception as e:
         print(f"Reply manzilini eslab qolishda xato: {e}")
 
+def order_card_text(order):
+    """Admin ko'radigan buyurtma kartochkasi matni."""
+    head = "❌ BEKOR QILINDI" if is_cancelled(order) else f"📦 Buyurtma #{order['daily_number']}"
+    if is_cancelled(order):
+        head = f"❌ Buyurtma #{order['daily_number']} — BEKOR QILINDI"
+    return (
+        f"{head}\n\n"
+        f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
+        f"{order_phone_line(order)}\n"
+        f"{order_address_line(order)}\n"
+        + (f"📝 {order['note']}\n" if order.get('note') else "")
+        + f"\n{order_items_text(order)}\n\n"
+        + order_discount_line(order)
+        + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
+        f"Holat: {order['status']}"
+    )
+
+def refresh_order_card(call, order):
+    """Admin bosgan xabarni yangilaydi."""
+    text = order_card_text(order)
+    try:
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
+                              reply_markup=status_keyboard(order))
+    except Exception as e:
+        if "BUTTON_USER_PRIVACY_RESTRICTED" in str(e):
+            try:
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
+                                      reply_markup=status_keyboard(order, include_contact=False))
+            except Exception:
+                pass
+
+def tell_customer(order, text_uz_key, **kw):
+    """Mijozga o'z tilida xabar yuboradi."""
+    uid = order.get("user_id")
+    if not uid:
+        return
+    try:
+        lang = get_user_lang(uid)
+        bot.send_message(uid, t(text_uz_key, lang, **kw))
+    except Exception as e:
+        print(f"Mijozga xabar yuborishda xato: {e}")
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("cancel:"))
+def cb_cancel_order(call):
+    """Butun buyurtmani bekor qilish."""
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    order_id = int(call.data.split(":", 1)[1])
+    orders = load_orders()
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order:
+        bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
+        return
+    if is_cancelled(order):
+        bot.answer_callback_query(call.id, "Bu buyurtma allaqachon bekor qilingan.")
+        return
+
+    restore_stock(active_items(order))
+    order["status"] = CANCELLED
+    order["cancelled_at"] = int(time.time())
+    order["cancelled_by"] = call.from_user.id
+    save_orders(orders)
+
+    bot.answer_callback_query(call.id, "❌ Buyurtma bekor qilindi.")
+    refresh_order_card(call, order)
+    tell_customer(order, "order_cancelled", no=order["daily_number"])
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("uncancel:"))
+def cb_uncancel_order(call):
+    """Xato bosilgan bo'lsa — bekorni qaytarish."""
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    order_id = int(call.data.split(":", 1)[1])
+    orders = load_orders()
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order or not is_cancelled(order):
+        bot.answer_callback_query(call.id, "Bu buyurtma bekor qilinmagan.")
+        return
+    order["status"] = "Yangi"
+    order.pop("cancelled_at", None)
+    order.pop("cancelled_by", None)
+    save_orders(orders)
+    bot.answer_callback_query(call.id, "♻️ Buyurtma qaytarildi.")
+    refresh_order_card(call, order)
+    tell_customer(order, "order_restored", no=order["daily_number"])
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("rmitem:"))
+def cb_remove_item(call):
+    """Buyurtmadan bitta taomni olib tashlash."""
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    _, order_id_str, idx_str = call.data.split(":", 2)
+    order_id, idx = int(order_id_str), int(idx_str)
+    orders = load_orders()
+    order = next((o for o in orders if o["id"] == order_id), None)
+    if not order:
+        bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
+        return
+    items = order.get("items", [])
+    if idx < 0 or idx >= len(items) or items[idx].get("cancelled"):
+        bot.answer_callback_query(call.id, "Bu taom allaqachon olib tashlangan.")
+        return
+    if len(active_items(order)) <= 1:
+        bot.answer_callback_query(call.id, "Oxirgi taom — butun buyurtmani bekor qiling.", show_alert=True)
+        return
+
+    it = items[idx]
+    restore_stock([it])
+    it["cancelled"] = True
+    recalc_order_total(order)
+    save_orders(orders)
+
+    bot.answer_callback_query(call.id, f"➖ {it['name']} olib tashlandi.")
+    refresh_order_card(call, order)
+    tell_customer(order, "item_cancelled", no=order["daily_number"],
+                  dish=it["name"], sum=fmt_sum(order["total"]))
+
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
     if not is_staff_or_admin(call.message.chat.id):
@@ -1093,31 +1299,13 @@ def cb_update_status(call):
     if not order:
         bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
         return
+    if is_cancelled(order):
+        bot.answer_callback_query(call.id, "Bu buyurtma bekor qilingan. Avval \"Bekorni qaytarish\"ni bosing.", show_alert=True)
+        return
     order["status"] = new_status
     save_orders(orders)
 
-    text = (
-        f"📦 Buyurtma #{order['daily_number']}\n\n"
-        f"👤 {order['customer_name']} ({order_contact_line(order)})\n"
-        f"{order_phone_line(order)}\n"
-        f"{order_address_line(order)}\n"
-        + (f"📝 {order['note']}\n" if order.get('note') else "")
-        + f"\n{order_items_text(order)}\n\n"
-        + order_discount_line(order)
-        + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
-        f"Holat: {new_status}"
-    )
-    try:
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
-                               reply_markup=status_keyboard(order))
-    except Exception as e:
-        if "BUTTON_USER_PRIVACY_RESTRICTED" in str(e):
-            try:
-                bot.edit_message_text(text, call.message.chat.id, call.message.message_id,
-                                       reply_markup=status_keyboard(order, include_contact=False))
-            except Exception:
-                pass
-        # boshqa xatolar (masalan matn o'zgarmagan) e'tiborsiz qoldiriladi
+    refresh_order_card(call, order)
     bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
 
     try:
@@ -2313,27 +2501,51 @@ def build_daily_report_text(target_date):
             f"Bugun buyurtma tushmadi."
         )
 
-    total_revenue = sum(o["total"] for o in day_orders)
+    # Bekor qilingan buyurtmalar savdoga qo'shilmaydi
+    live_orders = [o for o in day_orders if not is_cancelled(o)]
+    cancelled_orders = [o for o in day_orders if is_cancelled(o)]
+
+    if not live_orders:
+        return (
+            f"📊 Kunlik hisobot — {target_date.strftime('%d.%m.%Y')}\n\n"
+            f"Bugun haqiqiy buyurtma bo'lmadi.\n"
+            f"❌ Bekor qilinganlar: {len(cancelled_orders)} ta"
+        )
+
+    total_revenue = sum(o["total"] for o in live_orders)
     dish_counts = {}
-    for o in day_orders:
+    cancelled_items = 0
+    for o in live_orders:
         for it in o["items"]:
+            if it.get("cancelled"):          # buyurtma ichidan olib tashlangan taom
+                cancelled_items += 1
+                continue
             dish_counts[it["name"]] = dish_counts.get(it["name"], 0) + it["qty"]
 
     sorted_dishes = sorted(dish_counts.items(), key=lambda x: -x[1])
-    dish_lines = "\n".join(f"  • {name} — {qty} dona" for name, qty in sorted_dishes)
+    dish_lines = "\n".join(f"  • {name} — {qty} dona" for name, qty in sorted_dishes) or "  —"
 
     status_counts = {}
-    for o in day_orders:
+    for o in live_orders:
         status_counts[o["status"]] = status_counts.get(o["status"], 0) + 1
     status_lines = "\n".join(f"  • {s}: {c}" for s, c in status_counts.items())
 
-    return (
+    text = (
         f"📊 Kunlik hisobot — {target_date.strftime('%d.%m.%Y')}\n\n"
-        f"🧾 Buyurtmalar soni: {len(day_orders)}\n"
+        f"🧾 Buyurtmalar soni: {len(live_orders)}\n"
         f"💰 Jami savdo: {fmt_sum(total_revenue)}\n\n"
         f"🍽 Sotilgan taomlar:\n{dish_lines}\n\n"
         f"📦 Holatlar bo'yicha:\n{status_lines}"
     )
+    if cancelled_orders or cancelled_items:
+        text += "\n\n— — —"
+        if cancelled_orders:
+            yoqotilgan = sum(o.get("total", 0) for o in cancelled_orders)
+            text += (f"\n❌ Bekor qilingan buyurtmalar: {len(cancelled_orders)} ta"
+                     f" ({fmt_sum(yoqotilgan)}) — savdoga qo'shilmadi")
+        if cancelled_items:
+            text += f"\n➖ Buyurtmalardan olib tashlangan taomlar: {cancelled_items} ta"
+    return text
 
 def send_daily_report(target_date):
     text = build_daily_report_text(target_date)
