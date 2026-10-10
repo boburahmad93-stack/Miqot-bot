@@ -493,6 +493,51 @@ def mark_user_blocked(uid, blocked=True):
     except Exception:
         pass
 
+def backfill_users_from_history():
+    """Eski buyurtmalar va viktorina natijalaridan mijozlarni yig'ib oladi.
+       Ro'yxat keyinroq qo'shilgani uchun eskilari tushmay qolgan edi."""
+    try:
+        with DATA_LOCK:
+            users = load_users()
+            qoshildi = 0
+
+            for o in load_orders():
+                uid = o.get("user_id")
+                if not uid:
+                    continue
+                key = str(uid)
+                if key in users:
+                    continue
+                users[key] = {
+                    "name": o.get("customer_name") or "Mijoz",
+                    "username": o.get("username"),
+                    "first_seen": o.get("created_at", int(time.time())),
+                    "last_seen": o.get("created_at", int(time.time())),
+                    "blocked": False,
+                    "from_history": True,
+                }
+                qoshildi += 1
+
+            for key, r in load_quiz_results().items():
+                if key in users:
+                    continue
+                users[key] = {
+                    "name": r.get("name") or "Mijoz",
+                    "username": r.get("username"),
+                    "first_seen": r.get("started_at", int(time.time())),
+                    "last_seen": r.get("started_at", int(time.time())),
+                    "blocked": False,
+                    "from_history": True,
+                }
+                qoshildi += 1
+
+            if qoshildi:
+                save_json(USERS_FILE, users)
+            return qoshildi
+    except Exception as e:
+        print(f"Eski mijozlarni yig'ishda xato: {e}")
+        return 0
+
 def active_user_ids():
     return [int(uid) for uid, r in load_users().items() if not r.get("blocked")]
 
@@ -1829,7 +1874,11 @@ def run_broadcast(admin_id, text):
 def cmd_users(message):
     if not is_owner(message.chat.id):
         return
+    qoshildi = backfill_users_from_history()
     users = load_users()
+    if qoshildi:
+        bot.send_message(message.chat.id,
+            f"🔄 Eski buyurtmalardan {qoshildi} ta mijoz ro'yxatga qo'shildi.")
     faol = [r for r in users.values() if not r.get("blocked")]
     blok = len(users) - len(faol)
     hafta = int(time.time()) - 7 * 86400
@@ -4191,6 +4240,9 @@ def run_bot_polling():
     bot.infinity_polling()
 
 if __name__ == "__main__":
+    qoshildi = backfill_users_from_history()
+    if qoshildi:
+        print(f"Eski buyurtmalardan {qoshildi} ta mijoz ro'yxatga qo'shildi.")
     threading.Thread(target=run_bot_polling, daemon=True).start()
     threading.Thread(target=daily_report_scheduler, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
