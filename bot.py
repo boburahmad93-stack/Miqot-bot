@@ -456,6 +456,46 @@ def status_name(status, lang):
 
 # ---------- viktorina ----------
 
+# ---------- mijozlar ro'yxati (e'lon yuborish uchun) ----------
+
+USERS_FILE = os.path.join(DATA_DIR, "users.json")
+
+def load_users():
+    return load_json(USERS_FILE, {})
+
+def add_known_user(user):
+    """Bot bilan muloqot qilgan har bir mijozni eslab qolamiz."""
+    if not user or not getattr(user, "id", None):
+        return
+    try:
+        with DATA_LOCK:
+            users = load_users()
+            uid = str(user.id)
+            rec = users.get(uid) or {"first_seen": int(time.time())}
+            rec["name"] = (getattr(user, "first_name", "") or "Mijoz")
+            rec["username"] = getattr(user, "username", None)
+            rec["last_seen"] = int(time.time())
+            rec["blocked"] = rec.get("blocked", False)
+            users[uid] = rec
+            save_json(USERS_FILE, users)
+    except Exception as e:
+        print(f"Mijozni eslab qolishda xato: {e}")
+
+def mark_user_blocked(uid, blocked=True):
+    try:
+        with DATA_LOCK:
+            users = load_users()
+            rec = users.get(str(uid))
+            if rec is not None:
+                rec["blocked"] = blocked
+                users[str(uid)] = rec
+                save_json(USERS_FILE, users)
+    except Exception:
+        pass
+
+def active_user_ids():
+    return [int(uid) for uid, r in load_users().items() if not r.get("blocked")]
+
 QUIZ_FILE = os.path.join(DATA_DIR, "quiz.json")
 QUIZ_RESULTS_FILE = os.path.join(DATA_DIR, "quiz_results.json")
 
@@ -739,6 +779,7 @@ def lang_keyboard():
 
 @bot.message_handler(commands=["start"])
 def cmd_start(message):
+    add_known_user(message.from_user)
     carts.pop(message.from_user.id, None)
     checkout_state.pop(message.from_user.id, None)
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
@@ -1131,6 +1172,19 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
     }
     orders.append(order)
     save_orders(orders)
+    if tg_user_id:
+        try:
+            users = load_users()
+            uid = str(tg_user_id)
+            rec = users.get(uid) or {"first_seen": int(time.time())}
+            rec["name"] = customer_name or rec.get("name") or "Mijoz"
+            rec["username"] = username or rec.get("username")
+            rec["last_seen"] = int(time.time())
+            rec["blocked"] = rec.get("blocked", False)
+            users[uid] = rec
+            save_json(USERS_FILE, users)
+        except Exception:
+            pass
     return order, None
 
 def build_customer_receipt_text(order, lang=None):
@@ -1651,6 +1705,7 @@ def cmd_menu_admin(message):
         "🕒 Ish vaqti: /yopiq | /ochiq | /ish_vaqti 06:00 22:00\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
         "🎁 Viktorina: /viktorina | g'olib: /gholib\n"
+        "📣 E'lon yuborish: /elon matn | mijozlar soni: /mijozlar\n"
         "\n\n🧑‍🍳 Eng oson yo'l: pastdagi \"Menyuni boshqarish\" tugmasi orqali "
         "taomni rasmi bilan birga qo'shing/tahrirlang.\n\n"
         "Zaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
@@ -1662,6 +1717,131 @@ def cmd_menu_admin(message):
         "Admin qo'shish: /add_admin id | /remove_admin id | /admins\n"
         "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id\n"
         "Buyurtmani o'chirish (faqat bugungi): /delete_order kunlik_raqami"
+    )
+
+# ---------- e'lon yuborish ----------
+
+pending_broadcast = {}   # admin_id -> {"text": ..., "photo": file_id yoki None}
+
+def broadcast_preview_keyboard():
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(types.InlineKeyboardButton("✅ Hammaga yuborish", callback_data="bc:go"),
+           types.InlineKeyboardButton("❌ Bekor qilish", callback_data="bc:no"))
+    return kb
+
+@bot.message_handler(commands=["elon"])
+def cmd_broadcast(message):
+    if not is_owner(message.chat.id):
+        return
+    parts = message.text.split(" ", 1)
+    total = len(active_user_ids())
+    if len(parts) < 2 or not parts[1].strip():
+        bot.send_message(
+            message.chat.id,
+            "📣 E'lon yuborish\n\n"
+            f"Hozir botda {total} ta mijoz bor.\n\n"
+            "Format: /elon xabar matni\n\n"
+            "Masalan:\n"
+            "/elon 🎁 Viktorina boshlandi! 15 ta savol, g'olibga bepul tushlik. "
+            "Pastdagi \"🎁 Viktorina\" tugmasini bosing.\n\n"
+            "Yuborishdan oldin sizga ko'rinish ko'rsatiladi — tasdiqlaysiz."
+        )
+        return
+
+    text = parts[1].strip()
+    pending_broadcast[message.chat.id] = {"text": text}
+    bot.send_message(message.chat.id, "👁 Mijozlar shuni ko'radi:")
+    bot.send_message(message.chat.id, text)
+    bot.send_message(
+        message.chat.id,
+        f"📣 Qabul qiluvchilar: {total} ta mijoz.\n"
+        "Yuborilgandan keyin qaytarib bo'lmaydi.",
+        reply_markup=broadcast_preview_keyboard()
+    )
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("bc:"))
+def cb_broadcast(call):
+    if not is_owner(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    action = call.data.split(":", 1)[1]
+    job = pending_broadcast.pop(call.message.chat.id, None)
+
+    if action == "no" or not job:
+        bot.answer_callback_query(call.id, "Bekor qilindi.")
+        try:
+            bot.edit_message_text("❌ E'lon bekor qilindi.", call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
+        return
+
+    bot.answer_callback_query(call.id, "Yuborilmoqda...")
+    try:
+        bot.edit_message_text("📣 Yuborilmoqda... tugagach xabar beraman.",
+                              call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+    threading.Thread(target=run_broadcast, args=(call.message.chat.id, job["text"]), daemon=True).start()
+
+def run_broadcast(admin_id, text):
+    """E'lonni hamma mijozga yuboradi. Telegram cheklovini hisobga olib sekin yuboramiz."""
+    ids = active_user_ids()
+    users = load_users()
+    yuborildi, bloklagan, xato = 0, 0, 0
+    for i, uid in enumerate(ids):
+        try:
+            # Tugmalarni ham birga yuboramiz — mijoz /start bosmasa ham
+            # yangi tugmalar (masalan "🎁 Viktorina") darhol paydo bo'ladi
+            try:
+                uname = (users.get(str(uid)) or {}).get("username")
+                kb = main_keyboard(uid, uname)
+            except Exception:
+                kb = None
+            bot.send_message(uid, text, reply_markup=kb)
+            yuborildi += 1
+        except Exception as e:
+            msg = str(e).lower()
+            if "blocked" in msg or "user is deactivated" in msg or "chat not found" in msg:
+                mark_user_blocked(uid)
+                bloklagan += 1
+            else:
+                xato += 1
+                print(f"E'lon yuborishda xato ({uid}): {e}")
+        time.sleep(0.06)          # sekundiga ~16 ta — Telegram chegarasidan past
+        if (i + 1) % 100 == 0:
+            try:
+                bot.send_message(admin_id, f"… {i + 1}/{len(ids)} ta yuborildi")
+            except Exception:
+                pass
+    try:
+        bot.send_message(
+            admin_id,
+            f"📣 E'lon tugadi.\n\n"
+            f"✅ Yetib bordi: {yuborildi} ta\n"
+            + (f"🚫 Botni bloklagan: {bloklagan} ta\n" if bloklagan else "")
+            + (f"⚠️ Xato: {xato} ta\n" if xato else "")
+            + f"\nKeyingi e'lonlarda bloklaganlar o'tkazib yuboriladi."
+        )
+    except Exception:
+        pass
+
+@bot.message_handler(commands=["mijozlar"])
+def cmd_users(message):
+    if not is_owner(message.chat.id):
+        return
+    users = load_users()
+    faol = [r for r in users.values() if not r.get("blocked")]
+    blok = len(users) - len(faol)
+    hafta = int(time.time()) - 7 * 86400
+    yangi = len([r for r in users.values() if r.get("first_seen", 0) >= hafta])
+    bot.send_message(
+        message.chat.id,
+        f"👥 Botdagi mijozlar\n\n"
+        f"Jami: {len(users)} ta\n"
+        f"Faol (e'lon boradi): {len(faol)} ta\n"
+        + (f"Bloklagan: {blok} ta\n" if blok else "")
+        + f"So'nggi 7 kunda qo'shilgan: {yangi} ta\n\n"
+        "E'lon yuborish: /elon xabar matni"
     )
 
 @bot.message_handler(commands=["viktorina"])
@@ -3729,6 +3909,7 @@ def quiz_result_text(user_id, res, quiz):
 def start_quiz(message):
     quiz = load_quiz()
     user = message.from_user
+    add_known_user(user)
     uid = str(user.id)
     lang = get_user_lang(user.id, getattr(user, "language_code", None))
 
@@ -3893,6 +4074,7 @@ support_message_map = {}  # (admin_chat_id, message_id) -> mijoz_user_id
 
 @bot.message_handler(func=lambda m: m.text and is_contact_button(m.text))
 def handle_contact_button(message):
+    add_known_user(message.from_user)
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
     bot.send_message(message.chat.id, t("contact_prompt", lang))
 
@@ -3981,6 +4163,7 @@ def looks_like_menu_request(text):
 )
 def handle_customer_free_text(message):
     sender = message.from_user
+    add_known_user(sender)
     lang = get_user_lang(sender.id, getattr(sender, "language_code", None))
 
     # "menyu?" degan xabarga bot o'zi javob beradi — adminni bezovta qilmaymiz
