@@ -17,6 +17,7 @@ Admin buyruqlari (faqat OWNER_CHAT_ID uchun):
 
 import json
 import os
+import re
 import time
 import threading
 import hashlib
@@ -55,14 +56,30 @@ app.config["MAX_CONTENT_LENGTH"] = 12 * 1024 * 1024  # rasm uchun eng katta hajm
 # ---------- fayl bilan ishlash ----------
 
 def load_json(path, default):
-    if not os.path.exists(path):
-        return default
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with DATA_LOCK:
+        if not os.path.exists(path):
+            return default
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"{path} o'qishda xato: {e}")
+            return default
+
+# Bir vaqtda bir necha mijoz javob berganda ma'lumot buzilmasligi uchun qulf.
+# Bot (polling) va Mini App (Flask) alohida oqimlarda ishlaydi — ikkalasi ham shu qulfdan foydalanadi.
+DATA_LOCK = threading.RLock()
 
 def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    """Avval vaqtinchalik faylga yozib, keyin almashtiramiz —
+       yozish o'rtasida uzilib qolsa ham eski fayl butun qoladi."""
+    tmp = path + ".tmp"
+    with DATA_LOCK:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
 
 def load_menu():
     return load_json(MENU_FILE, [])
@@ -437,6 +454,101 @@ def t(key, lang, **kw):
 def status_name(status, lang):
     return STATUS_NAMES.get(status, {}).get(lang, status)
 
+# ---------- viktorina ----------
+
+QUIZ_FILE = os.path.join(DATA_DIR, "quiz.json")
+QUIZ_RESULTS_FILE = os.path.join(DATA_DIR, "quiz_results.json")
+
+def load_quiz():
+    q = load_json(QUIZ_FILE, {})
+    return {
+        "active": bool(q.get("active")),
+        "test": bool(q.get("test")),          # sinov rejimi: faqat adminlar ko'radi
+        "title": q.get("title") or "Viktorina",
+        "prize": q.get("prize") or "",
+        "questions": q.get("questions") or [],
+    }
+
+def quiz_visible_to(user_id):
+    """Viktorina shu odamga ko'rinadimi."""
+    q = load_quiz()
+    if not q["active"] or not q["questions"]:
+        return False
+    if q["test"]:
+        return is_owner(user_id) or user_id in load_staff_ids()
+    return True
+
+def save_quiz(q):
+    save_json(QUIZ_FILE, q)
+
+def load_quiz_results():
+    return load_json(QUIZ_RESULTS_FILE, {})
+
+def save_quiz_results(r):
+    save_json(QUIZ_RESULTS_FILE, r)
+
+def parse_quiz_text(text):
+    """Savollarni oddiy matndan o'qiydi.
+       Har bir savol bloki: birinchi qator — savol, keyingilari — variantlar,
+       to'g'ri javob oldida * turadi. Bloklar bo'sh qator bilan ajratiladi."""
+    questions, errors = [], []
+    blocks = [b for b in re.split(r"\n\s*\n", (text or "").strip()) if b.strip()]
+    for bi, block in enumerate(blocks, start=1):
+        lines = [ln.strip() for ln in block.splitlines() if ln.strip()]
+        if len(lines) < 3:
+            errors.append(f"{bi}-savol: savol va kamida 2 ta variant kerak")
+            continue
+        q = lines[0]
+        opts, correct = [], None
+        for ln in lines[1:]:
+            if ln.startswith("*"):
+                if correct is not None:
+                    errors.append(f"{bi}-savol: bitta to'g'ri javob belgilansin")
+                correct = len(opts)
+                ln = ln[1:].strip()
+            opts.append(ln)
+        if correct is None:
+            errors.append(f"{bi}-savol: to'g'ri javob * bilan belgilanmagan")
+            continue
+        if len(opts) > 6:
+            errors.append(f"{bi}-savol: 6 tadan ko'p variant bo'lmasin")
+            continue
+        questions.append({"q": q, "options": opts, "correct": correct})
+    return questions, errors
+
+def quiz_to_text(quiz):
+    out = []
+    for item in quiz.get("questions", []):
+        lines = [item["q"]]
+        for i, o in enumerate(item.get("options", [])):
+            lines.append(("*" if i == item.get("correct") else "") + o)
+        out.append("\n".join(lines))
+    return "\n\n".join(out)
+
+def quiz_leaderboard(limit=None):
+    """Tugatganlar: avval ko'p to'g'ri, keyin kam vaqt."""
+    rows = []
+    for uid, r in load_quiz_results().items():
+        if not r.get("done"):
+            continue
+        rows.append({
+            "uid": int(uid),
+            "name": r.get("name") or "Mijoz",
+            "username": r.get("username"),
+            "correct": r.get("correct", 0),
+            "ms": r.get("elapsed_ms", 0),
+            "finished_at": r.get("finished_at", 0),
+        })
+    rows.sort(key=lambda x: (-x["correct"], x["ms"], x["finished_at"]))
+    return rows[:limit] if limit else rows
+
+def fmt_secs(ms):
+    sec = ms / 1000.0
+    if sec < 60:
+        return f"{sec:.1f} s"
+    m = int(sec // 60)
+    return f"{m} daq {sec - m*60:.0f} s"
+
 # ---------- ish vaqti ----------
 
 def get_hours():
@@ -592,7 +704,14 @@ def main_keyboard(user_id=None, username=None, lang=None):
         kb.row(types.KeyboardButton(t("btn_order", lang), web_app=types.WebAppInfo(url=fresh_url)))
         if is_owner(user_id):
             admin_url = f"{WEBAPP_URL}/admin?{params}"
+            kitchen_url = f"{WEBAPP_URL}/kitchen?{params}"
             kb.row(types.KeyboardButton("🧑‍🍳 Menyuni boshqarish", web_app=types.WebAppInfo(url=admin_url)))
+            kb.row(types.KeyboardButton("🖨 Oshxona", web_app=types.WebAppInfo(url=kitchen_url)))
+    try:
+        if user_id and quiz_visible_to(user_id):
+            kb.row(types.KeyboardButton(QUIZ_BTN), types.KeyboardButton(BOARD_BTN))
+    except Exception:
+        pass
     kb.row(types.KeyboardButton(t("btn_contact", lang)), types.KeyboardButton(t("btn_lang", lang)))
     return kb
 
@@ -606,7 +725,8 @@ def is_no_phone_button(text):
     return any(text == TEXTS["btn_no_phone"][l] for l in SUPPORTED_LANGS)
 
 def is_any_bot_button(text):
-    return is_contact_button(text) or is_lang_button(text) or is_no_phone_button(text)
+    return (is_contact_button(text) or is_lang_button(text) or is_no_phone_button(text)
+            or text in (QUIZ_BTN, BOARD_BTN))
 
 def lang_keyboard():
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -932,6 +1052,23 @@ def handle_checkout_steps(message):
 
 def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username):
     """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi."""
+    with DATA_LOCK:
+        order, error = _create_order_locked(items_cart, customer_name, phone, latitude, longitude,
+                                            address_text, note, tg_user_id, username)
+    if error:
+        return None, error
+    # xabarlarni qulfdan tashqarida yuboramiz — boshqa mijozlar kutib qolmasin
+    if OWNER_CHAT_ID:
+        notify_owner_new_order(order)
+    if tg_user_id:
+        try:
+            bot.send_message(tg_user_id, build_customer_receipt_text(order),
+                             reply_markup=main_keyboard(tg_user_id, username))
+        except Exception:
+            pass
+    return order, None
+
+def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username):
     full_menu = load_menu()
     menu = {d["id"]: d for d in full_menu}
     items = []
@@ -986,6 +1123,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
         "original_total": original_total,
         "discount_percent": disc["percent"] if disc["active"] else 0,
         "status": "Yangi",
+        "printed": False,
         "payment": "naqd",
         "created_at": created_at,
         "user_id": tg_user_id,
@@ -993,17 +1131,6 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
     }
     orders.append(order)
     save_orders(orders)
-    if OWNER_CHAT_ID:
-        notify_owner_new_order(order)
-    if tg_user_id:
-        try:
-            bot.send_message(
-                tg_user_id,
-                build_customer_receipt_text(order),
-                reply_markup=main_keyboard(tg_user_id, username)
-            )
-        except Exception:
-            pass
     return order, None
 
 def build_customer_receipt_text(order, lang=None):
@@ -1038,6 +1165,96 @@ def order_items_text(order):
             line = f"❌ {line}  (bekor qilindi)"
         lines.append(line)
     return "\n".join(lines)
+
+# ---------- oshxona cheki (termoprinter) ----------
+
+RECEIPT_WIDTH = int(os.environ.get("RECEIPT_WIDTH", "32"))  # 58mm = 32, 80mm = 48
+
+# Termoprinterlar ko'pincha faqat oddiy belgilarni biladi — xavflilarini almashtiramiz
+_SAFE_MAP = {
+    "\u2019": "'", "\u2018": "'", "\u02bb": "'", "\u02bc": "'", "\u00b4": "'",
+    "\u201c": '"', "\u201d": '"', "\u201e": '"', "\u00ab": '"', "\u00bb": '"',
+    "\u2014": "-", "\u2013": "-", "\u2212": "-", "\u2026": "...",
+    "\u00a0": " ", "\u2022": "*", "\u20bd": "RUB",
+}
+
+def ascii_safe(text):
+    out = []
+    for ch in str(text):
+        out.append(_SAFE_MAP.get(ch, ch))
+    return "".join(out)
+
+def _rline(left, right, width):
+    """Chap va o'ng matnni chekning ikki chetiga joylaydi."""
+    space = width - len(left) - len(right)
+    if space < 1:
+        left = left[:max(0, width - len(right) - 1)]
+        space = max(1, width - len(left) - len(right))
+    return left + " " * space + right
+
+def _wrap(text, width):
+    out, line = [], ""
+    for word in str(text).split():
+        if not line:
+            line = word
+        elif len(line) + 1 + len(word) <= width:
+            line += " " + word
+        else:
+            out.append(line); line = word
+    if line:
+        out.append(line)
+    return out or [""]
+
+def build_receipt_lines(order, width=None, safe=True):
+    """Termoprinter uchun chek matni — oddiy qatorlar ro'yxati."""
+    w = width or RECEIPT_WIDTH
+    L = []
+    L.append(BUSINESS_NAME.upper().center(w).rstrip())
+    L.append("-" * w)
+    created = datetime.fromtimestamp(order.get("created_at", int(time.time())), TIMEZONE)
+    L.append(_rline(f"Buyurtma #{order.get('daily_number', '?')}", created.strftime("%d.%m %H:%M"), w))
+    L.append("")
+    L.append(f"Mijoz: {order.get('customer_name') or '-'}")
+    tel = (order.get("phone") or "").strip()
+    L.append(f"Tel: {tel}" if tel else "Tel: yo'q (Telegram orqali)")
+    if order.get("username"):
+        L.append(f"TG: @{order['username']}")
+    if order.get("latitude") is not None:
+        L.append("Manzil: xaritada yuborilgan")
+        L.append(f"  {order['latitude']:.5f}, {order['longitude']:.5f}")
+    else:
+        for i, ln in enumerate(_wrap(order.get("address_text") or "-", w - 8)):
+            L.append(("Manzil: " if i == 0 else "        ") + ln)
+    L.append("-" * w)
+
+    for it in order.get("items", []):
+        if it.get("cancelled"):
+            continue
+        L.append(it["name"][:w])
+        L.append(_rline(f"  {it['qty']} x {it['price']:.0f}", f"{it['price'] * it['qty']:.0f}", w))
+
+    L.append("-" * w)
+    pct = order.get("discount_percent") or 0
+    old = order.get("original_total")
+    if pct and old and old > order.get("total", 0):
+        L.append(_rline("Oldingi summa", f"{old:.0f}", w))
+        L.append(_rline(f"Aksiya -{pct}%", f"-{old - order['total']:.0f}", w))
+    L.append(_rline("JAMI", f"{order.get('total', 0):.0f} SAR", w))
+    L.append("")
+    L.append("To'lov: NAQD (yetkazishda)".center(w).rstrip())
+
+    if order.get("note"):
+        L.append("-" * w)
+        L.append("IZOH:")
+        for ln in _wrap(order["note"], w):
+            L.append("  " + ln)
+
+    L.append("-" * w)
+    L.append("Rahmat! Yana kutamiz".center(w).rstrip())
+    return [ascii_safe(x) for x in L] if safe else L
+
+def build_receipt_text(order, width=None, safe=True):
+    return "\n".join(build_receipt_lines(order, width, safe))
 
 def order_discount_line(order):
     """Aksiya bo'lgan buyurtmada eski summa va chegirma qatorini qaytaradi."""
@@ -1432,6 +1649,8 @@ def cmd_menu_admin(message):
         "Menyu:\n" + "\n".join(lines) +
         "\n\n🏷 Aksiya: /aksiya 17 (yoqish) | /aksiya off (o'chirish)\n"
         "🕒 Ish vaqti: /yopiq | /ochiq | /ish_vaqti 06:00 22:00\n"
+        "🖨 Chekni qayta chiqarish: /chek 7\n"
+        "🎁 Viktorina: /viktorina | g'olib: /gholib\n"
         "\n\n🧑‍🍳 Eng oson yo'l: pastdagi \"Menyuni boshqarish\" tugmasi orqali "
         "taomni rasmi bilan birga qo'shing/tahrirlang.\n\n"
         "Zaxira belgilash: /set_stock id soni (masalan: /set_stock 1 10)\n"
@@ -1444,6 +1663,109 @@ def cmd_menu_admin(message):
         "Xodim qo'shish (faqat holat o'zgartira oladi): /add_staff id | /remove_staff id\n"
         "Buyurtmani o'chirish (faqat bugungi): /delete_order kunlik_raqami"
     )
+
+@bot.message_handler(commands=["viktorina"])
+def cmd_quiz_admin(message):
+    if not is_owner(message.chat.id):
+        return
+    parts = message.text.split()
+    quiz = load_quiz()
+
+    if len(parts) > 1 and parts[1].lower() in ("on", "yoq", "yoqish", "boshla"):
+        if not quiz["questions"]:
+            bot.send_message(message.chat.id, "Avval savollarni kiriting — \"🧑‍🍳 Menyuni boshqarish\" panelidagi Viktorina bo'limidan.")
+            return
+        quiz["active"] = True
+        quiz["test"] = False
+        save_quiz(quiz)
+        bot.send_message(message.chat.id, f"🟢 Viktorina HAMMA UCHUN ochildi — {len(quiz['questions'])} ta savol.\n"
+                                           "Mijozlarda \"🎁 Viktorina\" tugmasi paydo bo'ladi (ular /start bosgach).")
+        return
+    if len(parts) > 1 and parts[1].lower() in ("sinov", "test"):
+        if not quiz["questions"]:
+            bot.send_message(message.chat.id, "Avval savollarni kiriting.")
+            return
+        quiz["active"] = True
+        quiz["test"] = True
+        save_quiz(quiz)
+        bot.send_message(message.chat.id, "🧪 Sinov rejimi yoqildi — viktorina faqat sizga va xodimlarga ko'rinadi.\n"
+                                           "Sinab bo'lgach: /viktorina on — hammaga ochiladi.")
+        return
+    if len(parts) > 1 and parts[1].lower() in ("off", "ochir", "toxtat", "tugat"):
+        quiz["active"] = False; save_quiz(quiz)
+        bot.send_message(message.chat.id, "⏹ Viktorina to'xtatildi. Natijalar saqlanib qoldi — /gholib bilan ko'ring.")
+        return
+
+    board = quiz_leaderboard()
+    if not quiz["active"]:
+        holat = "⏹ to'xtatilgan"
+    elif quiz["test"]:
+        holat = "🧪 sinov rejimi (faqat adminlar ko'radi)"
+    else:
+        holat = "🟢 hamma uchun ochiq"
+    sovga = quiz.get("prize") or ""
+    txt = (
+        "🎁 Viktorina: " + quiz["title"] + "\n"
+        "Holat: " + holat + "\n"
+        "Savollar: " + str(len(quiz["questions"])) + " ta\n"
+        "Tugatganlar: " + str(len(board)) + " ta\n"
+    )
+    if sovga:
+        txt += "Sovg'a: " + sovga + "\n"
+    txt += (
+        "\nSinov rejimi: /viktorina sinov\n"
+        "Hammaga ochish: /viktorina on\n"
+        "To'xtatish: /viktorina off\n"
+        "G'olib va to'liq ro'yxat: /gholib\n"
+        "Savollarni kiritish: \"🧑‍🍳 Menyuni boshqarish\" paneli → Viktorina"
+    )
+    bot.send_message(message.chat.id, txt)
+
+@bot.message_handler(commands=["gholib", "golib"])
+def cmd_quiz_winners(message):
+    if not is_owner(message.chat.id):
+        return
+    quiz = load_quiz()
+    board = quiz_leaderboard()
+    if not board:
+        bot.send_message(message.chat.id, "Hali hech kim viktorinani tugatmagan.")
+        return
+    total = len(quiz["questions"]) or 0
+    lines = [f"🏆 {quiz['title']} — to'liq ro'yxat", ""]
+    for i, r in enumerate(board, start=1):
+        who = f"@{r['username']}" if r.get("username") else f"ID {r['uid']}"
+        lines.append(f"{i}. {r['name']} ({who}) — {r['correct']}/{total} · {fmt_secs(r['ms'])}")
+    w = board[0]
+    lines += ["", "— — —",
+              f"🥇 G'olib: {w['name']}" + (f" (@{w['username']})" if w.get("username") else ""),
+              f"   {w['correct']}/{total} to'g'ri, {fmt_secs(w['ms'])}",
+              "", "G'olibga yozish uchun yuqoridagi @ nomiga bosing.",
+              "Agar @ nomi bo'lmasa — u viktorinani tugatganda sizga kelgan xabarga Reply qiling."]
+    text = "\n".join(lines)
+    for i in range(0, len(text), 3800):
+        bot.send_message(message.chat.id, text[i:i+3800])
+
+@bot.message_handler(commands=["chek"])
+def cmd_reprint(message):
+    """Buyurtmani qayta chop etishga qo'yish: /chek 7"""
+    if not is_owner(message.chat.id):
+        return
+    parts = message.text.split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        bot.send_message(message.chat.id,
+            "Format: /chek 7  — bugungi 7-buyurtmani qayta chop etishga qo'yadi.\n"
+            "Chek oshxonadagi telefonda o'zi chiqadi.")
+        return
+    no = int(parts[1])
+    orders = load_orders()
+    day = today_key()
+    target = next((o for o in orders if o.get("day_key") == day and o.get("daily_number") == no), None)
+    if not target:
+        bot.send_message(message.chat.id, f"Bugungi buyurtmalar orasida #{no} topilmadi.")
+        return
+    target["printed"] = False
+    save_orders(orders)
+    bot.send_message(message.chat.id, f"🖨 #{no} qayta chop etishga qo'yildi — oshxona telefonida chiqadi.")
 
 @bot.message_handler(commands=["yopiq", "ochiq", "ish_vaqti"])
 def cmd_hours(message):
@@ -1871,6 +2193,484 @@ def api_order():
 
 # ---------- admin paneli (Mini App orqali taom qo'shish) ----------
 
+KITCHEN_PAGE_HTML = """<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Oshxona — chek chiqarish</title>
+<style>
+  :root{
+    --bg:#0f1115; --fg:#f2f0ea; --dim:#9aa0ad; --line:#272c36; --card:#171a21;
+    --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444; --gold:#e3b34a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--fg); padding-bottom:24px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+  }
+  header{
+    position:sticky; top:0; z-index:5; padding:12px 14px;
+    background:rgba(15,17,21,.95); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .row{ display:flex; align-items:center; gap:10px; }
+  h1{ font-size:16px; margin:0; flex:1; }
+  .dot{ width:10px; height:10px; border-radius:50%; background:var(--bad); flex:none; }
+  .dot.on{ background:var(--ok); }
+  .sub{ font-size:12px; color:var(--dim); margin-top:3px; }
+
+  .bar{ display:flex; gap:8px; flex-wrap:wrap; margin-top:11px; }
+  button{
+    font:inherit; font-size:14px; font-weight:600; cursor:pointer;
+    padding:10px 14px; border-radius:10px; border:1px solid var(--line);
+    background:#1d222c; color:var(--fg);
+  }
+  button.main{ background:var(--gold); color:#1a1305; border-color:transparent; }
+  button.ghost{ background:transparent; color:var(--dim); }
+  button:disabled{ opacity:.45; }
+  button:focus-visible{ outline:2px solid var(--gold); outline-offset:2px; }
+
+  .opts{ display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:11px; font-size:13px; color:var(--dim); }
+  .opts label{ display:flex; align-items:center; gap:7px; }
+  .opts input[type=checkbox]{ width:19px; height:19px; accent-color:var(--gold); }
+  select{
+    font:inherit; font-size:13px; padding:6px 8px; border-radius:8px;
+    background:#1d222c; color:var(--fg); border:1px solid var(--line);
+  }
+
+  main{ padding:14px; }
+  .msg{ font-size:13px; padding:10px 12px; border-radius:10px; margin-bottom:12px; line-height:1.5; }
+  .msg.ok{ background:rgba(34,197,94,.12); color:#86efac; }
+  .msg.err{ background:rgba(239,68,68,.12); color:#fca5a5; }
+  .msg.info{ background:#171a21; color:var(--dim); border:1px solid var(--line); }
+
+  .order{
+    background:var(--card); border:1px solid var(--line); border-radius:13px;
+    padding:13px 14px; margin-bottom:11px;
+  }
+  .order .top{ display:flex; align-items:baseline; gap:9px; }
+  .order .no{ font-size:19px; font-weight:800; color:var(--gold); }
+  .order .who{ flex:1; font-size:14px; font-weight:600; }
+  .order .sum{ font-size:14px; font-weight:800; }
+  .order ul{ margin:8px 0 10px; padding-inline-start:19px; font-size:13px; color:var(--dim); line-height:1.65; }
+  .order .acts{ display:flex; gap:8px; }
+  .order .acts button{ flex:1; padding:9px 0; font-size:13.5px; }
+
+  .empty{ text-align:center; color:var(--dim); padding:40px 16px; font-size:14px; line-height:1.6; }
+  pre.prev{
+    background:#fff; color:#111; padding:10px; border-radius:8px;
+    font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; line-height:1.35;
+    white-space:pre; overflow-x:auto; margin:9px 0 0;
+  }
+  details{ margin-top:16px; font-size:13px; color:var(--dim); }
+  details summary{ cursor:pointer; padding:7px 0; }
+  details ol{ padding-inline-start:20px; line-height:1.7; }
+  details code{ background:#1d222c; padding:1px 5px; border-radius:4px; }
+
+  /* tizim orqali chop etish — faqat chek chiqadi */
+  #printArea{ display:none; }
+  @media print{
+    body > *{ display:none !important; }
+    #printArea{
+      display:block !important; margin:0; padding:0;
+      color:#000; background:#fff;
+      font-family:ui-monospace,"Courier New",monospace;
+      font-size:11pt; line-height:1.28; white-space:pre;
+    }
+    @page{ margin:2mm; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <span class="dot" id="dot"></span>
+    <h1>Oshxona — chek chiqarish</h1>
+    <span id="count" style="font-size:13px;color:var(--dim)"></span>
+  </div>
+  <div class="sub" id="state">Ulanmoqda...</div>
+  <div class="bar">
+    <button class="main" id="btConnect">🖨 Printerni ulash</button>
+    <button id="btTest">Sinov cheki</button>
+    <button class="ghost" id="btAgain">Qayta chiqarish</button>
+  </div>
+  <div class="opts">
+    <label><input type="checkbox" id="auto" checked> Avtomatik chiqarsin</label>
+    <label><input type="checkbox" id="snd" checked> Ovoz</label>
+    <label>Kengligi
+      <select id="w">
+        <option value="32">58 mm</option>
+        <option value="48" selected>80 mm</option>
+      </select>
+    </label>
+    <label>Usul
+      <select id="mode">
+        <option value="bt" selected>Bevosita Bluetooth</option>
+        <option value="sys">Tizim orqali (RawBT)</option>
+      </select>
+    </label>
+  </div>
+</header>
+
+<div id="printArea" aria-hidden="true"></div>
+
+<main>
+  <div class="msg info" id="hint">
+    Printerni yoqing, telefon Bluetooth'ini yoqing, so'ng <b>“Printerni ulash”</b>ni bosing.
+  </div>
+  <div id="list"></div>
+
+  <details>
+    <summary>Printer ulanmasa nima qilish kerak</summary>
+    <p><b>Avval shuni sinang:</b> “Printerni ulash” → ro'yxatdan printeringizni tanlang → “Sinov cheki”.
+       Chiqsa — tamom, boshqa hech narsa kerak emas.</p>
+    <p><b>Printer ro'yxatda ko'rinmasa</b> (stol printerlarida ko'p uchraydi — ular eski turdagi
+       Bluetooth ishlatadi, brauzer uni ko'rmaydi):</p>
+    <ol>
+      <li>Telefon sozlamasida printerni odatdagidek Bluetooth orqali ulang (juftlang).</li>
+      <li>Play Market'dan <b>RawBT</b> ilovasini o'rnating va unda shu printerni tanlang.</li>
+      <li>Shu sahifada yuqoridan <b>Usul → “Tizim orqali (RawBT)”</b> ni tanlang.</li>
+      <li>Endi “Chiqarish” bosganingizda chop etish oynasi ochiladi — RawBT'ni tanlaysiz.</li>
+    </ol>
+    <p>Tizim rejimida har bir chek uchun bir marta tasdiqlash kerak bo'ladi.
+       Bevosita rejimda esa cheklar o'zi chiqaveradi.</p>
+    <p>iPhone'da bevosita ulanish umuman ishlamaydi — u yerda “Matnni nusxalash” orqali
+       printer ilovasiga joylashtirasiz. Oshxonaga Android qo'ygan ma'qul.</p>
+  </details>
+</main>
+
+<script>
+(function(){
+  var AUTH = new URLSearchParams(location.search);
+  var url = function(p){ return p + (p.indexOf('?')>=0?'&':'?') + AUTH.toString(); };
+  var $ = function(id){ return document.getElementById(id); };
+
+  var dev = null, chr = null;      // Bluetooth qurilma va yozish kanali
+  var printing = false;
+  var seen = {};                   // ko'rsatilgan buyurtmalar
+  var failed = {};                 // chop etilmaganlar
+
+  function say(text, kind){
+    var m = $('hint');
+    m.className = 'msg ' + (kind || 'info');
+    m.innerHTML = text;
+  }
+  function setState(txt, ok){
+    $('state').textContent = txt;
+    $('dot').classList.toggle('on', !!ok);
+  }
+
+  /* ---------- ovoz (fayl kerak emas, o'zi hosil qiladi) ---------- */
+  var actx = null;
+  function beep(){
+    if (!$('snd').checked) return;
+    try{
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      [0, 180].forEach(function(delay){
+        var o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        g.gain.setValueAtTime(0.0001, actx.currentTime + delay/1000);
+        g.gain.exponentialRampToValueAtTime(0.35, actx.currentTime + delay/1000 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + delay/1000 + 0.16);
+        o.connect(g); g.connect(actx.destination);
+        o.start(actx.currentTime + delay/1000);
+        o.stop(actx.currentTime + delay/1000 + 0.18);
+      });
+    }catch(e){}
+  }
+
+  /* ---------- Bluetooth printer ---------- */
+  // Arzon termoprinterlarda uchraydigan xizmat raqamlari
+  var SERVICES = [
+    '000018f0-0000-1000-8000-00805f9b34fb',
+    '0000ffe0-0000-1000-8000-00805f9b34fb',
+    '0000ff00-0000-1000-8000-00805f9b34fb',
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    'e7810a71-73ae-499d-8c15-faa9aef0c3f2'
+  ];
+
+  function btSupported(){ return !!(navigator.bluetooth && navigator.bluetooth.requestDevice); }
+
+  async function connect(){
+    if (!btSupported()){
+      say("Bu brauzer Bluetooth printerni qo'llab-quvvatlamaydi. Android'da <b>Chrome</b> bilan oching, " +
+          "yoki pastdagi “boshqa yo'l”dan foydalaning.", 'err');
+      return;
+    }
+    try{
+      say('Printer tanlanmoqda...', 'info');
+      dev = await navigator.bluetooth.requestDevice({
+        filters: SERVICES.map(function(s){ return { services:[s] }; }),
+        optionalServices: SERVICES
+      });
+      dev.addEventListener('gattserverdisconnected', function(){
+        chr = null;
+        setState('Printer uzildi', false);
+        say("Printer uzildi. Qayta ulash uchun “Printerni ulash”ni bosing.", 'err');
+      });
+      var server = await dev.gatt.connect();
+      chr = null;
+      var svcs = await server.getPrimaryServices();
+      for (var i=0; i<svcs.length && !chr; i++){
+        var cs = await svcs[i].getCharacteristics();
+        for (var j=0; j<cs.length; j++){
+          if (cs[j].properties.write || cs[j].properties.writeWithoutResponse){ chr = cs[j]; break; }
+        }
+      }
+      if (!chr) throw new Error('yozish kanali topilmadi');
+      setState('Printer ulandi: ' + (dev.name || 'nomsiz'), true);
+      say('✅ Printer ulandi. Yangi buyurtmalar o‘zi chiqadi.', 'ok');
+      flushFailed();
+    }catch(e){
+      chr = null;
+      setState('Printer ulanmagan', false);
+      if (e && e.name === 'NotFoundError'){
+        say('Printer tanlanmadi. Printer yoqiqmi va Bluetooth ochiqmi — tekshiring.', 'err');
+      } else {
+        say('Ulanmadi: ' + (e && e.message ? e.message : e) + ". Pastdagi “boshqa yo‘l”ni ko‘ring.", 'err');
+      }
+    }
+  }
+
+  function escpos(text){
+    var enc = new TextEncoder();
+    var head = new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00]);   // reset + kodlash jadvali
+    var body = enc.encode(text + "\\n");
+    var tail = new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00]); // bo'sh joy + kesish
+    var out = new Uint8Array(head.length + body.length + tail.length);
+    out.set(head, 0); out.set(body, head.length); out.set(tail, head.length + body.length);
+    return out;
+  }
+
+  async function sendBytes(bytes){
+    var CH = 180;                       // katta paketlarni bo'lib yuboramiz
+    for (var i=0; i<bytes.length; i+=CH){
+      var part = bytes.slice(i, i+CH);
+      if (chr.writeValueWithoutResponse) await chr.writeValueWithoutResponse(part);
+      else await chr.writeValue(part);
+      await new Promise(function(r){ setTimeout(r, 22); });
+    }
+  }
+
+  function systemPrint(text){
+    // Android chop etish oynasi ochiladi — u yerdan RawBT yoki printer xizmati tanlanadi
+    document.getElementById('printArea').textContent = text;
+    window.print();
+  }
+
+  function mode(){ return $('mode').value; }
+
+  async function printText(text){
+    if (mode() === 'sys'){ systemPrint(text); return; }
+    if (!chr) throw new Error('printer ulanmagan');
+    await sendBytes(escpos(text));
+  }
+
+  /* ---------- buyurtmalar ---------- */
+  async function markDone(ids){
+    try{
+      await fetch(url('/api/print/done'), {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ids: ids })
+      });
+    }catch(e){}
+  }
+
+  async function printOrder(o, manual){
+    if (printing && !manual) return false;
+    printing = true;
+    try{
+      await printText(o.receipt);
+      await markDone([o.id]);
+      delete failed[o.id];
+      var card = document.querySelector('[data-oid="' + o.id + '"]');
+      if (card) card.remove();
+      say('✅ #' + o.no + ' cheki chiqdi.', 'ok');
+      return true;
+    }catch(e){
+      failed[o.id] = o;
+      say('❌ #' + o.no + ' chiqmadi: ' + (e && e.message ? e.message : e), 'err');
+      return false;
+    }finally{
+      printing = false;
+      renderCount();
+    }
+  }
+
+  async function flushFailed(){
+    var list = Object.keys(failed).map(function(k){ return failed[k]; });
+    for (var i=0; i<list.length; i++){ await printOrder(list[i], true); }
+  }
+
+  function card(o){
+    var el = document.createElement('div');
+    el.className = 'order';
+    el.setAttribute('data-oid', o.id);
+
+    var top = document.createElement('div');
+    top.className = 'top';
+    var no = document.createElement('span'); no.className='no'; no.textContent = '#' + o.no;
+    var who = document.createElement('span'); who.className='who'; who.textContent = o.name || '';
+    var sum = document.createElement('span'); sum.className='sum'; sum.textContent = (o.total||0) + ' SAR';
+    top.appendChild(no); top.appendChild(who); top.appendChild(sum);
+    el.appendChild(top);
+
+    var ul = document.createElement('ul');
+    (o.items||[]).forEach(function(t){ var li=document.createElement('li'); li.textContent=t; ul.appendChild(li); });
+    el.appendChild(ul);
+
+    var acts = document.createElement('div'); acts.className='acts';
+    var bp = document.createElement('button'); bp.className='main'; bp.textContent='🖨 Chiqarish';
+    bp.addEventListener('click', function(){ printOrder(o, true); });
+    var bc = document.createElement('button'); bc.textContent='Matnni nusxalash';
+    bc.addEventListener('click', function(){
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(o.receipt).then(function(){
+          bc.textContent = '✅ Nusxalandi';
+          setTimeout(function(){ bc.textContent = 'Matnni nusxalash'; }, 1800);
+        }).catch(function(){ showPreview(el, o); });
+      } else { showPreview(el, o); }
+    });
+    var bs = document.createElement('button'); bs.className='ghost'; bs.textContent='O‘tkazib yuborish';
+    bs.addEventListener('click', function(){ markDone([o.id]); el.remove(); renderCount(); });
+    acts.appendChild(bp); acts.appendChild(bc); acts.appendChild(bs);
+    el.appendChild(acts);
+    return el;
+  }
+
+  function showPreview(el, o){
+    if (el.querySelector('pre.prev')) return;
+    var pre = document.createElement('pre'); pre.className='prev'; pre.textContent = o.receipt;
+    el.appendChild(pre);
+  }
+
+  function renderCount(){
+    var n = document.querySelectorAll('.order').length;
+    $('count').textContent = n ? (n + ' ta kutyapti') : '';
+  }
+
+  var offline = 0;
+  async function poll(){
+    try{
+      var r = await fetch(url('/api/print/pending?w=' + $('w').value), { cache:'no-store' });
+      if (!r.ok){
+        setState(r.status === 403 ? 'Ruxsat yo‘q — botdan qaytadan oching' : 'Server javob bermadi', false);
+        return;
+      }
+      offline = 0;
+      var data = await r.json();
+      if (mode() === 'sys') setState('Tizim orqali: har chek uchun chop etish oynasi ochiladi', true);
+      else if (!chr) setState('Printer ulanmagan — buyurtmalar ko‘rinib turadi', false);
+      else setState('Printer ulandi: ' + (dev && dev.name ? dev.name : 'tayyor'), true);
+
+      var list = $('list');
+      var fresh = [];
+      (data.orders || []).forEach(function(o){
+        if (seen[o.id]) return;
+        seen[o.id] = true;
+        list.appendChild(card(o));
+        fresh.push(o);
+      });
+      if (fresh.length){
+        beep();
+        renderCount();
+        if ($('auto').checked && chr && mode() === 'bt'){
+          (async function(){ for (var i=0;i<fresh.length;i++){ await printOrder(fresh[i], false); } })();
+        }
+      }
+      if (!document.querySelectorAll('.order').length && !list.querySelector('.empty')){
+        list.innerHTML = '<div class="empty">Hozircha yangi buyurtma yo‘q.<br>Kelganda o‘zi chiqadi.</div>';
+        renderCount();
+      } else if (document.querySelectorAll('.order').length){
+        var e = list.querySelector('.empty'); if (e) e.remove();
+      }
+    }catch(e){
+      offline++;
+      if (offline > 1) setState('Internet aloqasi yo‘q', false);
+    }
+  }
+
+  /* ---------- tugmalar ---------- */
+  $('btConnect').addEventListener('click', connect);
+
+  $('btTest').addEventListener('click', async function(){
+    var w = parseInt($('w').value, 10);
+    var line = '-'.repeat(w);
+    var t = [
+      'MIQOT FOOD'.padStart(Math.floor((w + 10)/2)),
+      line, 'SINOV CHEKI', line,
+      'Agar bu matn to‘g‘ri chiqsa,'.slice(0,w),
+      'printer tayyor.',
+      line, ''
+    ].join('\\n');
+    if (mode() === 'bt' && !chr){ say('Avval printerni ulang.', 'err'); return; }
+    try{ await printText(t); say('✅ Sinov cheki yuborildi.', 'ok'); }
+    catch(e){ say('❌ Chiqmadi: ' + e.message, 'err'); }
+  });
+
+  $('btAgain').addEventListener('click', async function(){
+    var no = window.prompt('Qaysi buyurtma? Kunlik raqamini yozing (masalan: 7)');
+    if (!no) return;
+    try{
+      var r = await fetch(url('/api/print/again'), {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ no: parseInt(no, 10) })
+      });
+      var d = await r.json().catch(function(){ return {}; });
+      if (r.ok){ say('#' + no + ' navbatga qo‘yildi.', 'ok'); }
+      else { say(d.error || 'Topilmadi.', 'err'); }
+    }catch(e){ say('Aloqa uzildi.', 'err'); }
+  });
+
+  $('mode').addEventListener('change', function(){
+    var sys = mode() === 'sys';
+    $('btConnect').disabled = sys;
+    $('auto').disabled = sys;
+    if (sys){
+      $('auto').checked = false;
+      say("Tizim rejimi: har bir chek uchun Android chop etish oynasi ochiladi, " +
+          "u yerdan <b>RawBT</b>ni tanlaysiz. Bu Bluetooth Classic printerlar uchun.", 'info');
+    } else {
+      $('auto').checked = true;
+      say("Bevosita rejim: printerni ulasangiz cheklar o‘zi chiqadi.", 'info');
+    }
+    poll();
+  });
+
+  $('w').addEventListener('change', function(){
+    seen = {};                                   // yangi kenglikda qayta olamiz
+    $('list').innerHTML = '';
+    poll();
+  });
+
+  // ekran o'chib qolmasin
+  if (navigator.wakeLock && navigator.wakeLock.request){
+    var lock = null;
+    var keep = async function(){
+      try{ lock = await navigator.wakeLock.request('screen'); }catch(e){}
+    };
+    keep();
+    document.addEventListener('visibilitychange', function(){
+      if (document.visibilityState === 'visible') keep();
+    });
+  }
+
+  if (!btSupported()){
+    say("Bu brauzerda printerga bevosita ulab bo‘lmaydi (Android Chrome kerak). " +
+        "Buyurtmalar baribir ko‘rinadi — “Matnni nusxalash” orqali chiqarasiz.", 'err');
+  }
+
+  poll();
+  setInterval(poll, 5000);
+})();
+</script>
+</body>
+</html>"""
+
 ADMIN_PAGE_HTML = """<!doctype html>
 <html lang="uz">
 <head>
@@ -1931,6 +2731,18 @@ ADMIN_PAGE_HTML = """<!doctype html>
   .saleState.on { color:var(--accent); }
   .saleState.off { color:var(--muted); }
   .dish .sale-tag { display:inline-block; margin-top:3px; font-size:12px; font-weight:700; color:var(--accent); }
+  .card.quiz.on { background:linear-gradient(135deg, rgba(22,163,74,0.1), transparent); border-color:var(--accent); }
+  .qcount { font-size:13px; color:var(--muted); margin:-4px 0 14px; }
+  .qcount.bad { color:var(--danger); }
+  #quizResults { margin-top:14px; }
+  #quizResults .qrow {
+    display:flex; gap:10px; align-items:baseline; padding:7px 0;
+    border-bottom:1px solid var(--line); font-size:14px;
+  }
+  #quizResults .qrow:last-child { border-bottom:none; }
+  #quizResults .qp { font-weight:700; min-width:26px; color:var(--accent); }
+  #quizResults .qn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #quizResults .qs { font-variant-numeric:tabular-nums; color:var(--muted); font-size:13px; white-space:nowrap; }
   .card.hours.shut { border-color:var(--danger); background:linear-gradient(135deg, rgba(220,38,38,0.1), transparent); }
   .timeRow { display:flex; gap:12px; margin:4px 0 16px; }
   .timeRow label { flex:1; margin:0; }
@@ -1941,6 +2753,33 @@ ADMIN_PAGE_HTML = """<!doctype html>
 <body>
 <h1>🧑‍🍳 Menyuni boshqarish</h1>
 <p class="sub">Taomni rasmi bilan shu yerdan qo'shing — Telegram'ga qaytish shart emas.</p>
+
+<section class="card quiz" id="quizCard">
+  <h2>🎁 Viktorina</h2>
+  <p class="saleNote">Savollarni shu yerga yozasiz. Har bir savol alohida blok, bloklar orasida bo'sh qator.
+     Birinchi qator — savol, keyingilari — variantlar. To'g'ri javob oldiga <b>*</b> qo'ying.</p>
+
+  <label>Nomi<input id="q_title" placeholder="Miqot Food viktorinasi"></label>
+  <label>Sovg'a (mijozlarga ko'rinadi)<input id="q_prize" placeholder="G'olibga bepul tushlik"></label>
+  <label>Savollar
+    <textarea id="q_text" rows="11" placeholder="Miqot Food qaysi shaharda joylashgan?&#10;*Makka&#10;Madina&#10;Jidda&#10;&#10;Osh qaysi go'shtdan tayyorlanadi?&#10;*Mol&#10;Baliq&#10;Tovuq"></textarea>
+  </label>
+  <p class="qcount" id="q_count">Savollar: 0 ta</p>
+
+  <label class="chk"><input type="checkbox" id="q_test" checked> 🧪 Sinov rejimi — faqat men ko'raman</label>
+  <p class="qcount" id="q_testnote">Sinab bo'lgach belgini olib tashlang — shundan keyin mijozlarga ko'rinadi.</p>
+
+  <div class="saleRow">
+    <button id="quizSave" class="saleBtn off" style="flex:1">Saqlash</button>
+    <button id="quizToggle" class="saleBtn off" style="flex:1">Boshlash</button>
+  </div>
+  <p class="saleState" id="quizState">Hozir: to'xtatilgan</p>
+  <div class="saleRow" style="margin-top:10px">
+    <button id="quizBoard" class="small ghost" style="flex:1">Natijalarni ko'rish</button>
+    <button id="quizReset" class="small danger" style="flex:1">Natijalarni tozalash</button>
+  </div>
+  <div id="quizResults"></div>
+</section>
 
 <section class="card hours" id="hoursCard">
   <h2>🕒 Ish vaqti</h2>
@@ -2024,6 +2863,118 @@ function resetForm() {
   $('preview').hidden = true; $('cancelBtn').hidden = true; say('');
 }
 $('cancelBtn').addEventListener('click', resetForm);
+
+/* ---------- viktorina ---------- */
+var quiz = { active:false, test:true, title:'', prize:'', text:'', count:0 };
+
+function countQ(text){
+  var blocks = (text || '').trim().split(/\\n\\s*\\n/).filter(function(b){ return b.trim(); });
+  var good = 0, bad = 0;
+  blocks.forEach(function(b){
+    var lines = b.split('\\n').map(function(x){ return x.trim(); }).filter(Boolean);
+    var stars = lines.slice(1).filter(function(x){ return x.charAt(0) === '*'; }).length;
+    if (lines.length >= 3 && stars === 1) good++; else bad++;
+  });
+  return { good: good, bad: bad };
+}
+
+function renderQuizCount(){
+  var c = countQ($('q_text').value);
+  var el = $('q_count');
+  el.textContent = 'Savollar: ' + c.good + ' ta' + (c.bad ? '  ·  ' + c.bad + ' ta blok noto\u2018g\u2018ri' : '');
+  el.className = 'qcount' + (c.bad ? ' bad' : '');
+}
+
+function renderQuiz(){
+  $('q_title').value = quiz.title || '';
+  $('q_prize').value = quiz.prize || '';
+  $('q_test').checked = quiz.test !== false;
+  if (document.activeElement !== $('q_text')) $('q_text').value = quiz.text || '';
+  renderQuizCount();
+  var btn = $('quizToggle'), st = $('quizState'), card = $('quizCard');
+  if (quiz.active){
+    btn.textContent = "To\u2018xtatish"; btn.className = 'saleBtn on';
+    if (quiz.test){
+      st.textContent = '🧪 Sinov rejimi — faqat siz ko\u2018rasiz (' + quiz.count + ' ta savol)';
+      st.className = 'saleState'; st.style.color = 'var(--warn, #f59e0b)';
+    } else {
+      st.textContent = '🟢 Hamma uchun ochiq — ' + quiz.count + ' ta savol';
+      st.className = 'saleState on'; st.style.color = '';
+    }
+    card.classList.add('on');
+  } else {
+    btn.textContent = 'Boshlash'; btn.className = 'saleBtn off';
+    st.textContent = "⏹ Hozir: to\u2018xtatilgan";
+    st.className = 'saleState off'; st.style.color = '';
+    card.classList.remove('on');
+  }
+}
+
+$('q_text').addEventListener('input', renderQuizCount);
+
+async function saveQuiz(active){
+  var c = countQ($('q_text').value);
+  if (active && c.good === 0){ say('Avval kamida bitta savol yozing.', 'err'); return; }
+  if (active && c.bad){ say(c.bad + " ta blok noto\u2018g\u2018ri — har savolda bitta * belgilangan to\u2018g\u2018ri javob bo\u2018lsin.", 'err'); return; }
+  $('quizSave').disabled = true; $('quizToggle').disabled = true;
+  try {
+    var r = await fetch(url('/api/admin/quiz'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title: $('q_title').value, prize: $('q_prize').value,
+                             text: $('q_text').value, active: active,
+                             test: $('q_test').checked })
+    });
+    var d = await r.json().catch(function(){ return {}; });
+    if (r.ok){
+      quiz = d.quiz || quiz;
+      renderQuiz();
+      var m = '✅ Saqlandi.';
+      if (active === true) m = quiz.test ? '🧪 Sinov rejimida boshlandi — faqat siz ko\u2018rasiz.'
+                                         : '🟢 Viktorina hamma uchun ochildi!';
+      if (active === false) m = "⏹ Viktorina to\u2018xtatildi.";
+      say(m, 'ok');
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    } else { say(d.error || "Saqlab bo\u2018lmadi.", 'err'); }
+  } catch(e){ say("Aloqa uzildi.", 'err'); }
+  $('quizSave').disabled = false; $('quizToggle').disabled = false;
+}
+
+$('quizSave').addEventListener('click', function(){ saveQuiz(null); });
+$('quizToggle').addEventListener('click', function(){ saveQuiz(!quiz.active); });
+
+$('quizBoard').addEventListener('click', async function(){
+  var box = $('quizResults');
+  box.innerHTML = '';
+  try {
+    var r = await fetch(url('/api/admin/quiz/results'));
+    var d = await r.json();
+    var rows = d.board || [];
+    if (!rows.length){
+      var p = document.createElement('p');
+      p.className = 'qcount'; p.textContent = 'Hali hech kim tugatmagan.';
+      box.appendChild(p); return;
+    }
+    rows.forEach(function(x, i){
+      var row = document.createElement('div'); row.className = 'qrow';
+      var a = document.createElement('span'); a.className = 'qp'; a.textContent = (i+1) + '.';
+      var b = document.createElement('span'); b.className = 'qn';
+      b.textContent = x.name + (x.username ? ' (@' + x.username + ')' : '');
+      var c = document.createElement('span'); c.className = 'qs';
+      c.textContent = x.correct + '/' + (d.total || 0) + ' · ' + x.time;
+      row.appendChild(a); row.appendChild(b); row.appendChild(c);
+      box.appendChild(row);
+    });
+  } catch(e){ say('Natijalarni olib bo\u2018lmadi.', 'err'); }
+});
+
+$('quizReset').addEventListener('click', async function(){
+  if (!confirm("Barcha natijalar o\u2018chadi va hamma qaytadan qatnasha oladi. Davom etamizmi?")) return;
+  try {
+    var r = await fetch(url('/api/admin/quiz/results'), { method:'DELETE' });
+    if (r.ok){ $('quizResults').innerHTML = ''; say('✅ Natijalar tozalandi.', 'ok'); }
+    else { say("Tozalab bo\u2018lmadi.", 'err'); }
+  } catch(e){ say('Aloqa uzildi.', 'err'); }
+});
 
 /* ---------- ish vaqti ---------- */
 let hours = { closed_today:false, schedule_on:false, open:'06:00', close:'22:00' };
@@ -2135,6 +3086,11 @@ async function saveSale(active) {
 $('saleToggle').addEventListener('click', ()=> saveSale(!sale.active));
 
 async function load() {
+  try {
+    const rq = await fetch(url('/api/admin/quiz'));
+    if (rq.ok) { quiz = (await rq.json()).quiz || quiz; }
+  } catch (e) {}
+  renderQuiz();
   try {
     const rh = await fetch(url('/api/admin/hours'));
     if (rh.ok) { const d = await rh.json(); hours = d.hours || hours; shopOpen = d.shop ? d.shop.open : true; }
@@ -2314,6 +3270,141 @@ def admin_page():
             .replace("__CATEGORIES__", json.dumps(CATEGORIES, ensure_ascii=False))
             .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False)))
     return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+# ---------- oshxona printeri uchun API ----------
+
+@app.route("/kitchen")
+def kitchen_page():
+    if not admin_from_request():
+        return ("<h3 style='font-family:sans-serif;padding:24px;line-height:1.6'>Ruxsat yo'q.<br><br>"
+                "Telegramda botga <b>/start</b> yuboring va \"🖨 Oshxona\" tugmasini bosing.</h3>"), 403
+    return KITCHEN_PAGE_HTML, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+@app.route("/api/print/pending")
+def api_print_pending():
+    """Hali chop etilmagan buyurtmalar. Oshxona sahifasi shuni so'rab turadi."""
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    try:
+        width = int(request.args.get("w") or RECEIPT_WIDTH)
+    except Exception:
+        width = RECEIPT_WIDTH
+    width = max(24, min(64, width))
+
+    today = today_key()
+    out = []
+    for o in load_orders():
+        if o.get("printed"):
+            continue
+        if is_cancelled(o):
+            continue
+        if o.get("day_key") != today:      # eski buyurtmalar o'z-o'zidan chiqmasin
+            continue
+        out.append({
+            "id": o["id"],
+            "no": o.get("daily_number"),
+            "name": o.get("customer_name"),
+            "total": o.get("total"),
+            "items": [f"{it['name']} x{it['qty']}" for it in o.get("items", []) if not it.get("cancelled")],
+            "receipt": build_receipt_text(o, width),
+        })
+    out.sort(key=lambda x: x["id"])
+    return jsonify({"orders": out, "shop": shop_status()})
+
+@app.route("/api/print/done", methods=["POST"])
+def api_print_done():
+    """Chop etilgan buyurtmalarni belgilaymiz — qayta chiqmasligi uchun."""
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    body = request.get_json(force=True, silent=True) or {}
+    ids = body.get("ids") or []
+    if not isinstance(ids, list):
+        return jsonify({"error": "ids ro'yxat bo'lishi kerak"}), 400
+    ids = set(int(i) for i in ids if str(i).lstrip("-").isdigit())
+    orders = load_orders()
+    n = 0
+    for o in orders:
+        if o["id"] in ids and not o.get("printed"):
+            o["printed"] = True
+            n += 1
+    if n:
+        save_orders(orders)
+    return jsonify({"ok": True, "marked": n})
+
+@app.route("/api/print/again", methods=["POST"])
+def api_print_again():
+    """Bugungi buyurtmani qayta chop etishga qo'yadi (kunlik raqami bo'yicha)."""
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        no = int(body.get("no"))
+    except Exception:
+        return jsonify({"error": "Kunlik raqamni kiriting"}), 400
+    orders = load_orders()
+    day = today_key()
+    target = next((o for o in orders if o.get("day_key") == day and o.get("daily_number") == no), None)
+    if not target:
+        return jsonify({"error": f"Bugungi buyurtmalar orasida #{no} topilmadi"}), 404
+    target["printed"] = False
+    save_orders(orders)
+    return jsonify({"ok": True})
+
+@app.route("/api/admin/quiz", methods=["GET", "POST"])
+def api_admin_quiz():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    if request.method == "GET":
+        q = load_quiz()
+        return jsonify({"quiz": {"active": q["active"], "test": q["test"], "title": q["title"],
+                                 "prize": q["prize"], "text": quiz_to_text(q),
+                                 "count": len(q["questions"])}})
+
+    body = request.get_json(force=True, silent=True) or {}
+    q = load_quiz()
+    q["title"] = (body.get("title") or "").strip() or "Viktorina"
+    q["prize"] = (body.get("prize") or "").strip()
+
+    if "text" in body:
+        questions, errors = parse_quiz_text(body.get("text"))
+        if errors:
+            return jsonify({"error": "; ".join(errors[:3])}), 400
+        q["questions"] = questions
+
+    if "test" in body:
+        q["test"] = bool(body.get("test"))
+
+    active = body.get("active")
+    if active is not None:
+        if active and not q["questions"]:
+            return jsonify({"error": "Avval savollarni kiriting."}), 400
+        q["active"] = bool(active)
+
+    save_quiz(q)
+    for admin_id in load_admin_ids():
+        try:
+            if active is True:
+                rejim = "🧪 sinov rejimida (faqat adminlar)" if q["test"] else "🟢 hamma uchun"
+                bot.send_message(admin_id, f"🎁 Viktorina boshlandi {rejim} — {len(q['questions'])} ta savol.")
+            elif active is False:
+                bot.send_message(admin_id, "⏹ Viktorina to'xtatildi.")
+        except Exception:
+            pass
+    return jsonify({"ok": True, "quiz": {"active": q["active"], "test": q["test"], "title": q["title"],
+                                          "prize": q["prize"], "text": quiz_to_text(q),
+                                          "count": len(q["questions"])}})
+
+@app.route("/api/admin/quiz/results", methods=["GET", "DELETE"])
+def api_admin_quiz_results():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    if request.method == "DELETE":
+        save_quiz_results({})
+        return jsonify({"ok": True})
+    quiz = load_quiz()
+    board = [{"name": r["name"], "username": r["username"], "correct": r["correct"],
+              "time": fmt_secs(r["ms"]), "uid": r["uid"]} for r in quiz_leaderboard()]
+    return jsonify({"board": board, "total": len(quiz["questions"])})
 
 @app.route("/api/admin/hours", methods=["GET", "POST"])
 def api_admin_hours():
@@ -2582,6 +3673,219 @@ def daily_report_scheduler():
         except Exception as e:
             print(f"Kunlik hisobot xatosi: {e}")
         time.sleep(30)
+
+# ---------- viktorina: mijoz tomoni ----------
+
+QUIZ_BTN = "🎁 Viktorina"
+BOARD_BTN = "🏆 Natijalar"
+
+def quiz_question_keyboard(qi, options):
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    for i, o in enumerate(options):
+        label = o if len(o) <= 60 else o[:59] + "…"
+        kb.add(types.InlineKeyboardButton(label, callback_data=f"qz:{qi}:{i}"))
+    return kb
+
+def send_quiz_question(chat_id, user_id, quiz):
+    """Savolni yuboradi va yuborilgan vaqtni qulf ostida yozib qo'yadi."""
+    with DATA_LOCK:
+        results = load_quiz_results()
+        res = results.get(str(user_id))
+        if not res or res.get("done"):
+            return
+        qi = res["idx"]
+    if qi >= len(quiz["questions"]):
+        return
+    item = quiz["questions"][qi]
+    total = len(quiz["questions"])
+    text = (f"❓ {qi + 1}/{total}\n\n{item['q']}\n\n"
+            "⏱ Tezlik ham hisobga olinadi — o'ylab, lekin shoshilib javob bering.")
+    bot.send_message(chat_id, text, reply_markup=quiz_question_keyboard(qi, item["options"]))
+    with DATA_LOCK:
+        results = load_quiz_results()
+        r = results.get(str(user_id))
+        if r and not r.get("done") and r.get("idx") == qi:
+            r["sent_at"] = int(time.time() * 1000)
+            results[str(user_id)] = r
+            save_quiz_results(results)
+
+def quiz_result_text(user_id, res, quiz):
+    board = quiz_leaderboard()
+    place = next((i + 1 for i, r in enumerate(board) if r["uid"] == int(user_id)), None)
+    total = len(quiz["questions"])
+    lines = [
+        "🏁 Viktorina tugadi!",
+        "",
+        f"✅ To'g'ri javoblar: {res['correct']} / {total}",
+        f"⏱ Sarflangan vaqt: {fmt_secs(res['elapsed_ms'])}",
+    ]
+    if place:
+        lines.append(f"📊 Hozirgi o'rningiz: {place}-o'rin ({len(board)} ta qatnashchi orasida)")
+    if quiz.get("prize"):
+        lines += ["", f"🎁 Sovg'a: {quiz['prize']}"]
+    lines += ["", f"Umumiy jadvalni ko'rish uchun \"{BOARD_BTN}\" tugmasini bosing."]
+    return "\n".join(lines)
+
+def start_quiz(message):
+    quiz = load_quiz()
+    user = message.from_user
+    uid = str(user.id)
+    lang = get_user_lang(user.id, getattr(user, "language_code", None))
+
+    if not quiz_visible_to(user.id):
+        bot.send_message(message.chat.id, "Hozircha faol viktorina yo'q. Kanalimizni kuzatib turing 😊")
+        return
+    if quiz["test"]:
+        bot.send_message(message.chat.id, "🧪 SINOV REJIMI — bu faqat sizga ko'rinyapti, mijozlar ko'rmayapti.")
+
+    with DATA_LOCK:
+        results = load_quiz_results()
+        res = results.get(uid)
+        yangi = False
+        if not res:
+            yangi = True
+            res = {
+                "name": (user.first_name or "Mijoz") + ((" " + user.last_name) if getattr(user, "last_name", None) else ""),
+                "username": user.username,
+                "idx": 0, "correct": 0, "elapsed_ms": 0,
+                "started_at": int(time.time()), "sent_at": None,
+                "done": False, "finished_at": None,
+            }
+            results[uid] = res
+            save_quiz_results(results)
+        tugagan = bool(res.get("done"))
+
+    if tugagan:
+        bot.send_message(
+            message.chat.id,
+            "Siz bu viktorinada allaqachon qatnashgansiz — har kim bir marta yechadi.\n\n"
+            + quiz_result_text(uid, res, quiz)
+        )
+        return
+
+    if yangi:
+        intro = [f"🎁 {quiz['title']}", ""]
+        intro.append(f"Savollar soni: {len(quiz['questions'])} ta")
+        intro.append("Har kim faqat bir marta yechadi.")
+        intro.append("G'olib eng ko'p to'g'ri javob bergan, teng bo'lsa — eng tez javob bergan bo'ladi.")
+        if quiz.get("prize"):
+            intro += ["", f"🏆 Sovg'a: {quiz['prize']}"]
+        intro += ["", "Boshladik! 👇"]
+        bot.send_message(message.chat.id, "\n".join(intro))
+    else:
+        bot.send_message(message.chat.id, "Viktorinani davom ettiramiz 👇")
+
+    send_quiz_question(message.chat.id, user.id, quiz)
+
+@bot.message_handler(func=lambda m: m.text == QUIZ_BTN)
+def handle_quiz_button(message):
+    start_quiz(message)
+
+@bot.message_handler(commands=["viktorina_boshlash"])
+def cmd_quiz_start(message):
+    start_quiz(message)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("qz:"))
+def cb_quiz_answer(call):
+    quiz = load_quiz()
+    uid = str(call.from_user.id)
+
+    try:
+        _, qi_str, choice_str = call.data.split(":")
+        qi, choice = int(qi_str), int(choice_str)
+    except Exception:
+        bot.answer_callback_query(call.id)
+        return
+    if qi >= len(quiz["questions"]):
+        bot.answer_callback_query(call.id, "Savol topilmadi.")
+        return
+    item = quiz["questions"][qi]
+    ok = (choice == item["correct"])
+
+    # --- holatni o'zgartirish: qulf ostida, bitta-bittadan ---
+    with DATA_LOCK:
+        results = load_quiz_results()
+        res = results.get(uid)
+        if not res or res.get("done"):
+            bot.answer_callback_query(call.id, "Bu viktorina siz uchun tugagan.")
+            return
+        if qi != res["idx"]:
+            bot.answer_callback_query(call.id, "Bu savol o'tib ketgan.")
+            return
+
+        now = int(time.time() * 1000)
+        sent = res.get("sent_at") or now
+        res["elapsed_ms"] = res.get("elapsed_ms", 0) + max(0, now - sent)
+        if ok:
+            res["correct"] = res.get("correct", 0) + 1
+        res["idx"] = qi + 1
+        tugadi = res["idx"] >= len(quiz["questions"])
+        if tugadi:
+            res["done"] = True
+            res["finished_at"] = int(time.time())
+            res["sent_at"] = None
+        results[uid] = res
+        save_quiz_results(results)
+        res = dict(res)      # qulfdan tashqarida ishlatish uchun nusxa
+
+    # javob berilgan savolni belgilab qo'yamiz — qayta bosib bo'lmaydi
+    try:
+        chosen = item["options"][choice]
+        right = item["options"][item["correct"]]
+        mark = (f"❓ {qi + 1}/{len(quiz['questions'])}\n\n{item['q']}\n\n"
+                + (f"✅ To'g'ri: {chosen}" if ok else f"❌ Siz: {chosen}\n✅ To'g'risi: {right}"))
+        bot.edit_message_text(mark, call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+
+    bot.answer_callback_query(call.id, "✅ To'g'ri!" if ok else "❌ Noto'g'ri")
+
+    if tugadi:
+        bot.send_message(call.message.chat.id, quiz_result_text(uid, res, quiz),
+                         reply_markup=main_keyboard(call.from_user.id, call.from_user.username))
+        for admin_id in load_admin_ids():
+            try:
+                who = f"@{res['username']}" if res.get("username") else res.get("name")
+                bot.send_message(admin_id,
+                    f"🎁 Viktorina: {res.get('name')} ({who}) tugatdi — "
+                    f"{res['correct']}/{len(quiz['questions'])}, {fmt_secs(res['elapsed_ms'])}")
+            except Exception:
+                pass
+        return
+
+    send_quiz_question(call.message.chat.id, call.from_user.id, quiz)
+
+def board_text(viewer_id=None):
+    quiz = load_quiz()
+    board = quiz_leaderboard()
+    if not board:
+        return "Hozircha hech kim viktorinani tugatmagan. Birinchi bo'ling! 🎯"
+    total = len(quiz["questions"]) or 0
+    medals = ["🥇", "🥈", "🥉"]
+    lines = [f"🏆 {quiz['title']} — natijalar", ""]
+    for i, r in enumerate(board[:10]):
+        tag = medals[i] if i < 3 else f"{i+1}."
+        lines.append(f"{tag} {r['name']} — {r['correct']}/{total} · {fmt_secs(r['ms'])}")
+    lines.append("")
+    lines.append(f"Jami qatnashchilar: {len(board)} ta")
+    if viewer_id is not None:
+        place = next((i + 1 for i, r in enumerate(board) if r["uid"] == int(viewer_id)), None)
+        if place:
+            me = board[place - 1]
+            lines += ["", f"📊 Siz: {place}-o'rin — {me['correct']}/{total} · {fmt_secs(me['ms'])}"]
+        else:
+            lines += ["", f"Siz hali qatnashmagansiz — \"{QUIZ_BTN}\" tugmasini bosing."]
+    if quiz.get("prize"):
+        lines += ["", f"🎁 Sovg'a: {quiz['prize']}"]
+    return "\n".join(lines)
+
+@bot.message_handler(func=lambda m: m.text == BOARD_BTN)
+def handle_board_button(message):
+    bot.send_message(message.chat.id, board_text(message.from_user.id))
+
+@bot.message_handler(commands=["natijalar"])
+def cmd_board(message):
+    bot.send_message(message.chat.id, board_text(message.from_user.id))
 
 # ---------- mijoz bilan yozishish (support chat) ----------
 
