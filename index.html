@@ -74,6 +74,36 @@
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   }
 
+  /* ---------- keshbek ---------- */
+  [hidden]{display:none !important;}
+  .cb-chip{
+    position:relative;z-index:1;margin-top:11px;
+    display:flex;align-items:center;gap:9px;
+    padding:9px 12px;border-radius:13px;
+    background:linear-gradient(135deg, rgba(227,179,74,0.16), rgba(227,179,74,0.06));
+    border:1px solid rgba(227,179,74,0.32);
+  }
+  .cb-chip .ic{font-size:17px;line-height:1;flex:none;}
+  .cb-chip .tx{min-width:0;flex:1;}
+  .cb-chip .lb{font-size:10.5px;color:var(--dim);font-weight:600;letter-spacing:0.2px;}
+  .cb-chip .vl{font-size:15px;font-weight:700;color:var(--accent1);line-height:1.25;}
+  .cb-chip .hint{font-size:10.5px;color:var(--dim);font-weight:600;text-align:end;flex:none;max-width:40%;}
+  .cb-chip.empty .vl{font-size:12.5px;color:var(--fg);font-weight:600;}
+
+  .cb-box{
+    margin-top:14px;padding:12px;border-radius:13px;
+    background:rgba(227,179,74,0.08);border:1px solid rgba(227,179,74,0.28);
+  }
+  .cb-box.off{opacity:0.55;}
+  .cb-toggle{display:flex;align-items:center;gap:11px;cursor:pointer;margin:0;}
+  .cb-toggle input{width:20px;height:20px;flex:none;accent-color:var(--accent1);margin:0;}
+  .cb-toggle .cb-t{display:block;font-size:14px;font-weight:600;}
+  .cb-toggle .cb-s{display:block;font-size:11.5px;color:var(--accent1);font-weight:600;margin-top:2px;}
+  .cb-line{display:flex;justify-content:space-between;font-size:14px;font-weight:600;
+           padding-top:9px;color:var(--accent1);}
+  .cb-pay{display:flex;justify-content:space-between;font-weight:700;font-size:17px;
+          padding-top:10px;margin-top:9px;border-top:1px dashed var(--line);}
+
   /* ---------- sticky qidiruv + kategoriya ---------- */
   .sticky-bar{
     position:sticky;top:0;z-index:30;
@@ -338,6 +368,14 @@
       <p id="business-tagline">Taom tanlang va buyurtma bering</p>
     </div>
   </div>
+  <div class="cb-chip" id="cb-chip" hidden>
+    <span class="ic">💳</span>
+    <span class="tx">
+      <span class="lb" id="cb-label">Keshbegingiz</span>
+      <span class="vl" id="cb-value">0 SAR</span>
+    </span>
+    <span class="hint" id="cb-hint"></span>
+  </div>
 </div>
 
 <div class="sticky-bar" id="sticky-bar">
@@ -364,6 +402,17 @@
   <h2 id="t-cartTitle">Savatingiz</h2>
   <div id="cart-lines"></div>
   <div class="cart-total-row"><span id="t-total">Jami</span><span id="cart-total-amt">0 SAR</span></div>
+  <div class="cb-line" id="cb-line" hidden><span id="t-cbApplied">Keshbek</span><span id="cb-line-amt">0 SAR</span></div>
+  <div class="cb-pay" id="cb-pay" hidden><span id="t-cbPay">To'lanadi</span><span id="cb-pay-amt">0 SAR</span></div>
+  <div class="cb-box" id="cb-box" hidden>
+    <label class="cb-toggle">
+      <input type="checkbox" id="use-cb">
+      <span>
+        <span class="cb-t" id="t-cbUse">Keshbekdan foydalanish</span>
+        <span class="cb-s" id="cb-avail"></span>
+      </span>
+    </label>
+  </div>
   <button class="primary-btn" id="go-checkout-btn">Buyurtma berish</button>
   <button class="ghost-btn" id="close-cart-btn">Yopish</button>
 </div>
@@ -386,6 +435,7 @@
   <label for="in-note" id="t-noteLabel">Izoh (ixtiyoriy)</label>
   <input type="text" id="in-note" placeholder="Masalan: achchiq bo'lmasin">
   <div class="loc-status" id="t-payNote">To'lov: naqd — kuryer yetkazib berganda olinadi.</div>
+  <div class="cb-line" id="cb-checkout-note" hidden></div>
   <button class="primary-btn" id="submit-order-btn">Buyurtmani tasdiqlash</button>
 </div>
 
@@ -423,6 +473,10 @@ const LANGS = [
 
 const I18N = {
   uz:{
+    cbLabel:"Keshbegingiz", cbUse:"Keshbekdan foydalanish", cbApplied:"Keshbek", cbPay:"To'lanadi",
+    cbAvail:(a)=>`Mavjud: ${a}`, cbEarnHint:(p)=>`Har buyurtmadan ${p}%`,
+    cbStart:(p)=>`Har yetkazilgan buyurtmadan ${p}% keshbek yig'iladi`,
+    cbNote:(a,p)=>`Keshbek: −${a} • To'lanadi: ${p}`,
     tagline:"Taom tanlang va buyurtma bering",
     search:"Taom qidirish...", add:"Qo'shish", soldOut:"Tugadi",
     lastN:(n)=>`Oxirgi ${n} dona`, dishCount:(n)=>`${n} ta taom`, itemCount:(n)=>`${n} ta mahsulot`,
@@ -460,6 +514,10 @@ const I18N = {
     cats:{"Nonushta":"Nonushta","Ovqatlar":"Ovqatlar","Fast Food":"Fast Food","Salatlar":"Salatlar","Salqin ichimliklar":"Salqin ichimliklar","Boshqa mahsulotlar":"Boshqa mahsulotlar"}
   },
   ar:{
+    cbLabel:"رصيدك", cbUse:"استخدام الكاش باك", cbApplied:"كاش باك", cbPay:"المطلوب",
+    cbAvail:(a)=>`المتاح: ${a}`, cbEarnHint:(p)=>`${p}% من كل طلب`,
+    cbStart:(p)=>`تحصل على ${p}% من كل طلب يتم توصيله`,
+    cbNote:(a,p)=>`كاش باك: −${a} • المطلوب: ${p}`,
     tagline:"اختر طعامك واطلب الآن",
     search:"ابحث عن طبق...", add:"أضف", soldOut:"نفد",
     lastN:(n)=>`آخر ${n} قطعة`, dishCount:(n)=>`${n} طبق`, itemCount:(n)=>`${n} منتج`,
@@ -497,6 +555,10 @@ const I18N = {
     cats:{"Nonushta":"الإفطار","Ovqatlar":"الأطباق الرئيسية","Fast Food":"الوجبات السريعة","Salatlar":"السلطات","Salqin ichimliklar":"المشروبات الباردة","Boshqa mahsulotlar":"منتجات أخرى"}
   },
   en:{
+    cbLabel:"Your cashback", cbUse:"Use cashback", cbApplied:"Cashback", cbPay:"To pay",
+    cbAvail:(a)=>`Available: ${a}`, cbEarnHint:(p)=>`${p}% on every order`,
+    cbStart:(p)=>`You earn ${p}% on every delivered order`,
+    cbNote:(a,p)=>`Cashback: −${a} • To pay: ${p}`,
     tagline:"Pick your food and place an order",
     search:"Search dishes...", add:"Add", soldOut:"Sold out",
     lastN:(n)=>`Only ${n} left`, dishCount:(n)=>`${n} dishes`, itemCount:(n)=>`${n} items`,
@@ -534,6 +596,10 @@ const I18N = {
     cats:{"Nonushta":"Breakfast","Ovqatlar":"Main dishes","Fast Food":"Fast food","Salatlar":"Salads","Salqin ichimliklar":"Cold drinks","Boshqa mahsulotlar":"Other items"}
   },
   ru:{
+    cbLabel:"Ваш кешбэк", cbUse:"Использовать кешбэк", cbApplied:"Кешбэк", cbPay:"К оплате",
+    cbAvail:(a)=>`Доступно: ${a}`, cbEarnHint:(p)=>`${p}% с каждого заказа`,
+    cbStart:(p)=>`С каждого доставленного заказа начисляется ${p}%`,
+    cbNote:(a,p)=>`Кешбэк: −${a} • К оплате: ${p}`,
     tagline:"Выберите блюдо и оформите заказ",
     search:"Поиск блюда...", add:"Добавить", soldOut:"Закончилось",
     lastN:(n)=>`Осталось ${n} шт.`, dishCount:(n)=>`${n} блюд`, itemCount:(n)=>`${n} товаров`,
@@ -571,6 +637,10 @@ const I18N = {
     cats:{"Nonushta":"Завтрак","Ovqatlar":"Основные блюда","Fast Food":"Фастфуд","Salatlar":"Салаты","Salqin ichimliklar":"Холодные напитки","Boshqa mahsulotlar":"Другое"}
   },
   tr:{
+    cbLabel:"Nakit iadeniz", cbUse:"Nakit iadeyi kullan", cbApplied:"Nakit iade", cbPay:"Ödenecek",
+    cbAvail:(a)=>`Mevcut: ${a}`, cbEarnHint:(p)=>`Her siparişte %${p}`,
+    cbStart:(p)=>`Teslim edilen her siparişten %${p} kazanırsınız`,
+    cbNote:(a,p)=>`Nakit iade: −${a} • Ödenecek: ${p}`,
     tagline:"Yemeğinizi seçin ve sipariş verin",
     search:"Yemek ara...", add:"Ekle", soldOut:"Tükendi",
     lastN:(n)=>`Son ${n} adet`, dishCount:(n)=>`${n} yemek`, itemCount:(n)=>`${n} ürün`,
@@ -608,6 +678,10 @@ const I18N = {
     cats:{"Nonushta":"Kahvaltı","Ovqatlar":"Ana yemekler","Fast Food":"Fast food","Salatlar":"Salatalar","Salqin ichimliklar":"Soğuk içecekler","Boshqa mahsulotlar":"Diğer ürünler"}
   },
   ur:{
+    cbLabel:"آپ کا کیش بیک", cbUse:"کیش بیک استعمال کریں", cbApplied:"کیش بیک", cbPay:"قابل ادا",
+    cbAvail:(a)=>`دستیاب: ${a}`, cbEarnHint:(p)=>`ہر آرڈر پر ${p}%`,
+    cbStart:(p)=>`ہر ڈلیور آرڈر پر ${p}% ملتا ہے`,
+    cbNote:(a,p)=>`کیش بیک: −${a} • قابل ادا: ${p}`,
     tagline:"اپنا کھانا منتخب کریں اور آرڈر دیں",
     search:"کھانا تلاش کریں...", add:"شامل کریں", soldOut:"ختم",
     lastN:(n)=>`صرف ${n} باقی`, dishCount:(n)=>`${n} کھانے`, itemCount:(n)=>`${n} اشیاء`,
@@ -645,6 +719,10 @@ const I18N = {
     cats:{"Nonushta":"ناشتہ","Ovqatlar":"اہم کھانے","Fast Food":"فاسٹ فوڈ","Salatlar":"سلاد","Salqin ichimliklar":"ٹھنڈے مشروبات","Boshqa mahsulotlar":"دیگر اشیاء"}
   },
   id:{
+    cbLabel:"Cashback Anda", cbUse:"Pakai cashback", cbApplied:"Cashback", cbPay:"Dibayar",
+    cbAvail:(a)=>`Tersedia: ${a}`, cbEarnHint:(p)=>`${p}% tiap pesanan`,
+    cbStart:(p)=>`Anda mendapat ${p}% dari setiap pesanan yang terkirim`,
+    cbNote:(a,p)=>`Cashback: −${a} • Dibayar: ${p}`,
     tagline:"Pilih makanan dan pesan sekarang",
     search:"Cari menu...", add:"Tambah", soldOut:"Habis",
     lastN:(n)=>`Sisa ${n}`, dishCount:(n)=>`${n} menu`, itemCount:(n)=>`${n} item`,
@@ -707,7 +785,15 @@ let shopInfo = {open:true, reason:null, open_time:'', close_time:''};
 let spy = null;
 
 const $ = (id) => document.getElementById(id);
-function fmtSar(n){ return Math.round(n).toLocaleString('en-US') + " SAR"; }
+function fmtSar(n){
+  // butun bo'lsa "18 SAR", kasrli bo'lsa "12.50 SAR" — keshbek tiyin-tiyin yig'iladi
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  const whole = Math.abs(v % 1) < 0.005;
+  return v.toLocaleString('en-US', {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2
+  }) + " SAR";
+}
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function haptic(kind){ try{ if(tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(kind || 'light'); }catch(e){} }
 function slug(cat){ return 'cat-' + cat.replace(/[^a-zA-Z0-9]/g, '-'); }
@@ -767,6 +853,8 @@ function applyLang(code, redraw){
   txt('lang-title', t.langTitle);
 
   renderLangList();
+  renderCashbackChip();
+  renderCashbackRows();
   if (redraw){ renderChips(); renderMenu(); updateCartBar(); }
   saveLangToServer();
 }
@@ -801,6 +889,81 @@ function saveLangToServer(){
                              ts: signedUser.ts, sig: signedUser.sig })
     }).catch(()=>{});
   }catch(e){}
+}
+
+/* ---------- keshbek ---------- */
+let cbInfo = { active:false, percent:0, balance:0 };
+let useCashback = false;
+
+async function loadCashback(){
+  const hasInit = !!(tg && tg.initData);
+  if (!signedUser.uid && !hasInit){ renderCashbackChip(); return; }
+  try{
+    const q = new URLSearchParams({ uid:signedUser.uid || '', uname:signedUser.uname || '',
+                                    ts:signedUser.ts || '', sig:signedUser.sig || '',
+                                    initData: hasInit ? tg.initData : '' });
+    const res = await fetch('/api/cashback?' + q.toString());
+    const d = await res.json();
+    cbInfo = { active: !!d.active, percent: Number(d.percent) || 0,
+               balance: Number(d.balance) || 0 };
+  }catch(e){ /* keshbek ko'rinmasa ham ilova ishlaydi */ }
+  if (cbInfo.balance <= 0) useCashback = false;
+  renderCashbackChip();
+  renderCashbackRows();
+}
+
+function renderCashbackChip(){
+  const chip = $('cb-chip');
+  if (!chip) return;
+  if (!cbInfo.active){ chip.hidden = true; return; }
+  const t = T();
+  chip.hidden = false;
+  const has = cbInfo.balance > 0;
+  chip.classList.toggle('empty', !has);
+  $('cb-label').textContent = t.cbLabel;
+  $('cb-value').textContent = has ? fmtSar(cbInfo.balance) : t.cbStart(trimPct(cbInfo.percent));
+  $('cb-hint').textContent = has ? t.cbEarnHint(trimPct(cbInfo.percent)) : '';
+}
+
+function trimPct(p){ return String(Math.round(p * 100) / 100); }
+
+function cbUsable(){
+  if (!cbInfo.active || cbInfo.balance <= 0) return 0;
+  return Math.min(cbInfo.balance, cartTotal());
+}
+function cbApplied(){ return useCashback ? cbUsable() : 0; }
+
+function renderCashbackRows(){
+  const box = $('cb-box');
+  if (!box) return;
+  const t = T();
+  const usable = cbUsable();
+  const show = cbInfo.active && cbInfo.balance > 0 && cartCount() > 0;
+  box.hidden = !show;
+  if (show){
+    $('t-cbUse').textContent = t.cbUse;
+    $('cb-avail').textContent = t.cbAvail(fmtSar(cbInfo.balance));
+    const chk = $('use-cb');
+    if (chk) chk.checked = useCashback;
+  }
+  const applied = cbApplied();
+  const lineEl = $('cb-line'), payEl = $('cb-pay');
+  if (lineEl){
+    lineEl.hidden = applied <= 0;
+    $('t-cbApplied').textContent = t.cbApplied;
+    $('cb-line-amt').textContent = '−' + fmtSar(applied);
+  }
+  if (payEl){
+    payEl.hidden = applied <= 0;
+    $('t-cbPay').textContent = t.cbPay;
+    $('cb-pay-amt').textContent = fmtSar(Math.max(0, cartTotal() - applied));
+  }
+  const note = $('cb-checkout-note');
+  if (note){
+    note.hidden = applied <= 0;
+    note.textContent = applied > 0
+      ? t.cbNote(fmtSar(applied), fmtSar(Math.max(0, cartTotal() - applied))) : '';
+  }
 }
 
 async function loadMenu(){
@@ -1039,6 +1202,13 @@ $('cart-overlay').addEventListener('click', ()=>closeSheet('cart'));
 $('lang-btn').addEventListener('click', ()=>{ haptic('light'); renderLangList(); openSheet('lang'); });
 $('lang-overlay').addEventListener('click', ()=>closeSheet('lang'));
 $('close-cart-btn').addEventListener('click', ()=>closeSheet('cart'));
+document.addEventListener('change', (e)=>{
+  if (e.target && e.target.id === 'use-cb'){
+    useCashback = e.target.checked;
+    haptic('light');
+    renderCashbackRows();
+  }
+});
 
 function renderCartSheet(){
   const linesEl = $('cart-lines');
@@ -1082,6 +1252,7 @@ function renderCartSheet(){
     });
   }
   $('cart-total-amt').textContent = fmtSar(cartTotal());
+  renderCashbackRows();
 }
 
 /* ---------- checkout ---------- */
@@ -1162,7 +1333,8 @@ $('submit-order-btn').addEventListener('click', async ()=>{
     address_text: addressText || null,
     latitude: userLocation ? userLocation.latitude : null,
     longitude: userLocation ? userLocation.longitude : null,
-    note: note
+    note: note,
+    use_cashback: cbApplied() > 0
   };
 
   submitBtn.disabled = true;
@@ -1183,10 +1355,14 @@ $('submit-order-btn').addEventListener('click', async ()=>{
       return;
     }
     cart = {};
+    useCashback = false;
+    if (typeof data.cashback_balance === 'number') cbInfo.balance = data.cashback_balance;
+    renderCashbackChip();
     updateCartBar();
     renderMenu();
     closeSheet('checkout');
     openSheet('confirm');
+    loadCashback();
     if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
   }catch(e){
     notify(T().errNet);
@@ -1202,6 +1378,7 @@ $('close-app-btn').addEventListener('click', ()=>{
 
 applyLang(detectLang(), false);
 loadMenu();
+loadCashback();
 </script>
 </body>
 </html>
