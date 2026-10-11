@@ -44,6 +44,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 MENU_FILE = os.path.join(DATA_DIR, "menu.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+CASHBACK_FILE = os.path.join(DATA_DIR, "cashback.json")
 DISH_PHOTOS_DIR = os.path.join(DATA_DIR, "static", "dishes")
 LOGO_PATH = os.path.join(DATA_DIR, "static", "logo.jpg")
 
@@ -428,6 +429,60 @@ TEXTS = {
         "uz": "Tilni tanlang:", "ar": "اختر اللغة:", "en": "Choose your language:",
         "ru": "Выберите язык:", "tr": "Dil seçin:", "ur": "زبان منتخب کریں:", "id": "Pilih bahasa:",
     },
+    "cb_earned": {
+        "uz": "\U0001F381 Sizga {amt} keshbek yozildi!\n\U0001F4B3 Keshbek hisobingiz: {bal}\n\nKeyingi buyurtmada ishlatishingiz mumkin \u2014 savatda \u00abKeshbekdan foydalanish\u00bb ni belgilang.",
+        "ar": "\U0001F381 \u062A\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 {amt} \u0643\u0627\u0634 \u0628\u0627\u0643!\n\U0001F4B3 \u0631\u0635\u064A\u062F\u0643: {bal}\n\n\u064A\u0645\u0643\u0646\u0643 \u0627\u0633\u062A\u062E\u062F\u0627\u0645\u0647 \u0641\u064A \u0627\u0644\u0637\u0644\u0628 \u0627\u0644\u0642\u0627\u062F\u0645 \u2014 \u0641\u0639\u0651\u0644 \u00ab\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u0643\u0627\u0634 \u0628\u0627\u0643\u00bb \u0641\u064A \u0627\u0644\u0633\u0644\u0629.",
+        "en": "\U0001F381 You earned {amt} cashback!\n\U0001F4B3 Your balance: {bal}\n\nUse it on your next order \u2014 tick \u00abUse cashback\u00bb in the cart.",
+        "ru": "\U0001F381 Вам начислен кешбэк {amt}!\n\U0001F4B3 Ваш баланс: {bal}\n\nИспользуйте его в следующем заказе \u2014 отметьте \u00abИспользовать кешбэк\u00bb в корзине.",
+        "tr": "\U0001F381 {amt} nakit iade kazandınız!\n\U0001F4B3 Bakiyeniz: {bal}\n\nBir sonraki siparişte kullanın \u2014 sepette \u00abNakit iadeyi kullan\u00bb seçeneğini işaretleyin.",
+        "ur": "\U0001F381 \u0622\u067E \u06A9\u0648 {amt} \u06A9\u06CC\u0634 \u0628\u06CC\u06A9 \u0645\u0644\u0627!\n\U0001F4B3 \u0622\u067E \u06A9\u0627 \u0628\u06CC\u0644\u0646\u0633: {bal}\n\n\u0627\u06AF\u0644\u06D2 \u0622\u0631\u0688\u0631 \u0645\u06CC\u06BA \u0627\u0633\u062A\u0639\u0645\u0627\u0644 \u06A9\u0631\u06CC\u06BA\u06D4",
+        "id": "\U0001F381 Anda mendapat cashback {amt}!\n\U0001F4B3 Saldo Anda: {bal}\n\nGunakan pada pesanan berikutnya \u2014 centang \u00abPakai cashback\u00bb di keranjang.",
+    },
+    "cb_refunded": {
+        "uz": "\U0001F4B3 {amt} keshbek hisobingizga qaytarildi.\nJami keshbegingiz: {bal}",
+        "ar": "\U0001F4B3 \u062A\u0645\u0651 \u0625\u0631\u062C\u0627\u0639 {amt} \u0625\u0644\u0649 \u0631\u0635\u064A\u062F\u0643.\n\u0627\u0644\u0645\u062C\u0645\u0648\u0639: {bal}",
+        "en": "\U0001F4B3 {amt} cashback has been returned to your balance.\nTotal: {bal}",
+        "ru": "\U0001F4B3 Кешбэк {amt} возвращён на ваш баланс.\nВсего: {bal}",
+        "tr": "\U0001F4B3 {amt} nakit iade bakiyenize geri yüklendi.\nToplam: {bal}",
+        "ur": "\U0001F4B3 {amt} \u06A9\u06CC\u0634 \u0628\u06CC\u06A9 \u0622\u067E \u06A9\u06D2 \u0628\u06CC\u0644\u0646\u0633 \u0645\u06CC\u06BA \u0648\u0627\u067E\u0633 \u06A9\u0631 \u062F\u06CC\u0627 \u06AF\u06CC\u0627\u06D4\n\u06A9\u0644: {bal}",
+        "id": "\U0001F4B3 Cashback {amt} telah dikembalikan ke saldo Anda.\nTotal: {bal}",
+    },
+    "cb_balance": {
+        "uz": "\U0001F4B3 Keshbek hisobingiz: {bal}\n\nHar bir yetkazilgan buyurtmadan {pct}% keshbek yig'iladi. Menyuni oching, savatda \u00abKeshbekdan foydalanish\u00bb ni belgilasangiz, keshbegingiz summadan chegiriladi.",
+        "ar": "\U0001F4B3 \u0631\u0635\u064A\u062F \u0627\u0644\u0643\u0627\u0634 \u0628\u0627\u0643: {bal}\n\n\u062A\u062D\u0635\u0644 \u0639\u0644\u0649 {pct}% \u0645\u0646 \u0643\u0644 \u0637\u0644\u0628 \u064A\u062A\u0645 \u062A\u0648\u0635\u064A\u0644\u0647.",
+        "en": "\U0001F4B3 Your cashback balance: {bal}\n\nYou earn {pct}% on every delivered order. Open the menu and tick \u00abUse cashback\u00bb in the cart to spend it.",
+        "ru": "\U0001F4B3 Ваш кешбэк: {bal}\n\nС каждого доставленного заказа начисляется {pct}%. Откройте меню и отметьте \u00abИспользовать кешбэк\u00bb в корзине.",
+        "tr": "\U0001F4B3 Nakit iade bakiyeniz: {bal}\n\nTeslim edilen her siparişten {pct}% kazanırsınız.",
+        "ur": "\U0001F4B3 \u0622\u067E \u06A9\u0627 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9: {bal}\n\n\u06C1\u0631 \u0688\u0644\u06CC\u0648\u0631 \u0622\u0631\u0688\u0631 \u067E\u0631 {pct}% \u0645\u0644\u062A\u0627 \u06C1\u06D2\u06D4",
+        "id": "\U0001F4B3 Saldo cashback Anda: {bal}\n\nAnda mendapat {pct}% dari setiap pesanan yang terkirim.",
+    },
+    "cb_zero": {
+        "uz": "\U0001F4B3 Hozircha keshbegingiz yo'q.\n\nHar bir yetkazilgan buyurtmadan {pct}% keshbek yig'iladi \u2014 u hisobingizda to'planib boradi va xohlagan paytingizda ishlatasiz.",
+        "ar": "\U0001F4B3 \u0644\u0627 \u064A\u0648\u062C\u062F \u0631\u0635\u064A\u062F \u062D\u0627\u0644\u064A\u0627\u064B.\n\n\u062A\u062D\u0635\u0644 \u0639\u0644\u0649 {pct}% \u0645\u0646 \u0643\u0644 \u0637\u0644\u0628 \u064A\u062A\u0645 \u062A\u0648\u0635\u064A\u0644\u0647.",
+        "en": "\U0001F4B3 You have no cashback yet.\n\nYou earn {pct}% on every delivered order \u2014 it builds up and you can spend it any time.",
+        "ru": "\U0001F4B3 Кешбэка пока нет.\n\nС каждого доставленного заказа начисляется {pct}% \u2014 копится и тратится когда захотите.",
+        "tr": "\U0001F4B3 Henüz nakit iadeniz yok.\n\nTeslim edilen her siparişten {pct}% kazanırsınız.",
+        "ur": "\U0001F4B3 \u0627\u0628\u06BE\u06CC \u06A9\u0648\u0626\u06CC \u06A9\u06CC\u0634 \u0628\u06CC\u06A9 \u0646\u06C1\u06CC\u06BA\u06D4\n\n\u06C1\u0631 \u0688\u0644\u06CC\u0648\u0631 \u0622\u0631\u0688\u0631 \u067E\u0631 {pct}% \u0645\u0644\u062A\u0627 \u06C1\u06D2\u06D4",
+        "id": "\U0001F4B3 Belum ada cashback.\n\nAnda mendapat {pct}% dari setiap pesanan yang terkirim.",
+    },
+    "cb_off": {
+        "uz": "\U0001F4B3 Keshbek hozircha ishlamayapti.",
+        "ar": "\U0001F4B3 \u0627\u0644\u0643\u0627\u0634 \u0628\u0627\u0643 \u063A\u064A\u0631 \u0645\u0641\u0639\u0651\u0644 \u062D\u0627\u0644\u064A\u0627\u064B.",
+        "en": "\U0001F4B3 Cashback is currently switched off.",
+        "ru": "\U0001F4B3 Кешбэк сейчас отключён.",
+        "tr": "\U0001F4B3 Nakit iade şu anda kapalı.",
+        "ur": "\U0001F4B3 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9 \u0641\u06CC \u0627\u0644\u062D\u0627\u0644 \u0628\u0646\u062F \u06C1\u06D2\u06D4",
+        "id": "\U0001F4B3 Cashback sedang nonaktif.",
+    },
+    "cb_receipt_line": {
+        "uz": "\U0001F4B3 Keshbek: \u2212{amt}\n\U0001F4B5 To'lanadi: {pay}\n",
+        "ar": "\U0001F4B3 \u0643\u0627\u0634 \u0628\u0627\u0643: \u2212{amt}\n\U0001F4B5 \u0627\u0644\u0645\u0637\u0644\u0648\u0628: {pay}\n",
+        "en": "\U0001F4B3 Cashback: \u2212{amt}\n\U0001F4B5 To pay: {pay}\n",
+        "ru": "\U0001F4B3 Кешбэк: \u2212{amt}\n\U0001F4B5 К оплате: {pay}\n",
+        "tr": "\U0001F4B3 Nakit iade: \u2212{amt}\n\U0001F4B5 Ödenecek: {pay}\n",
+        "ur": "\U0001F4B3 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9: \u2212{amt}\n\U0001F4B5 \u0642\u0627\u0628\u0644 \u0627\u062F\u0627: {pay}\n",
+        "id": "\U0001F4B3 Cashback: \u2212{amt}\n\U0001F4B5 Dibayar: {pay}\n",
+    },
     "lang_saved": {
         "uz": "✅ Til o'zgartirildi.", "ar": "✅ تم تغيير اللغة.", "en": "✅ Language changed.",
         "ru": "✅ Язык изменён.", "tr": "✅ Dil değiştirildi.", "ur": "✅ زبان تبدیل ہو گئی۔",
@@ -735,6 +790,163 @@ def discounted_price(price, disc=None):
         return price
     return round(price * (100 - disc["percent"]) / 100)
 
+
+# ---------- keshbek ----------
+
+DEFAULT_CASHBACK_PERCENT = 5
+
+def load_cashback():
+    return load_json(CASHBACK_FILE, {})
+
+def save_cashback(data):
+    save_json(CASHBACK_FILE, data)
+
+def get_cashback_cfg():
+    """Hozirgi sozlama: {'active': bool, 'percent': float}."""
+    s = load_settings()
+    cb = s.get("cashback") or {}
+    try:
+        percent = float(cb.get("percent", DEFAULT_CASHBACK_PERCENT))
+    except Exception:
+        percent = DEFAULT_CASHBACK_PERCENT
+    percent = max(0.0, min(100.0, percent))
+    active = bool(cb.get("active", True)) and percent > 0
+    return {"active": active, "percent": percent}
+
+def set_cashback_cfg(active=None, percent=None):
+    with DATA_LOCK:
+        s = load_settings()
+        cb = s.get("cashback") or {}
+        if percent is not None:
+            try:
+                cb["percent"] = max(0.0, min(100.0, float(percent)))
+            except Exception:
+                pass
+        if active is not None:
+            cb["active"] = bool(active)
+        s["cashback"] = cb
+        save_settings(s)
+    return get_cashback_cfg()
+
+def cashback_balance(user_id):
+    if not user_id:
+        return 0.0
+    rec = load_cashback().get(str(user_id)) or {}
+    return money(rec.get("balance", 0))
+
+def cashback_move(user_id, delta, order_id=None, note=""):
+    """Balansni o'zgartiradi (+ qo'shish, − yechish). Yangi balansni qaytaradi.
+    Balans hech qachon manfiy bo'lmaydi."""
+    delta = money(delta)
+    if not user_id or delta == 0:
+        return cashback_balance(user_id)
+    with DATA_LOCK:
+        data = load_cashback()
+        uid = str(user_id)
+        rec = data.get(uid) or {"balance": 0.0, "earned": 0.0, "spent": 0.0, "history": []}
+        cur = money(rec.get("balance", 0))
+        new_bal = money(cur + delta)
+        if new_bal < 0:                 # bor-yo'g'idan ortig'ini yecha olmaymiz
+            delta = money(-cur)
+            new_bal = 0.0
+        rec["balance"] = new_bal
+        if delta > 0:
+            rec["earned"] = money(rec.get("earned", 0) + delta)
+        else:
+            rec["spent"] = money(rec.get("spent", 0) - delta)
+        hist = rec.get("history") or []
+        hist.append({"ts": int(time.time()), "delta": delta, "order": order_id,
+                     "note": note, "balance": new_bal})
+        rec["history"] = hist[-40:]
+        rec["updated_at"] = int(time.time())
+        data[uid] = rec
+        save_cashback(data)
+    return new_bal
+
+def cashback_for(amount):
+    """Shu summadan qancha keshbek yoziladi."""
+    cfg = get_cashback_cfg()
+    if not cfg["active"]:
+        return 0.0
+    return money(amount * cfg["percent"] / 100.0)
+
+def order_cashback_used(order):
+    return money(order.get("cashback_used") or 0)
+
+def order_payable(order):
+    """Mijoz naqd to'laydigan summa — keshbek chegirilgandan keyin."""
+    return max(0.0, money(order.get("total", 0) - order_cashback_used(order)))
+
+def credit_order_cashback(order):
+    """Yetkazilgan buyurtma uchun keshbek yozadi. (yozilgan_summa, yangi_balans).
+    Keshbek bilan to'langan qismdan qayta keshbek hisoblanmaydi."""
+    uid = order.get("user_id")
+    if not uid or order.get("cashback_credited") or is_cancelled(order):
+        return 0.0, cashback_balance(uid)
+    amount = cashback_for(order_payable(order))
+    order["cashback_credited"] = True
+    order["cashback_earned"] = amount
+    order["cashback_credited_at"] = int(time.time())
+    if amount <= 0:
+        return 0.0, cashback_balance(uid)
+    return amount, cashback_move(uid, amount, order.get("id"), "buyurtma yetkazildi")
+
+def revoke_order_cashback(order, note="yetkazildi bekor qilindi"):
+    """Yozilgan keshbekni qaytarib oladi (bekor qilinganda yoki holat orqaga o'zgarganda)."""
+    uid = order.get("user_id")
+    if not uid or not order.get("cashback_credited"):
+        return 0.0, cashback_balance(uid)
+    amount = money(order.get("cashback_earned") or 0)
+    order["cashback_credited"] = False
+    order["cashback_earned"] = 0.0
+    order.pop("cashback_credited_at", None)
+    if amount <= 0:
+        return 0.0, cashback_balance(uid)
+    return amount, cashback_move(uid, -amount, order.get("id"), note)
+
+def refund_used_cashback(order, note="buyurtma bekor qilindi"):
+    """Bekor qilinganda ishlatilgan keshbekni mijozga qaytaradi."""
+    uid = order.get("user_id")
+    used = order_cashback_used(order)
+    if not uid or used <= 0 or order.get("cashback_refunded"):
+        return 0.0, cashback_balance(uid)
+    order["cashback_refunded"] = True
+    return used, cashback_move(uid, used, order.get("id"), note)
+
+def recharge_used_cashback(order):
+    """Bekor qaytarilganda keshbekni qaytadan yechadi. Balans yetmasa False qaytaradi."""
+    uid = order.get("user_id")
+    used = order_cashback_used(order)
+    if not uid or used <= 0 or not order.get("cashback_refunded"):
+        return True
+    with DATA_LOCK:
+        if cashback_balance(uid) + 1e-9 < used:
+            order["cashback_used"] = 0.0        # oraliqda sarflab yuborilgan
+            order["cashback_refunded"] = False
+            return False
+        cashback_move(uid, -used, order.get("id"), "bekor qaytarildi")
+        order["cashback_refunded"] = False
+    return True
+
+def trim_cashback_to_total(order):
+    """Taom olib tashlangach keshbek summadan oshib ketsa, ortig'ini qaytaradi."""
+    used = order_cashback_used(order)
+    total = money(order.get("total") or 0)
+    if used <= total:
+        return 0.0
+    extra = money(used - total)
+    order["cashback_used"] = total
+    if order.get("user_id") and not order.get("cashback_refunded"):
+        cashback_move(order["user_id"], extra, order.get("id"), "taom olib tashlandi")
+    return extra
+
+def cashback_totals():
+    """Barcha mijozlardagi yig'ilib turgan keshbek — bu bizning qarzimiz."""
+    data = load_cashback()
+    bal = money(sum(money(r.get("balance", 0)) for r in data.values()))
+    people = sum(1 for r in data.values() if money(r.get("balance", 0)) > 0)
+    return {"balance": bal, "people": people, "all": len(data)}
+
 def is_owner(chat_id):
     """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
     return chat_id in load_admin_ids()
@@ -746,8 +958,20 @@ def is_staff_or_admin(chat_id):
 def notify_recipients():
     return load_admin_ids() | load_staff_ids()
 
+def money(x):
+    """Pulni 2 xonagacha yaxlitlaydi — suzuvchi nuqta xatolari yig'ilib ketmasin."""
+    try:
+        return round(float(x) + 1e-9, 2)
+    except Exception:
+        return 0.0
+
 def fmt_sum(n):
-    return f"{n:,.0f} SAR".replace(",", " ")
+    """Butun bo'lsa '18 SAR', kasrli bo'lsa '17.10 SAR'."""
+    v = money(n)
+    s = f"{v:,.2f}".replace(",", " ")
+    if s.endswith(".00"):
+        s = s[:-3]
+    return s + " SAR"
 
 def parse_dish_caption(text):
     """'Nomi;Narxi;Tavsif;Kategoriya' formatini o'qiydi. Kategoriya ixtiyoriy."""
@@ -1136,11 +1360,11 @@ def handle_checkout_steps(message):
 
 # ---------- buyurtma yaratish (chat va Mini App uchun umumiy) ----------
 
-def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username):
+def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False):
     """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi."""
     with DATA_LOCK:
         order, error = _create_order_locked(items_cart, customer_name, phone, latitude, longitude,
-                                            address_text, note, tg_user_id, username)
+                                            address_text, note, tg_user_id, username, use_cashback)
     if error:
         return None, error
     # xabarlarni qulfdan tashqarida yuboramiz — boshqa mijozlar kutib qolmasin
@@ -1154,7 +1378,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
             pass
     return order, None
 
-def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username):
+def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False):
     full_menu = load_menu()
     menu = {d["id"]: d for d in full_menu}
     items = []
@@ -1191,6 +1415,13 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
             dish["stock"] = max(0, dish["stock"] - qty)
     save_menu(full_menu)
 
+    # keshbek: balansdan buyurtma summasidan oshmaydigan qismi ishlatiladi
+    cb_used = 0.0
+    if use_cashback and tg_user_id and get_cashback_cfg()["active"]:
+        cb_used = money(min(cashback_balance(tg_user_id), money(total)))
+        if cb_used < 0.01:
+            cb_used = 0.0
+
     orders = load_orders()
     created_at = int(time.time())
     day_key = today_key(created_at)
@@ -1209,6 +1440,9 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         "original_total": original_total,
         "discount_percent": disc["percent"] if disc["active"] else 0,
         "status": "Yangi",
+        "cashback_used": cb_used,
+        "cashback_earned": 0.0,
+        "cashback_credited": False,
         "printed": False,
         "payment": "naqd",
         "created_at": created_at,
@@ -1217,6 +1451,8 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
     }
     orders.append(order)
     save_orders(orders)
+    if cb_used > 0:
+        cashback_move(tg_user_id, -cb_used, order["id"], "buyurtmada ishlatildi")
     if tg_user_id:
         try:
             users = load_users()
@@ -1239,7 +1475,8 @@ def build_customer_receipt_text(order, lang=None):
         f"{order_items_text(order)}\n\n"
         + discount_line_for_customer(order, lang)
         + t("receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
-        f"{order_address_line(order)}\n"
+        + cashback_line_for_customer(order, lang)
+        + f"{order_address_line(order)}\n"
     )
     if order.get("note"):
         text += f"📝 {order['note']}\n"
@@ -1247,6 +1484,12 @@ def build_customer_receipt_text(order, lang=None):
         text += t("receipt_nophone", lang)
     text += t("receipt_tail", lang)
     return text
+
+def cashback_line_for_customer(order, lang):
+    used = order_cashback_used(order)
+    if used <= 0:
+        return ""
+    return t("cb_receipt_line", lang, amt=fmt_sum(used), pay=fmt_sum(order_payable(order)))
 
 def discount_line_for_customer(order, lang):
     pct = order.get("discount_percent") or 0
@@ -1338,9 +1581,16 @@ def build_receipt_lines(order, width=None, safe=True):
     if pct and old and old > order.get("total", 0):
         L.append(_rline("Oldingi summa", f"{old:.0f}", w))
         L.append(_rline(f"Aksiya -{pct}%", f"-{old - order['total']:.0f}", w))
-    L.append(_rline("JAMI", f"{order.get('total', 0):.0f} SAR", w))
+    L.append(_rline("JAMI", fmt_sum(order.get("total", 0)), w))
+    used_cb = order_cashback_used(order)
+    if used_cb > 0:
+        L.append(_rline("Keshbek", "-" + fmt_sum(used_cb), w))
+        L.append(_rline("TO'LOVGA", fmt_sum(order_payable(order)), w))
     L.append("")
-    L.append("To'lov: NAQD (yetkazishda)".center(w).rstrip())
+    if used_cb > 0:
+        L.append("To'lov: NAQD + KESHBEK".center(w).rstrip())
+    else:
+        L.append("To'lov: NAQD (yetkazishda)".center(w).rstrip())
 
     if order.get("note"):
         L.append("-" * w)
@@ -1363,6 +1613,15 @@ def order_discount_line(order):
         return ""
     saved = old - order["total"]
     return f"🏷 Aksiya −{pct}%: {fmt_sum(old)} → {fmt_sum(order['total'])} (−{fmt_sum(saved)})\n"
+
+def order_money_lines(order):
+    """Admin ko'radigan pul qatorlari — keshbek ishlatilgan bo'lsa ajratib ko'rsatamiz."""
+    used = order_cashback_used(order)
+    if used <= 0:
+        return f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))} (naqd)\n"
+    return (f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))}\n"
+            f"\U0001F4B3 Keshbek bilan: \u2212{fmt_sum(used)}\n"
+            f"\U0001F4B5 Naqd olinadi: {fmt_sum(order_payable(order))}\n")
 
 def order_address_line(order):
     if order.get("latitude") is not None:
@@ -1447,8 +1706,8 @@ def notify_owner_new_order(order):
             + (f"📝 {order['note']}\n" if order.get('note') else "")
             + f"\n{order_items_text(order)}\n\n"
             + order_discount_line(order)
-            + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
-            f"Holat: {order['status']}"
+            + order_money_lines(order)
+            + f"Holat: {order['status']}"
         )
         kb = status_keyboard(order)
     except Exception as e:
@@ -1496,8 +1755,8 @@ def order_card_text(order):
         + (f"📝 {order['note']}\n" if order.get('note') else "")
         + f"\n{order_items_text(order)}\n\n"
         + order_discount_line(order)
-        + f"💰 Jami: {fmt_sum(order['total'])} (naqd)\n"
-        f"Holat: {order['status']}"
+        + order_money_lines(order)
+        + f"Holat: {order['status']}"
     )
 
 def refresh_order_card(call, order):
@@ -1532,24 +1791,39 @@ def cb_cancel_order(call):
         bot.answer_callback_query(call.id, "Ruxsat yo'q.")
         return
     order_id = int(call.data.split(":", 1)[1])
-    orders = load_orders()
-    order = next((o for o in orders if o["id"] == order_id), None)
-    if not order:
-        bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
-        return
-    if is_cancelled(order):
-        bot.answer_callback_query(call.id, "Bu buyurtma allaqachon bekor qilingan.")
+    err = None
+    taken_back = refunded = new_balance = 0.0
+    with DATA_LOCK:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        if not order:
+            err = "Buyurtma topilmadi."
+        elif is_cancelled(order):
+            err = "Bu buyurtma allaqachon bekor qilingan."
+    if err:
+        bot.answer_callback_query(call.id, err)
         return
 
-    restore_stock(active_items(order))
-    order["status"] = CANCELLED
-    order["cancelled_at"] = int(time.time())
-    order["cancelled_by"] = call.from_user.id
-    save_orders(orders)
+    with DATA_LOCK:
+        restore_stock(active_items(order))
+        order["status"] = CANCELLED
+        order["cancelled_at"] = int(time.time())
+        order["cancelled_by"] = call.from_user.id
+        # yozilgan keshbek bekor bo'ladi, ishlatilgani esa mijozga qaytadi
+        taken_back, _ = revoke_order_cashback(order, "buyurtma bekor qilindi")
+        refunded, new_balance = refund_used_cashback(order)
+        save_orders(orders)
 
-    bot.answer_callback_query(call.id, "❌ Buyurtma bekor qilindi.")
+    msg = "❌ Buyurtma bekor qilindi."
+    if taken_back > 0:
+        msg += f" Keshbek −{fmt_sum(taken_back)}."
+    if refunded > 0:
+        msg += f" Mijozga {fmt_sum(refunded)} keshbek qaytarildi."
+    bot.answer_callback_query(call.id, msg)
     refresh_order_card(call, order)
     tell_customer(order, "order_cancelled", no=order["daily_number"])
+    if refunded > 0:
+        tell_customer(order, "cb_refunded", amt=fmt_sum(refunded), bal=fmt_sum(new_balance))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("uncancel:"))
 def cb_uncancel_order(call):
@@ -1558,16 +1832,24 @@ def cb_uncancel_order(call):
         bot.answer_callback_query(call.id, "Ruxsat yo'q.")
         return
     order_id = int(call.data.split(":", 1)[1])
-    orders = load_orders()
-    order = next((o for o in orders if o["id"] == order_id), None)
-    if not order or not is_cancelled(order):
+    with DATA_LOCK:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        bad = not order or not is_cancelled(order)
+    if bad:
         bot.answer_callback_query(call.id, "Bu buyurtma bekor qilinmagan.")
         return
-    order["status"] = "Yangi"
-    order.pop("cancelled_at", None)
-    order.pop("cancelled_by", None)
-    save_orders(orders)
-    bot.answer_callback_query(call.id, "♻️ Buyurtma qaytarildi.")
+    with DATA_LOCK:
+        order["status"] = "Yangi"
+        order.pop("cancelled_at", None)
+        order.pop("cancelled_by", None)
+        cb_ok = recharge_used_cashback(order)
+        save_orders(orders)
+    msg = "♻️ Buyurtma qaytarildi."
+    if not cb_ok:
+        msg = ("♻️ Qaytarildi, lekin mijozning keshbegi yetmadi — "
+               "buyurtma to'liq naqd to'lanadigan bo'ldi.")
+    bot.answer_callback_query(call.id, msg, show_alert=not cb_ok)
     refresh_order_card(call, order)
     tell_customer(order, "order_restored", no=order["daily_number"])
 
@@ -1579,26 +1861,35 @@ def cb_remove_item(call):
         return
     _, order_id_str, idx_str = call.data.split(":", 2)
     order_id, idx = int(order_id_str), int(idx_str)
-    orders = load_orders()
-    order = next((o for o in orders if o["id"] == order_id), None)
-    if not order:
-        bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
-        return
-    items = order.get("items", [])
-    if idx < 0 or idx >= len(items) or items[idx].get("cancelled"):
-        bot.answer_callback_query(call.id, "Bu taom allaqachon olib tashlangan.")
-        return
-    if len(active_items(order)) <= 1:
-        bot.answer_callback_query(call.id, "Oxirgi taom — butun buyurtmani bekor qiling.", show_alert=True)
+    err = None
+    alert = False
+    with DATA_LOCK:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        items = order.get("items", []) if order else []
+        if not order:
+            err = "Buyurtma topilmadi."
+        elif idx < 0 or idx >= len(items) or items[idx].get("cancelled"):
+            err = "Bu taom allaqachon olib tashlangan."
+        elif len(active_items(order)) <= 1:
+            err, alert = "Oxirgi taom — butun buyurtmani bekor qiling.", True
+    if err:
+        bot.answer_callback_query(call.id, err, show_alert=alert)
         return
 
     it = items[idx]
-    restore_stock([it])
-    it["cancelled"] = True
-    recalc_order_total(order)
-    save_orders(orders)
+    with DATA_LOCK:
+        restore_stock([it])
+        it["cancelled"] = True
+        recalc_order_total(order)
+        # keshbek yangi summadan oshib ketgan bo'lsa, ortig'i mijozga qaytadi
+        given_back = trim_cashback_to_total(order)
+        save_orders(orders)
 
-    bot.answer_callback_query(call.id, f"➖ {it['name']} olib tashlandi.")
+    msg = f"➖ {it['name']} olib tashlandi."
+    if given_back > 0:
+        msg += f" {fmt_sum(given_back)} keshbek mijozga qaytarildi."
+    bot.answer_callback_query(call.id, msg)
     refresh_order_card(call, order)
     tell_customer(order, "item_cancelled", no=order["daily_number"],
                   dish=it["name"], sum=fmt_sum(order["total"]))
@@ -1610,24 +1901,43 @@ def cb_update_status(call):
         return
     _, order_id_str, new_status = call.data.split(":", 2)
     order_id = int(order_id_str)
-    orders = load_orders()
-    order = next((o for o in orders if o["id"] == order_id), None)
-    if not order:
-        bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
-        return
-    if is_cancelled(order):
-        bot.answer_callback_query(call.id, "Bu buyurtma bekor qilingan. Avval \"Bekorni qaytarish\"ni bosing.", show_alert=True)
-        return
-    order["status"] = new_status
-    save_orders(orders)
+
+    earned = 0.0
+    new_balance = 0.0
+    taken_back = 0.0
+    with DATA_LOCK:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        if not order:
+            bot.answer_callback_query(call.id, "Buyurtma topilmadi.")
+            return
+        if is_cancelled(order):
+            bot.answer_callback_query(call.id, "Bu buyurtma bekor qilingan. Avval \"Bekorni qaytarish\"ni bosing.", show_alert=True)
+            return
+        prev_status = order.get("status")
+        order["status"] = new_status
+        # keshbek faqat YETKAZILGANDA yoziladi
+        if new_status == "Yetkazildi":
+            earned, new_balance = credit_order_cashback(order)
+        elif prev_status == "Yetkazildi":
+            taken_back, new_balance = revoke_order_cashback(order, "holat orqaga o'zgartirildi")
+        save_orders(orders)
 
     refresh_order_card(call, order)
-    bot.answer_callback_query(call.id, f"Holat yangilandi: {new_status}")
+    note = f"Holat yangilandi: {new_status}"
+    if earned > 0:
+        note += f" • keshbek +{fmt_sum(earned)}"
+    elif taken_back > 0:
+        note += f" • keshbek −{fmt_sum(taken_back)} qaytarib olindi"
+    bot.answer_callback_query(call.id, note)
 
     try:
         clang = get_user_lang(order["user_id"])
         bot.send_message(order["user_id"], t("status_update", clang,
                                              no=order["daily_number"], st=status_name(new_status, clang)))
+        if earned > 0:
+            bot.send_message(order["user_id"], t("cb_earned", clang,
+                                                 amt=fmt_sum(earned), bal=fmt_sum(new_balance)))
     except Exception:
         pass
 
@@ -2370,6 +2680,7 @@ def api_order():
     body = request.get_json(force=True, silent=True) or {}
     init_data = body.get("initData", "")
     user = validate_init_data(init_data) or {}
+    verified = bool(user)
 
     if not user:
         # 1) avval botning o'zi imzolagan uid/uname/ts/sig orqali tekshiramiz (eng ishonchli)
@@ -2378,6 +2689,7 @@ def api_order():
         )
         if signed_user:
             user = signed_user
+            verified = True
         else:
             # 2) bo'lmasa, Telegram tomonidan berilgan (imzosiz) ma'lumotdan foydalanamiz
             unsafe_user = body.get("unsafe_user")
@@ -2405,7 +2717,10 @@ def api_order():
     if not phone and not user.get("id"):
         return jsonify({"error": "Telefon raqamingizni kiriting — aks holda siz bilan bog'lana olmaymiz."}), 400
 
+    # keshbekni faqat shaxsi tasdiqlangan foydalanuvchi ishlata oladi —
+    # imzosiz so'rov bilan birovning hisobidan yechib bo'lmaydi
     order, error = create_order(
+        use_cashback=bool(body.get("use_cashback")) and verified,
         items_cart=items_cart,
         customer_name=customer_name,
         phone=phone,
@@ -2418,7 +2733,29 @@ def api_order():
     )
     if error:
         return jsonify({"error": error}), 409
-    return jsonify({"ok": True, "order_id": order["daily_number"], "total": order["total"]})
+    return jsonify({
+        "ok": True,
+        "order_id": order["daily_number"],
+        "total": order["total"],
+        "cashback_used": order_cashback_used(order),
+        "payable": order_payable(order),
+        "cashback_balance": cashback_balance(user.get("id")) if user.get("id") else 0,
+    })
+
+@app.route("/api/cashback")
+def api_cashback():
+    """Mini App tepasidagi keshbek balansi."""
+    cfg = get_cashback_cfg()
+    user = (validate_init_data(request.args.get("initData", ""))
+            or verify_signed_user(request.args.get("uid"), request.args.get("uname"),
+                                  request.args.get("ts"), request.args.get("sig")))
+    # imzosiz so'rovga balans bermaymiz — birovning hisobini ko'rib bo'lmaydi
+    uid = user["id"] if user else None
+    return jsonify({
+        "active": cfg["active"],
+        "percent": cfg["percent"],
+        "balance": cashback_balance(uid) if uid else 0,
+    })
 
 # ---------- admin paneli (Mini App orqali taom qo'shish) ----------
 
@@ -3832,7 +4169,11 @@ def build_daily_report_text(target_date):
             f"❌ Bekor qilinganlar: {len(cancelled_orders)} ta"
         )
 
-    total_revenue = sum(o["total"] for o in live_orders)
+    total_revenue = money(sum(o["total"] for o in live_orders))
+    cb_spent = money(sum(order_cashback_used(o) for o in live_orders))
+    cb_given = money(sum(o.get("cashback_earned") or 0
+                         for o in live_orders if o.get("cashback_credited")))
+    cash_in = money(total_revenue - cb_spent)
     dish_counts = {}
     cancelled_items = 0
     for o in live_orders:
@@ -3853,8 +4194,11 @@ def build_daily_report_text(target_date):
     text = (
         f"📊 Kunlik hisobot — {target_date.strftime('%d.%m.%Y')}\n\n"
         f"🧾 Buyurtmalar soni: {len(live_orders)}\n"
-        f"💰 Jami savdo: {fmt_sum(total_revenue)}\n\n"
-        f"🍽 Sotilgan taomlar:\n{dish_lines}\n\n"
+        f"💰 Jami savdo: {fmt_sum(total_revenue)}\n"
+        + (f"💳 Keshbek bilan to'landi: −{fmt_sum(cb_spent)}\n"
+           f"💵 Naqd tushum: {fmt_sum(cash_in)}\n" if cb_spent > 0 else "")
+        + (f"🎁 Bugun yozilgan keshbek: {fmt_sum(cb_given)}\n" if cb_given > 0 else "")
+        + f"\n🍽 Sotilgan taomlar:\n{dish_lines}\n\n"
         f"📦 Holatlar bo'yicha:\n{status_lines}"
     )
     if cancelled_orders or cancelled_items:
@@ -3881,6 +4225,87 @@ def cmd_report(message):
         return
     today = datetime.now(TIMEZONE).date()
     bot.send_message(message.chat.id, build_daily_report_text(today))
+
+@bot.message_handler(commands=["keshbek", "cashback"])
+def cmd_cashback(message):
+    """Mijoz uchun — o'z balansi. Admin uchun — umumiy holat."""
+    cfg = get_cashback_cfg()
+    lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
+    parts = (message.text or "").split()
+
+    if is_owner(message.chat.id):
+        if len(parts) > 1:
+            try:
+                target = int(parts[1])
+            except ValueError:
+                bot.send_message(message.chat.id, "Foydalanish: /keshbek yoki /keshbek <user_id>")
+                return
+            rec = load_cashback().get(str(target)) or {}
+            hist = (rec.get("history") or [])[-8:]
+            lines = [f"\U0001F4B3 Mijoz {target}",
+                     f"Balans: {fmt_sum(rec.get('balance', 0))}",
+                     f"Jami yozilgan: {fmt_sum(rec.get('earned', 0))}",
+                     f"Jami ishlatilgan: {fmt_sum(rec.get('spent', 0))}"]
+            if hist:
+                lines.append("")
+                lines.append("Oxirgi harakatlar:")
+                for h in reversed(hist):
+                    when = datetime.fromtimestamp(h.get("ts", 0), TIMEZONE).strftime("%d.%m %H:%M")
+                    sign = "+" if h.get("delta", 0) > 0 else "\u2212"
+                    lines.append(f"  {when}  {sign}{fmt_sum(abs(h.get('delta', 0)))}  {h.get('note', '')}")
+            bot.send_message(message.chat.id, "\n".join(lines))
+            return
+        tot = cashback_totals()
+        state = f"\U0001F7E2 yoqilgan — {cfg['percent']:g}%" if cfg["active"] else "\u23F9 o'chirilgan"
+        bot.send_message(message.chat.id,
+            "\U0001F4B3 Keshbek holati\n\n"
+            f"Sozlama: {state}\n"
+            f"Mijozlarda yig'ilgan: {fmt_sum(tot['balance'])}\n"
+            f"Keshbegi bor mijozlar: {tot['people']} ta\n\n"
+            "Boshqarish:\n"
+            "/keshbek_foiz 5 — foizni o'zgartirish\n"
+            "/keshbek_foiz 0 — keshbekni butunlay o'chirish\n"
+            "/keshbek <user_id> — bitta mijozni ko'rish")
+        return
+
+    if not cfg["active"]:
+        bot.send_message(message.chat.id, t("cb_off", lang))
+        return
+    bal = cashback_balance(message.from_user.id)
+    key = "cb_balance" if bal > 0 else "cb_zero"
+    bot.send_message(message.chat.id, t(key, lang, bal=fmt_sum(bal), pct=f"{cfg['percent']:g}"),
+                     reply_markup=main_keyboard(message.from_user.id, message.from_user.username))
+
+@bot.message_handler(commands=["keshbek_foiz"])
+def cmd_cashback_percent(message):
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split()
+    if len(parts) < 2:
+        cfg = get_cashback_cfg()
+        bot.send_message(message.chat.id,
+                         f"Hozirgi keshbek: {cfg['percent']:g}%\n"
+                         "O'zgartirish: /keshbek_foiz 5\nO'chirish: /keshbek_foiz 0")
+        return
+    try:
+        pct = float(parts[1].replace(",", "."))
+    except ValueError:
+        bot.send_message(message.chat.id, "Raqam kiriting. Masalan: /keshbek_foiz 5")
+        return
+    if pct < 0 or pct > 100:
+        bot.send_message(message.chat.id, "Foiz 0 dan 100 gacha bo'lishi kerak.")
+        return
+    cfg = set_cashback_cfg(active=pct > 0, percent=pct)
+    if cfg["active"]:
+        bot.send_message(message.chat.id,
+            f"\u2705 Keshbek {cfg['percent']:g}% qilib qo'yildi.\n\n"
+            "Bu faqat bundan keyingi yetkazilgan buyurtmalarga ta'sir qiladi — "
+            "mijozlarda yig'ilib turgan keshbek joyida qoladi.")
+    else:
+        bot.send_message(message.chat.id,
+            "\u23F9 Keshbek o'chirildi. Yangi buyurtmalardan keshbek yozilmaydi.\n\n"
+            "Mijozlardagi eski keshbek saqlanib qoladi, lekin ular uni ishlata olmaydi. "
+            "Qayta yoqish: /keshbek_foiz 5")
 
 @bot.message_handler(commands=["yesterday_report"])
 def cmd_yesterday_report(message):
