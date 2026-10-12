@@ -1547,11 +1547,13 @@ def _wrap(text, width):
         out.append(line)
     return out or [""]
 
-def build_receipt_lines(order, width=None, safe=True):
-    """Termoprinter uchun chek matni — oddiy qatorlar ro'yxati."""
+def build_receipt_lines(order, width=None, safe=True, header=True):
+    """Termoprinter uchun chek matni — oddiy qatorlar ro'yxati.
+    header=False — tepaga logo rasmi chiqadi, nom yozuvi kerak emas."""
     w = width or RECEIPT_WIDTH
     L = []
-    L.append(BUSINESS_NAME.upper().center(w).rstrip())
+    if header:
+        L.append(BUSINESS_NAME.upper().center(w).rstrip())
     L.append("-" * w)
     created = datetime.fromtimestamp(order.get("created_at", int(time.time())), TIMEZONE)
     L.append(_rline(f"Buyurtma #{order.get('daily_number', '?')}", created.strftime("%d.%m %H:%M"), w))
@@ -1602,8 +1604,8 @@ def build_receipt_lines(order, width=None, safe=True):
     L.append("Rahmat! Yana kutamiz".center(w).rstrip())
     return [ascii_safe(x) for x in L] if safe else L
 
-def build_receipt_text(order, width=None, safe=True):
-    return "\n".join(build_receipt_lines(order, width, safe))
+def build_receipt_text(order, width=None, safe=True, header=True):
+    return "\n".join(build_receipt_lines(order, width, safe, header))
 
 def order_discount_line(order):
     """Aksiya bo'lgan buyurtmada eski summa va chegirma qatorini qaytaradi."""
@@ -2835,6 +2837,12 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   details ol{ padding-inline-start:20px; line-height:1.7; }
   details code{ background:#1d222c; padding:1px 5px; border-radius:4px; }
 
+  .logoprev{
+    width:38px; height:38px; border-radius:7px; background:#fff; object-fit:contain;
+    border:1px solid #2b313d; vertical-align:middle; margin-inline-start:7px;
+    image-rendering:pixelated;
+  }
+
   /* tizim orqali chop etish — faqat chek chiqadi */
   #printArea{ display:none; }
   @media print{
@@ -2845,6 +2853,11 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       font-family:ui-monospace,"Courier New",monospace;
       font-size:11pt; line-height:1.28; white-space:pre;
     }
+    #printArea img.plogo{
+      display:block; margin:0 auto 2mm; max-width:100%;
+      image-rendering:pixelated;
+    }
+    #printArea pre{ margin:0; font:inherit; white-space:pre; }
     @page{ margin:2mm; }
   }
 </style>
@@ -2866,6 +2879,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   <div class="opts">
     <label><input type="checkbox" id="auto" checked> Avtomatik chiqarsin</label>
     <label><input type="checkbox" id="snd" checked> Ovoz</label>
+    <label title="Chek tepasida nom yozuvi o'rniga logo rasmi chiqadi">
+      <input type="checkbox" id="logo" checked> Logo bilan
+      <img id="logoPrev" class="logoprev" alt="" hidden>
+    </label>
     <label>Kengligi
       <select id="w">
         <option value="32">58 mm</option>
@@ -3002,14 +3019,148 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     }
   }
 
-  function escpos(text){
-    var enc = new TextEncoder();
-    var head = new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00]);   // reset + kodlash jadvali
-    var body = enc.encode(text + "\\n");
-    var tail = new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00]); // bo'sh joy + kesish
-    var out = new Uint8Array(head.length + body.length + tail.length);
-    out.set(head, 0); out.set(body, head.length); out.set(tail, head.length + body.length);
+  /* ---------- logo: rasmni printer tushunadigan nuqtalarga aylantiramiz ---------- */
+  var hasLogo = false;            // serverda logo bormi
+  var logoCache = {};             // kenglik -> {bytes, url}
+
+  function dots(){ return $('w').value === '32' ? 384 : 576; }
+  function logoOn(){ var c = $('logo'); return !!(c && c.checked && hasLogo); }
+
+  function loadImage(src){
+    return new Promise(function(res, rej){
+      var im = new Image();
+      im.onload = function(){ res(im); };
+      im.onerror = function(){ rej(new Error('logo yuklanmadi')); };
+      im.src = src;
+    });
+  }
+
+  async function buildLogo(width){
+    if (logoCache[width]) return logoCache[width];
+    var im = await loadImage(url('/static/logo.jpg'));
+    var maxH = 220;                                  // qog'oz behuda ketmasin
+    var w = width;
+    var h = Math.round(im.height * (w / im.width));
+    if (h > maxH){ h = maxH; w = Math.round(im.width * (h / im.height)); }
+    w = Math.floor(w / 8) * 8;
+    if (w < 8) w = 8;
+    if (h < 1) h = 1;
+
+    var cv = document.createElement('canvas');
+    cv.width = w; cv.height = h;
+    var cx = cv.getContext('2d');
+    cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+    cx.drawImage(im, 0, 0, w, h);
+
+    var img = cx.getImageData(0, 0, w, h);
+    var d = img.data;
+    var g = new Float32Array(w * h);
+    var sum = 0;
+    for (var i = 0, p = 0; i < d.length; i += 4, p++){
+      var a = d[i+3] / 255;
+      var v = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      v = v * a + 255 * (1 - a);                     // shaffof joy — oq qog'oz
+      g[p] = v; sum += v;
+    }
+    // fon to'q bo'lsa (masalan oltin logo ko'k fonda) ag'daramiz, aks holda qop-qora dog' chiqadi
+    if (sum / (w * h) < 128){
+      for (var q = 0; q < g.length; q++) g[q] = 255 - g[q];
+    }
+
+    // kontrastni cho'zamiz: fon oppoq, logo qop-qora bo'lsin.
+    // Busiz fon kulrang qolib, chekda kir dog'dek nuqtalar bosilib ketadi.
+    var hist = new Uint32Array(256);
+    for (var hq = 0; hq < g.length; hq++){
+      var hv = Math.round(g[hq]);
+      hist[hv < 0 ? 0 : (hv > 255 ? 255 : hv)]++;
+    }
+    var cut = Math.max(1, Math.floor(g.length * 0.02));   // chetdagi 2% shovqinni hisobga olmaymiz
+    var lo = 0, hi2 = 255, acc = 0, z;
+    for (z = 0; z < 256; z++){ acc += hist[z]; if (acc >= cut){ lo = z; break; } }
+    acc = 0;
+    for (z = 255; z >= 0; z--){ acc += hist[z]; if (acc >= cut){ hi2 = z; break; } }
+    if (hi2 - lo > 10){
+      var sc = 255 / (hi2 - lo);
+      for (var sq = 0; sq < g.length; sq++){
+        var vv = (g[sq] - lo) * sc;
+        g[sq] = vv < 0 ? 0 : (vv > 255 ? 255 : vv);
+      }
+    }
+    // JPEG shovqini fonda mayda nuqta qoldirmasin — deyarli oqni butunlay oq qilamiz
+    var dark = 0;
+    for (var wq = 0; wq < g.length; wq++){
+      if (g[wq] > 215) g[wq] = 255;
+      if (g[wq] < 128) dark++;
+    }
+    // surat ko'rinishidagi logo juda qora chiqsa, qog'oz qizib ketadi — biroz yoritamiz
+    if (dark > g.length * 0.45){
+      for (var yq = 0; yq < g.length; yq++){
+        g[yq] = 255 * Math.pow(g[yq] / 255, 0.6);
+      }
+    }
+
+    // Floyd-Steinberg: kulrangni nuqtalarga taqsimlaymiz
+    var bpr = w / 8;
+    var bits = new Uint8Array(bpr * h);
+    for (var y = 0; y < h; y++){
+      for (var x = 0; x < w; x++){
+        var idx = y * w + x;
+        var old = g[idx];
+        var nv = old < 128 ? 0 : 255;
+        var err = old - nv;
+        if (nv === 0) bits[y*bpr + (x >> 3)] |= (0x80 >> (x & 7));
+        if (x + 1 < w) g[idx+1] += err * 7 / 16;
+        if (y + 1 < h){
+          if (x > 0) g[idx+w-1] += err * 3 / 16;
+          g[idx+w] += err * 5 / 16;
+          if (x + 1 < w) g[idx+w+1] += err * 1 / 16;
+        }
+      }
+    }
+
+    // ko'rib turish uchun o'sha nuqtalarni qaytarib chizamiz
+    for (var yy = 0; yy < h; yy++){
+      for (var xx = 0; xx < w; xx++){
+        var on = bits[yy*bpr + (xx >> 3)] & (0x80 >> (xx & 7));
+        var o4 = (yy * w + xx) * 4;
+        var c = on ? 0 : 255;
+        d[o4] = c; d[o4+1] = c; d[o4+2] = c; d[o4+3] = 255;
+      }
+    }
+    cx.putImageData(img, 0, 0);
+
+    // GS v 0 — ESC/POS rastr buyrug'i
+    var head = new Uint8Array([0x1d, 0x76, 0x30, 0x00,
+                               bpr & 0xff, (bpr >> 8) & 0xff,
+                               h & 0xff, (h >> 8) & 0xff]);
+    var raster = new Uint8Array(head.length + bits.length);
+    raster.set(head, 0); raster.set(bits, head.length);
+
+    logoCache[width] = { bytes: raster, url: cv.toDataURL('image/png') };
+    var pv = $('logoPrev');
+    if (pv){ pv.src = logoCache[width].url; pv.hidden = false; }
+    return logoCache[width];
+  }
+
+  function joinBytes(parts){
+    var n = 0, i;
+    for (i = 0; i < parts.length; i++) n += parts[i].length;
+    var out = new Uint8Array(n), at = 0;
+    for (i = 0; i < parts.length; i++){ out.set(parts[i], at); at += parts[i].length; }
     return out;
+  }
+
+  function escpos(text, logo){
+    var enc = new TextEncoder();
+    var parts = [new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00])];   // reset + kodlash jadvali
+    if (logo){
+      parts.push(new Uint8Array([0x1b,0x61,0x01]));              // o'rtaga
+      parts.push(logo.bytes);
+      parts.push(new Uint8Array([0x0a, 0x1b,0x61,0x00]));        // chapga qaytaramiz
+    }
+    parts.push(enc.encode(text + "\\n"));
+    parts.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00])); // bo'sh joy + kesish
+    return joinBytes(parts);
   }
 
   async function sendBytes(bytes){
@@ -3022,18 +3173,55 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     }
   }
 
-  function systemPrint(text){
+  function systemPrint(text, logo){
     // Android chop etish oynasi ochiladi — u yerdan RawBT yoki printer xizmati tanlanadi
-    document.getElementById('printArea').textContent = text;
+    var area = document.getElementById('printArea');
+    area.innerHTML = '';
+    if (logo){
+      var im = document.createElement('img');
+      im.className = 'plogo';
+      im.src = logo.url;
+      area.appendChild(im);
+    }
+    var pre = document.createElement('pre');
+    pre.textContent = text;
+    area.appendChild(pre);
     window.print();
   }
 
   function mode(){ return $('mode').value; }
 
+  ['w','logo'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', function(){
+      logoCache = {};                       // yangi kenglikka qayta tayyorlanadi
+      seen = {};                            // cheklar yangi matn bilan qayta kelsin
+      var list = document.getElementById('list');
+      if (list) list.innerHTML = '';
+      try{ localStorage.setItem('miqot_logo', $('logo').checked ? '1' : '0'); }catch(e){}
+      if (logoOn()) buildLogo(dots()).catch(function(){});
+      poll();
+    });
+  });
+  try{
+    var savedLogo = localStorage.getItem('miqot_logo');
+    if (savedLogo === '0') $('logo').checked = false;
+  }catch(e){}
+
   async function printText(text){
-    if (mode() === 'sys'){ systemPrint(text); return; }
+    var logo = null;
+    if (logoOn()){
+      try{
+        logo = await buildLogo(dots());
+      }catch(e){
+        logo = null;
+        say("Logo yuklanmadi — chek nom yozuvi bilan chiqadi.", 'info');
+      }
+    }
+    if (mode() === 'sys'){ systemPrint(text, logo); return; }
     if (!chr) throw new Error('printer ulanmagan');
-    await sendBytes(escpos(text));
+    await sendBytes(escpos(text, logo));
   }
 
   /* ---------- buyurtmalar ---------- */
@@ -3122,13 +3310,21 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   var offline = 0;
   async function poll(){
     try{
-      var r = await fetch(url('/api/print/pending?w=' + $('w').value), { cache:'no-store' });
+      var r = await fetch(url('/api/print/pending?w=' + $('w').value +
+                              (logoOn() ? '&logo=1' : '')), { cache:'no-store' });
       if (!r.ok){
         setState(r.status === 403 ? 'Ruxsat yo‘q — botdan qaytadan oching' : 'Server javob bermadi', false);
         return;
       }
       offline = 0;
       var data = await r.json();
+      var hadLogo = hasLogo;
+      hasLogo = !!data.has_logo;
+      if (hasLogo && !hadLogo){ buildLogo(dots()).catch(function(){}); }
+      if (!hasLogo){
+        var pv = $('logoPrev');
+        if (pv) pv.hidden = true;
+      }
       if (mode() === 'sys') setState('Tizim orqali: har chek uchun chop etish oynasi ochiladi', true);
       else if (!chr) setState('Printer ulanmagan — buyurtmalar ko‘rinib turadi', false);
       else setState('Printer ulandi: ' + (dev && dev.name ? dev.name : 'tayyor'), true);
@@ -3856,6 +4052,8 @@ def api_print_pending():
     except Exception:
         width = RECEIPT_WIDTH
     width = max(24, min(64, width))
+    # logo rasm sifatida chiqsa, chek matnida nom yozuvi takrorlanmasin
+    with_logo = request.args.get("logo") == "1"
 
     today = today_key()
     out = []
@@ -3872,10 +4070,11 @@ def api_print_pending():
             "name": o.get("customer_name"),
             "total": o.get("total"),
             "items": [f"{it['name']} x{it['qty']}" for it in o.get("items", []) if not it.get("cancelled")],
-            "receipt": build_receipt_text(o, width),
+            "receipt": build_receipt_text(o, width, header=not with_logo),
         })
     out.sort(key=lambda x: x["id"])
-    return jsonify({"orders": out, "shop": shop_status()})
+    return jsonify({"orders": out, "shop": shop_status(),
+                    "has_logo": os.path.exists(LOGO_PATH)})
 
 @app.route("/api/print/done", methods=["POST"])
 def api_print_done():
