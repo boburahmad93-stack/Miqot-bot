@@ -45,6 +45,16 @@ MENU_FILE = os.path.join(DATA_DIR, "menu.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 CASHBACK_FILE = os.path.join(DATA_DIR, "cashback.json")
+WINBACK_FILE = os.path.join(DATA_DIR, "winback.json")
+
+# ---------- mijozni qaytarish sozlamalari (oson o'zgartirish uchun shu yerda) ----------
+SUB_OFFER_AFTER = int(os.environ.get("SUB_OFFER_AFTER", "3"))       # nechanchi buyurtmadan keyin obuna taklifi
+SUB_OFFER_URL = os.environ.get("SUB_OFFER_URL", "https://t.me/miqot1oybot")
+WINBACK_DAYS_1 = int(os.environ.get("WINBACK_DAYS_1", "7"))         # 1-bosqich: necha kundan keyin
+WINBACK_DAYS_2 = int(os.environ.get("WINBACK_DAYS_2", "21"))        # 2-bosqich: necha kundan keyin
+WINBACK_BONUS = float(os.environ.get("WINBACK_BONUS", "10"))        # 2-bosqichda beriladigan bonus (SAR)
+WINBACK_HOUR = int(os.environ.get("WINBACK_HOUR", "12"))            # har kuni soat nechada tekshiriladi
+REPEAT_MIN_TOTAL = float(os.environ.get("REPEAT_MIN_TOTAL", "30"))  # takrorlash uchun eng kam summa
 DISH_PHOTOS_DIR = os.path.join(DATA_DIR, "static", "dishes")
 LOGO_PATH = os.path.join(DATA_DIR, "static", "logo.jpg")
 
@@ -482,6 +492,145 @@ TEXTS = {
         "tr": "\U0001F4B3 Nakit iade: \u2212{amt}\n\U0001F4B5 Ödenecek: {pay}\n",
         "ur": "\U0001F4B3 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9: \u2212{amt}\n\U0001F4B5 \u0642\u0627\u0628\u0644 \u0627\u062F\u0627: {pay}\n",
         "id": "\U0001F4B3 Cashback: \u2212{amt}\n\U0001F4B5 Dibayar: {pay}\n",
+    },
+    "btn_repeat": {
+        "uz": "🔁 Avvalgi buyurtmani takrorlash",
+        "ar": "🔁 إعادة الطلب السابق",
+        "en": "🔁 Repeat last order",
+        "ru": "🔁 Повторить прошлый заказ",
+        "tr": "🔁 Son siparişi tekrarla",
+        "ur": "🔁 پچھلا آرڈر دوبارہ",
+        "id": "🔁 Ulangi pesanan terakhir",
+    },
+    "sub_offer": {
+        "uz": "Har kuni {biz}dan buyurtma berasizmi? 😊\n1 oylik tarifimiz bilan har kuni tushlik va kechki ovqat uyingizga keladi — arzonroq va har kuni o'ylab o'tirmaysiz.",
+        "ar": "هل تطلب من {biz} يومياً؟ 😊\nمع اشتراك الشهر يصلك الغداء والعشاء كل يوم — أرخص وبلا تفكير يومي.",
+        "en": "Do you order from {biz} every day? 😊\nWith our monthly plan, lunch and dinner come to your door every day — cheaper, and no deciding every evening.",
+        "ru": "Заказываете в {biz} каждый день? 😊\nС месячным тарифом обед и ужин приезжают к вам каждый день — дешевле и без ежедневных раздумий.",
+        "tr": "Her gün {biz}'dan sipariş veriyor musunuz? 😊\nAylık paketimizle öğle ve akşam yemeği her gün kapınıza gelir — daha ucuz ve her gün düşünmek yok.",
+        "ur": "کیا آپ روزانہ {biz} سے آرڈر کرتے ہیں؟ 😊\nہمارے ماہانہ پلین میں دوپہر اور رات کا کھانا روز آپ کے گھر آئے گا — سستا اور آسان۔",
+        "id": "Apakah Anda memesan dari {biz} setiap hari? 😊\nDengan paket bulanan kami, makan siang dan malam datang setiap hari — lebih murah dan tanpa repot memilih.",
+    },
+    "btn_sub_info": {
+        "uz": "📅 1 oylik tarif haqida", "ar": "📅 عن اشتراك الشهر",
+        "en": "📅 About the monthly plan", "ru": "📅 О месячном тарифе",
+        "tr": "📅 Aylık paket hakkında", "ur": "📅 ماہانہ پلین کے بارے میں",
+        "id": "📅 Tentang paket bulanan",
+    },
+    "wb_7": {
+        "uz": "Assalomu alaykum, {ism}! 😊\nBir haftadan beri sizdan buyurtma bo'lmadi, uzoqlashib ketdik.\nBalki biror narsa ko'nglingizga tegdimi? Ovqat, vaqt yoki boshqa narsa bo'lsa, bemalol yozing. Har bir fikringiz biz uchun muhim 🙏",
+        "ar": "السلام عليكم يا {ism}! 😊\nمضى أسبوع بلا طلب منك واشتقنا إليك.\nربما لم يعجبك شيء؟ اكتب لنا بكل صراحة — رأيك يهمنا 🙏",
+        "en": "Hello, {ism}! 😊\nIt has been a week since your last order and we have missed you.\nWas something not right — the food, the timing, anything else? Please write to us, your opinion matters 🙏",
+        "ru": "Здравствуйте, {ism}! 😊\nУже неделю от вас нет заказов, мы соскучились.\nМожет, что-то не понравилось — еда, время или что-то ещё? Напишите нам, ваше мнение важно 🙏",
+        "tr": "Merhaba {ism}! 😊\nBir haftadır sipariş vermediniz, sizi özledik.\nBir şey mi ters gitti — yemek, zaman ya da başka bir şey? Bize yazın, görüşünüz bizim için önemli 🙏",
+        "ur": "السلام علیکم، {ism}! 😊\nایک ہفتے سے آپ کا آرڈر نہیں آیا، ہمیں آپ کی یاد آئی۔\nکیا کوئی بات ناگوار گزری؟ براہ کرم ہمیں لکھیں 🙏",
+        "id": "Halo, {ism}! 😊\nSudah seminggu tidak ada pesanan dari Anda, kami merindukan Anda.\nApakah ada yang kurang pas — makanan, waktu, atau hal lain? Tulis saja kepada kami, pendapat Anda penting 🙏",
+    },
+    "wb_21": {
+        "uz": "{ism}, sizni yana mehmon qilgimiz keldi 🍲\nHisobingizga {bonus} bonus qo'shdik, keyingi buyurtmada ishlatishingiz mumkin. {biz} sizni kutadi!",
+        "ar": "{ism}، نشتاق لضيافتك مرة أخرى 🍲\nأضفنا {bonus} إلى رصيدك، يمكنك استخدامه في طلبك القادم. {biz} في انتظارك!",
+        "en": "{ism}, we would love to host you again 🍲\nWe have added a {bonus} bonus to your balance — use it on your next order. {biz} is waiting for you!",
+        "ru": "{ism}, мы будем рады снова вас угостить 🍲\nМы добавили на ваш баланс бонус {bonus} — используйте его в следующем заказе. {biz} вас ждёт!",
+        "tr": "{ism}, sizi yeniden ağırlamak isteriz 🍲\nBakiyenize {bonus} bonus ekledik, bir sonraki siparişinizde kullanabilirsiniz. {biz} sizi bekliyor!",
+        "ur": "{ism}، ہم آپ کی دوبارہ میزبانی کرنا چاہتے ہیں 🍲\nہم نے آپ کے بیلنس میں {bonus} بونس شامل کیا ہے۔ {biz} آپ کا منتظر ہے!",
+        "id": "{ism}, kami ingin menjamu Anda lagi 🍲\nKami menambahkan bonus {bonus} ke saldo Anda, pakai pada pesanan berikutnya. {biz} menunggu Anda!",
+    },
+    "btn_feedback": {
+        "uz": "✉️ Fikr bildirish", "ar": "✉️ شاركنا رأيك", "en": "✉️ Share feedback",
+        "ru": "✉️ Оставить отзыв", "tr": "✉️ Görüş bildir",
+        "ur": "✉️ رائے دیں", "id": "✉️ Beri masukan",
+    },
+    "btn_order_now": {
+        "uz": "🛍 Buyurtma berish", "ar": "🛍 اطلب الآن", "en": "🛍 Order now",
+        "ru": "🛍 Заказать", "tr": "🛍 Sipariş ver",
+        "ur": "🛍 آرڈر کریں", "id": "🛍 Pesan sekarang",
+    },
+    "rep_none": {
+        "uz": "Sizda hali yetkazilgan buyurtma yo'q. Menyuni oching va birinchi buyurtmangizni bering 😊",
+        "ar": "لا يوجد لديك طلب سابق. افتح القائمة واطلب 😊",
+        "en": "You have no delivered orders yet. Open the menu and place your first one 😊",
+        "ru": "У вас пока нет доставленных заказов. Откройте меню и сделайте первый 😊",
+        "tr": "Henüz teslim edilmiş siparişiniz yok. Menüyü açıp ilk siparişinizi verin 😊",
+        "ur": "ابھی کوئی پچھلا آرڈر نہیں۔ مینو کھولیں 😊",
+        "id": "Anda belum punya pesanan yang terkirim. Buka menu dan pesan yang pertama 😊",
+    },
+    "rep_title": {
+        "uz": "🔁 Avvalgi buyurtmangiz:", "ar": "🔁 طلبك السابق:",
+        "en": "🔁 Your last order:", "ru": "🔁 Ваш прошлый заказ:",
+        "tr": "🔁 Son siparişiniz:", "ur": "🔁 آپ کا پچھلا آرڈر:",
+        "id": "🔁 Pesanan terakhir Anda:",
+    },
+    "rep_removed": {
+        "uz": "⚠️ Bu taomlar hozir menyuda yo'q, shuning uchun chiqarib tashladik: {list}",
+        "ar": "⚠️ هذه الأطباق غير متوفرة الآن وتمّ حذفها: {list}",
+        "en": "⚠️ These dishes are not on the menu right now, so we removed them: {list}",
+        "ru": "⚠️ Этих блюд сейчас нет в меню, мы их убрали: {list}",
+        "tr": "⚠️ Bu yemekler şu an menüde yok, çıkardık: {list}",
+        "ur": "⚠️ یہ کھانے اب مینو میں نہیں، اس لیے ہٹا دیے: {list}",
+        "id": "⚠️ Menu ini sedang tidak tersedia, jadi kami hapus: {list}",
+    },
+    "rep_too_small": {
+        "uz": "Avvalgi buyurtmangizdagi taomlarning ko'pi hozir menyuda yo'q — qolgani {sum} bo'lib qoldi, eng kami {min}.\nMenyuni ochib, yangisini tanlang 👇",
+        "ar": "معظم أطباق طلبك السابق غير متوفرة — المتبقي {sum} والحد الأدنى {min}.\nافتح القائمة واختر من جديد 👇",
+        "en": "Most dishes from your last order are unavailable — what is left comes to {sum}, and the minimum is {min}.\nOpen the menu and pick again 👇",
+        "ru": "Большинства блюд из прошлого заказа сейчас нет — осталось на {sum}, а минимум {min}.\nОткройте меню и выберите заново 👇",
+        "tr": "Son siparişinizdeki yemeklerin çoğu şu an yok — kalan {sum}, en az {min} olmalı.\nMenüyü açıp yeniden seçin 👇",
+        "ur": "پچھلے آرڈر کے زیادہ تر کھانے دستیاب نہیں — باقی {sum}، کم از کم {min}.\nمینو کھولیں 👇",
+        "id": "Sebagian besar menu pesanan lama tidak tersedia — sisanya {sum}, minimum {min}.\nBuka menu dan pilih lagi 👇",
+    },
+    "rep_ask_addr": {
+        "uz": "Yangi manzilni yozing yoki joylashuvingizni yuboring 📍",
+        "ar": "اكتب العنوان الجديد أو أرسل موقعك 📍",
+        "en": "Type the new address or send your location 📍",
+        "ru": "Напишите новый адрес или отправьте геолокацию 📍",
+        "tr": "Yeni adresi yazın veya konumunuzu gönderin 📍",
+        "ur": "نیا پتہ لکھیں یا لوکیشن بھیجیں 📍",
+        "id": "Tulis alamat baru atau kirim lokasi Anda 📍",
+    },
+    "rep_addr_ok": {
+        "uz": "✅ Manzil yangilandi.", "ar": "✅ تم تحديث العنوان.",
+        "en": "✅ Address updated.", "ru": "✅ Адрес обновлён.",
+        "tr": "✅ Adres güncellendi.", "ur": "✅ پتہ اپ ڈیٹ ہو گیا۔",
+        "id": "✅ Alamat diperbarui.",
+    },
+    "rep_cancelled": {
+        "uz": "Bekor qilindi.", "ar": "تم الإلغاء.", "en": "Cancelled.",
+        "ru": "Отменено.", "tr": "İptal edildi.", "ur": "منسوخ۔", "id": "Dibatalkan.",
+    },
+    "rep_expired": {
+        "uz": "Bu so'rov eskirdi. Tugmani qaytadan bosing.",
+        "ar": "انتهت صلاحية الطلب. اضغط الزر مرة أخرى.",
+        "en": "This request expired. Tap the button again.",
+        "ru": "Запрос устарел. Нажмите кнопку ещё раз.",
+        "tr": "Bu istek zaman aşımına uğradı. Butona tekrar basın.",
+        "ur": "یہ درخواست پرانی ہو گئی۔ دوبارہ دبائیں۔",
+        "id": "Permintaan ini kedaluwarsa. Tekan tombol lagi.",
+    },
+    "btn_rep_ok": {
+        "uz": "✅ Tasdiqlash", "ar": "✅ تأكيد", "en": "✅ Confirm",
+        "ru": "✅ Подтвердить", "tr": "✅ Onayla", "ur": "✅ تصدیق", "id": "✅ Konfirmasi",
+    },
+    "btn_rep_no": {
+        "uz": "❌ Bekor qilish", "ar": "❌ إلغاء", "en": "❌ Cancel",
+        "ru": "❌ Отмена", "tr": "❌ İptal", "ur": "❌ منسوخ", "id": "❌ Batal",
+    },
+    "btn_rep_addr": {
+        "uz": "📍 Manzilni o'zgartirish", "ar": "📍 تغيير العنوان",
+        "en": "📍 Change address", "ru": "📍 Изменить адрес",
+        "tr": "📍 Adresi değiştir", "ur": "📍 پتہ بدلیں",
+        "id": "📍 Ubah alamat",
+    },
+    "btn_rep_cb_on": {
+        "uz": "💳 Keshbekni ishlatish", "ar": "💳 استخدام الكاش باك",
+        "en": "💳 Use cashback", "ru": "💳 Использовать кешбэк",
+        "tr": "💳 Nakit iadeyi kullan", "ur": "💳 کیش بیک استعمال",
+        "id": "💳 Pakai cashback",
+    },
+    "btn_rep_cb_off": {
+        "uz": "↩️ Keshbeksiz", "ar": "↩️ بدون كاش باك",
+        "en": "↩️ Without cashback", "ru": "↩️ Без кешбэка",
+        "tr": "↩️ Nakit iadesiz", "ur": "↩️ کیش بیک کے بغیر",
+        "id": "↩️ Tanpa cashback",
     },
     "lang_saved": {
         "uz": "✅ Til o'zgartirildi.", "ar": "✅ تم تغيير اللغة.", "en": "✅ Language changed.",
@@ -947,6 +1096,84 @@ def cashback_totals():
     people = sum(1 for r in data.values() if money(r.get("balance", 0)) > 0)
     return {"balance": bal, "people": people, "all": len(data)}
 
+# ---------- mijozni qaytarish: kimga nima yuborilgani ----------
+
+def load_winback():
+    """{"<user_id>": {"offer3": ts, "s7": ts, "s21": ts}} — bir xil xabar ikki marta ketmasin."""
+    return load_json(WINBACK_FILE, {})
+
+def save_winback(data):
+    save_json(WINBACK_FILE, data)
+
+def winback_mark(user_id, key):
+    with DATA_LOCK:
+        data = load_winback()
+        uid = str(user_id)
+        rec = data.get(uid) or {}
+        rec[key] = int(time.time())
+        data[uid] = rec
+        save_winback(data)
+
+def winback_reset(user_id):
+    """Mijoz qayta buyurtma berdi — uxlash bosqichlari noldan boshlanadi."""
+    if not user_id:
+        return
+    with DATA_LOCK:
+        data = load_winback()
+        uid = str(user_id)
+        rec = data.get(uid)
+        if not rec:
+            return
+        if not rec.get("s7") and not rec.get("s21"):
+            return
+        rec.pop("s7", None)
+        rec.pop("s21", None)
+        data[uid] = rec
+        save_winback(data)
+
+def order_delivered_ts(order):
+    return order.get("delivered_at") or order.get("cashback_credited_at") or order.get("created_at") or 0
+
+def delivered_orders_of(user_id, orders=None):
+    """Mijozning yetkazilgan (bekor qilinmagan) buyurtmalari — eskidan yangiga."""
+    if not user_id:
+        return []
+    orders = orders if orders is not None else load_orders()
+    mine = [o for o in orders
+            if o.get("user_id") == user_id
+            and o.get("status") == "Yetkazildi"
+            and not is_cancelled(o)]
+    mine.sort(key=order_delivered_ts)
+    return mine
+
+def last_delivery_by_user(orders=None):
+    """{user_id: oxirgi yetkazilgan vaqti} — bitta o'qishda hammasi."""
+    orders = orders if orders is not None else load_orders()
+    out = {}
+    for o in orders:
+        uid = o.get("user_id")
+        if not uid or is_cancelled(o) or o.get("status") != "Yetkazildi":
+            continue
+        ts = order_delivered_ts(o)
+        if ts > out.get(uid, 0):
+            out[uid] = ts
+    return out
+
+# Tugmalarni chizishda har safar orders.json o'qimaslik uchun kichik kesh
+_delivered_cache = {"ts": 0.0, "ids": set()}
+
+def users_with_delivery():
+    now = time.time()
+    if now - _delivered_cache["ts"] > 60:
+        _delivered_cache["ids"] = set(last_delivery_by_user().keys())
+        _delivered_cache["ts"] = now
+    return _delivered_cache["ids"]
+
+def mark_delivered_user(user_id):
+    """Yangi yetkazilgan buyurtma — keshni darhol yangilaymiz."""
+    if user_id:
+        _delivered_cache["ids"].add(user_id)
+
 def is_owner(chat_id):
     """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
     return chat_id in load_admin_ids()
@@ -1017,6 +1244,11 @@ def main_keyboard(user_id=None, username=None, lang=None):
             kb.row(types.KeyboardButton("🧑‍🍳 Menyuni boshqarish", web_app=types.WebAppInfo(url=admin_url)))
             kb.row(types.KeyboardButton("🖨 Oshxona", web_app=types.WebAppInfo(url=kitchen_url)))
     try:
+        if user_id and user_id in users_with_delivery():
+            kb.row(types.KeyboardButton(t("btn_repeat", lang)))
+    except Exception:
+        pass
+    try:
         if user_id and quiz_visible_to(user_id):
             kb.row(types.KeyboardButton(QUIZ_BTN), types.KeyboardButton(BOARD_BTN))
     except Exception:
@@ -1035,7 +1267,7 @@ def is_no_phone_button(text):
 
 def is_any_bot_button(text):
     return (is_contact_button(text) or is_lang_button(text) or is_no_phone_button(text)
-            or text in (QUIZ_BTN, BOARD_BTN))
+            or is_repeat_button(text) or text in (QUIZ_BTN, BOARD_BTN))
 
 def lang_keyboard():
     kb = types.InlineKeyboardMarkup(row_width=2)
@@ -1920,6 +2152,8 @@ def cb_update_status(call):
         order["status"] = new_status
         # keshbek faqat YETKAZILGANDA yoziladi
         if new_status == "Yetkazildi":
+            if not order.get("delivered_at"):
+                order["delivered_at"] = int(time.time())
             earned, new_balance = credit_order_cashback(order)
         elif prev_status == "Yetkazildi":
             taken_back, new_balance = revoke_order_cashback(order, "holat orqaga o'zgartirildi")
@@ -1942,6 +2176,450 @@ def cb_update_status(call):
                                                  amt=fmt_sum(earned), bal=fmt_sum(new_balance)))
     except Exception:
         pass
+
+    if new_status == "Yetkazildi":
+        mark_delivered_user(order.get("user_id"))
+        winback_reset(order.get("user_id"))      # qayta buyurtma berdi — uxlash hisobi noldan
+        try:
+            maybe_send_subscription_offer(order)
+        except Exception as e:
+            print(f"Obuna taklifi xatosi: {e}")
+
+
+# ======================================================================
+#  OBUNA TAKLIFI — 3-buyurtmadan keyin bir marta
+# ======================================================================
+
+def maybe_send_subscription_offer(order):
+    """Mijozning SUB_OFFER_AFTER-chi buyurtmasi yetkazilganda 1 oylik tarifni taklif qiladi."""
+    uid = order.get("user_id")
+    if not uid:
+        return False
+    wb = load_winback()
+    if (wb.get(str(uid)) or {}).get("offer3"):
+        return False                                  # bu mijozga allaqachon yuborilgan
+    if len(delivered_orders_of(uid)) < SUB_OFFER_AFTER:
+        return False
+
+    lang = get_user_lang(uid)
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton(t("btn_sub_info", lang), url=SUB_OFFER_URL))
+    try:
+        bot.send_message(uid, t("sub_offer", lang, biz=BUSINESS_NAME), reply_markup=kb)
+    except Exception as e:
+        msg = str(e).lower()
+        if "blocked" in msg or "deactivated" in msg or "chat not found" in msg:
+            mark_user_blocked(uid)
+        print(f"Obuna taklifi yuborilmadi ({uid}): {e}")
+        return False
+    winback_mark(uid, "offer3")
+    return True
+
+
+# ======================================================================
+#  AVVALGI BUYURTMANI TAKRORLASH
+# ======================================================================
+
+repeat_state = {}          # user_id -> tayyorlangan takroriy buyurtma
+REPEAT_TTL = 30 * 60       # yarim soatdan keyin eskiradi
+
+def is_repeat_button(text):
+    return any(text == TEXTS["btn_repeat"][l] for l in SUPPORTED_LANGS)
+
+def build_repeat_plan(user_id):
+    """Oxirgi yetkazilgan buyurtmadan bugungi menyu bo'yicha yangi savat tuzadi."""
+    orders = load_orders()
+    mine = delivered_orders_of(user_id, orders)
+    if not mine:
+        return None, None
+    last = mine[-1]
+    by_name = {}
+    for d in load_menu():
+        by_name.setdefault(d["name"], d)
+    disc = get_discount()
+
+    cart, lines, missing = {}, [], []
+    total = 0
+    for it in last.get("items", []):
+        if it.get("cancelled"):
+            continue
+        dish = by_name.get(it["name"])
+        stock = dish.get("stock") if dish else None
+        if not dish or (stock is not None and stock <= 0):
+            missing.append(it["name"])               # menyudan olib tashlangan yoki tugagan
+            continue
+        qty = int(it.get("qty") or 1)
+        if stock is not None and qty > stock:
+            qty = stock
+        unit = discounted_price(dish["price"], disc)
+        cart[dish["id"]] = cart.get(dish["id"], 0) + qty
+        total += unit * qty
+        lines.append(f"{dish['name']} \u00d7 {qty} = {fmt_sum(unit * qty)}")
+
+    plan = {"cart": cart, "lines": lines, "missing": missing, "total": money(total)}
+    return last, plan
+
+def repeat_address_line(st):
+    if st.get("lat") is not None:
+        return "\U0001F4CD Joylashuv xaritada yuborilgan"
+    addr = st.get("addr") or "\u2014"
+    return f"\U0001F4CD {addr}"
+
+def repeat_text(uid, st):
+    lang = get_user_lang(uid)
+    parts = [t("rep_title", lang), ""]
+    parts += st["lines"]
+    parts.append("")
+    if st.get("missing"):
+        parts.append(t("rep_removed", lang, list=", ".join(st["missing"])))
+        parts.append("")
+    parts.append(t("receipt_total", lang, sum=fmt_sum(st["total"])))
+    used = st.get("cb_amount", 0) if st.get("use_cb") else 0
+    if used > 0:
+        parts.append(t("cb_receipt_line", lang, amt=fmt_sum(used),
+                       pay=fmt_sum(max(0, money(st["total"] - used)))).rstrip())
+    parts.append(repeat_address_line(st))
+    return "\n".join(parts)
+
+def repeat_keyboard(uid, st):
+    lang = get_user_lang(uid)
+    kb = types.InlineKeyboardMarkup()
+    kb.row(types.InlineKeyboardButton(t("btn_rep_ok", lang), callback_data="rep:ok"),
+           types.InlineKeyboardButton(t("btn_rep_no", lang), callback_data="rep:no"))
+    kb.add(types.InlineKeyboardButton(t("btn_rep_addr", lang), callback_data="rep:addr"))
+    bal = cashback_balance(uid)
+    if get_cashback_cfg()["active"] and bal > 0:
+        key = "btn_rep_cb_off" if st.get("use_cb") else "btn_rep_cb_on"
+        kb.add(types.InlineKeyboardButton(t(key, lang), callback_data="rep:cb"))
+    return kb
+
+def refresh_repeat_cb(uid, st):
+    """Keshbek yoqilgan bo'lsa qancha ishlatilishini qayta hisoblaymiz."""
+    if st.get("use_cb") and get_cashback_cfg()["active"]:
+        st["cb_amount"] = money(min(cashback_balance(uid), st["total"]))
+    else:
+        st["cb_amount"] = 0
+
+@bot.message_handler(func=lambda m: (m.content_type == "text" and m.text
+                                     and is_repeat_button(m.text)
+                                     and m.from_user.id not in checkout_state))
+def handle_repeat_button(message):
+    uid = message.from_user.id
+    add_known_user(message.from_user)
+    lang = get_user_lang(uid, getattr(message.from_user, "language_code", None))
+
+    shop = shop_status()
+    if not shop["open"] and not is_owner(uid):
+        bot.send_message(message.chat.id, closed_message(lang, shop))
+        return
+
+    last, plan = build_repeat_plan(uid)
+    if not last:
+        bot.send_message(message.chat.id, t("rep_none", lang),
+                         reply_markup=main_keyboard(uid, message.from_user.username, lang))
+        return
+
+    if not plan["cart"] or plan["total"] < REPEAT_MIN_TOTAL:
+        text = ""
+        if plan["missing"]:
+            # qaysi taom tushib qolganini baribir aytamiz
+            text += t("rep_removed", lang, list=", ".join(plan["missing"])) + "\n\n"
+        text += t("rep_too_small", lang, sum=fmt_sum(plan["total"]),
+                  min=fmt_sum(REPEAT_MIN_TOTAL))
+        bot.send_message(message.chat.id, text,
+                         reply_markup=main_keyboard(uid, message.from_user.username, lang))
+        return
+
+    st = {
+        "cart": plan["cart"], "lines": plan["lines"], "missing": plan["missing"],
+        "total": plan["total"],
+        "name": last.get("customer_name") or message.from_user.first_name or "Mijoz",
+        "phone": last.get("phone") or "",
+        "addr": last.get("address_text"),
+        "lat": last.get("latitude"), "lon": last.get("longitude"),
+        "note": last.get("note") or "",
+        "use_cb": False, "cb_amount": 0,
+        "ts": time.time(), "await_addr": False,
+    }
+    repeat_state[uid] = st
+    bot.send_message(message.chat.id, repeat_text(uid, st), reply_markup=repeat_keyboard(uid, st))
+
+def repeat_alive(uid):
+    st = repeat_state.get(uid)
+    if not st:
+        return None
+    if time.time() - st.get("ts", 0) > REPEAT_TTL:
+        repeat_state.pop(uid, None)
+        return None
+    return st
+
+@bot.callback_query_handler(func=lambda c: c.data and c.data.startswith("rep:"))
+def cb_repeat(call):
+    uid = call.from_user.id
+    lang = get_user_lang(uid)
+    st = repeat_alive(uid)
+    if not st:
+        bot.answer_callback_query(call.id, t("rep_expired", lang), show_alert=True)
+        return
+    action = call.data.split(":", 1)[1]
+
+    if action == "no":
+        repeat_state.pop(uid, None)
+        bot.answer_callback_query(call.id, t("rep_cancelled", lang))
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                          reply_markup=None)
+        except Exception:
+            pass
+        return
+
+    if action == "cb":
+        st["use_cb"] = not st.get("use_cb")
+        refresh_repeat_cb(uid, st)
+        st["ts"] = time.time()
+        bot.answer_callback_query(call.id)
+        try:
+            bot.edit_message_text(repeat_text(uid, st), call.message.chat.id,
+                                  call.message.message_id, reply_markup=repeat_keyboard(uid, st))
+        except Exception:
+            pass
+        return
+
+    if action == "addr":
+        st["await_addr"] = True
+        st["ts"] = time.time()
+        bot.answer_callback_query(call.id)
+        bot.send_message(call.message.chat.id, t("rep_ask_addr", lang),
+                         reply_markup=location_keyboard(lang))
+        return
+
+    if action == "ok":
+        shop = shop_status()
+        if not shop["open"] and not is_owner(uid):
+            bot.answer_callback_query(call.id, t("closed_short", lang), show_alert=True)
+            bot.send_message(call.message.chat.id, closed_message(lang, shop))
+            return
+        repeat_state.pop(uid, None)
+        bot.answer_callback_query(call.id, "\u2705")
+        try:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                          reply_markup=None)
+        except Exception:
+            pass
+        order, error = create_order(
+            items_cart=st["cart"],
+            customer_name=st["name"],
+            phone=st["phone"],
+            latitude=st["lat"],
+            longitude=st["lon"],
+            address_text=st["addr"],
+            note=st["note"],
+            tg_user_id=uid,
+            username=call.from_user.username,
+            use_cashback=bool(st.get("use_cb")),
+        )
+        if error:
+            bot.send_message(call.message.chat.id, error,
+                             reply_markup=main_keyboard(uid, call.from_user.username, lang))
+
+@bot.message_handler(func=lambda m: (m.from_user.id in repeat_state
+                                     and repeat_state[m.from_user.id].get("await_addr")),
+                     content_types=["text", "location"])
+def handle_repeat_address(message):
+    uid = message.from_user.id
+    lang = get_user_lang(uid)
+    st = repeat_alive(uid)
+    if not st:
+        bot.send_message(message.chat.id, t("rep_expired", lang),
+                         reply_markup=main_keyboard(uid, message.from_user.username, lang))
+        return
+
+    if message.content_type == "location":
+        st["lat"] = message.location.latitude
+        st["lon"] = message.location.longitude
+        st["addr"] = None
+    else:
+        text = (message.text or "").strip()
+        if is_repeat_button(text) or is_any_bot_button(text):
+            return
+        if not text:
+            bot.send_message(message.chat.id, t("rep_ask_addr", lang))
+            return
+        st["addr"] = text
+        st["lat"] = None
+        st["lon"] = None
+
+    st["await_addr"] = False
+    st["ts"] = time.time()
+    bot.send_message(message.chat.id, t("rep_addr_ok", lang),
+                     reply_markup=main_keyboard(uid, message.from_user.username, lang))
+    bot.send_message(message.chat.id, repeat_text(uid, st), reply_markup=repeat_keyboard(uid, st))
+
+
+# ======================================================================
+#  UXLAB QOLGAN MIJOZLAR
+# ======================================================================
+
+def order_webapp_button(uid, users, lang):
+    """Inline "Buyurtma berish" tugmasi — Mini App to'g'ridan-to'g'ri ochiladi."""
+    if not WEBAPP_URL:
+        return None
+    uname = (users.get(str(uid)) or {}).get("username")
+    ts, sig = sign_user_params(uid, uname)
+    params = f"uid={uid}&uname={urllib.parse.quote(uname or '')}&ts={ts}&sig={sig}&v={ts}"
+    return types.InlineKeyboardButton(t("btn_order_now", lang),
+                                      web_app=types.WebAppInfo(url=f"{WEBAPP_URL}?{params}"))
+
+def winback_scan():
+    """(1-bosqich, 2-bosqich) — hali xabar yuborilmagan uxlab qolgan mijozlar."""
+    now = int(time.time())
+    last = last_delivery_by_user()
+    wb = load_winback()
+    users = load_users()
+    g1, g2 = [], []
+    for uid, ts in last.items():
+        if (users.get(str(uid)) or {}).get("blocked"):
+            continue
+        days = (now - ts) / 86400.0
+        rec = wb.get(str(uid)) or {}
+        if days >= WINBACK_DAYS_2:
+            if not rec.get("s21"):
+                g2.append((uid, days))
+        elif days >= WINBACK_DAYS_1:
+            if not rec.get("s7"):
+                g1.append((uid, days))
+    return g1, g2
+
+def _winback_failed(uid, err):
+    msg = str(err).lower()
+    if "blocked" in msg or "deactivated" in msg or "chat not found" in msg:
+        mark_user_blocked(uid)
+        return True
+    print(f"Uxlaganlarga xabar yuborishda xato ({uid}): {err}")
+    return False
+
+def customer_name_of(uid, users=None):
+    users = users if users is not None else load_users()
+    return ((users.get(str(uid)) or {}).get("name") or "").strip() or "mijoz"
+
+def run_winback(report_to=None):
+    """Uxlab qolganlarga xabar yuboradi. Fon oqimida ishlaydi."""
+    g1, g2 = winback_scan()
+    users = load_users()
+    sent1 = sent2 = 0
+
+    for uid, _days in g1:
+        lang = get_user_lang(uid)
+        kb = types.InlineKeyboardMarkup()
+        kb.add(types.InlineKeyboardButton(t("btn_feedback", lang), callback_data="wb:fb"))
+        ob = order_webapp_button(uid, users, lang)
+        if ob:
+            kb.add(ob)
+        try:
+            bot.send_message(uid, t("wb_7", lang, ism=customer_name_of(uid, users)),
+                             reply_markup=kb)
+            winback_mark(uid, "s7")
+            sent1 += 1
+        except Exception as e:
+            _winback_failed(uid, e)
+        time.sleep(0.06)
+
+    for uid, _days in g2:
+        lang = get_user_lang(uid)
+        kb = types.InlineKeyboardMarkup()
+        ob = order_webapp_button(uid, users, lang)
+        if ob:
+            kb.add(ob)
+        kb.add(types.InlineKeyboardButton(t("btn_feedback", lang), callback_data="wb:fb"))
+        # bonusni avval qo'shamiz — xabarda u haqida yozilgan
+        cashback_move(uid, WINBACK_BONUS, None, "uxlab qolgan mijozga bonus")
+        try:
+            bot.send_message(uid, t("wb_21", lang, ism=customer_name_of(uid, users),
+                                    bonus=fmt_sum(WINBACK_BONUS), biz=BUSINESS_NAME),
+                             reply_markup=kb)
+            winback_mark(uid, "s21")
+            sent2 += 1
+        except Exception as e:
+            # xabar yetib bormadi — bonusni qaytarib olamiz, keyingi safar qayta uriniladi
+            cashback_move(uid, -WINBACK_BONUS, None, "xabar yetmadi, bonus qaytarildi")
+            _winback_failed(uid, e)
+        time.sleep(0.06)
+
+    if sent1 or sent2 or report_to:
+        text = (f"\U0001F634 Uxlab qolgan mijozlar: "
+                f"{WINBACK_DAYS_1} kunlik \u2014 {sent1} ta, "
+                f"{WINBACK_DAYS_2} kunlik \u2014 {sent2} ta xabar yuborildi.")
+        if sent2:
+            text += f"\n\U0001F381 Berilgan bonus: {fmt_sum(sent2 * WINBACK_BONUS)}"
+        targets = [report_to] if report_to else list(load_admin_ids())
+        for admin_id in targets:
+            try:
+                bot.send_message(admin_id, text)
+            except Exception:
+                pass
+    return sent1, sent2
+
+@bot.callback_query_handler(func=lambda c: c.data == "wb:fb")
+def cb_winback_feedback(call):
+    """"Fikr bildirish" — mavjud Murojaat tizimiga ulanadi, keyingi xabar adminlarga boradi."""
+    lang = get_user_lang(call.from_user.id)
+    bot.answer_callback_query(call.id)
+    try:
+        bot.send_message(call.message.chat.id, t("contact_prompt", lang))
+    except Exception:
+        pass
+
+def winback_scheduler():
+    """Har kuni WINBACK_HOUR da (Riyadh vaqti) uxlab qolganlarni tekshiradi."""
+    last_run = None
+    while True:
+        try:
+            now = datetime.now(TIMEZONE)
+            if now.hour == WINBACK_HOUR and now.minute == 0 and last_run != now.date():
+                last_run = now.date()
+                threading.Thread(target=run_winback, daemon=True).start()
+        except Exception as e:
+            print(f"Uxlaganlar jadvali xatosi: {e}")
+        time.sleep(30)
+
+@bot.message_handler(commands=["uxlaganlar"])
+def cmd_sleepers(message):
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split()
+    if len(parts) > 1 and parts[1].lower() in ("yubor", "send"):
+        bot.send_message(message.chat.id, "Yuborilmoqda... Tugagach hisobot keladi.")
+        threading.Thread(target=run_winback, args=(message.chat.id,), daemon=True).start()
+        return
+
+    now = int(time.time())
+    last = last_delivery_by_user()
+    wb = load_winback()
+    users = load_users()
+    n1 = n2 = 0
+    for uid, ts in last.items():
+        days = (now - ts) / 86400.0
+        if days >= WINBACK_DAYS_2:
+            n2 += 1
+        elif days >= WINBACK_DAYS_1:
+            n1 += 1
+    g1, g2 = winback_scan()
+    done1 = sum(1 for r in wb.values() if r.get("s7"))
+    done2 = sum(1 for r in wb.values() if r.get("s21"))
+    bloklagan = sum(1 for uid in last if (users.get(str(uid)) or {}).get("blocked"))
+
+    bot.send_message(message.chat.id,
+        "\U0001F634 Uxlab qolgan mijozlar\n\n"
+        f"Buyurtma bergan mijozlar: {len(last)} ta\n\n"
+        f"{WINBACK_DAYS_1}\u2013{WINBACK_DAYS_2} kundan beri jim: {n1} ta\n"
+        f"   \u2514 xabar kutayotgani: {len(g1)} ta\n"
+        f"{WINBACK_DAYS_2}+ kundan beri jim: {n2} ta\n"
+        f"   \u2514 xabar kutayotgani: {len(g2)} ta\n\n"
+        f"Avval yuborilgan: {WINBACK_DAYS_1} kunlik \u2014 {done1} ta, "
+        f"{WINBACK_DAYS_2} kunlik \u2014 {done2} ta\n"
+        + (f"Botni bloklagan: {bloklagan} ta\n" if bloklagan else "")
+        + f"\nHar kuni soat {WINBACK_HOUR}:00 da o'zi tekshiradi.\n"
+        "Hoziroq yuborish: /uxlaganlar yubor")
 
 # ---------- admin: menyuni boshqarish ----------
 
@@ -4830,6 +5508,7 @@ def looks_like_menu_request(text):
         m.content_type == "text"
         and not m.text.startswith("/")
         and m.from_user.id not in checkout_state
+        and m.from_user.id not in repeat_state
         and not is_staff_or_admin(m.from_user.id)
         and not is_any_bot_button(m.text)
     )
@@ -4869,6 +5548,7 @@ if __name__ == "__main__":
         print(f"Eski buyurtmalardan {qoshildi} ta mijoz ro'yxatga qo'shildi.")
     threading.Thread(target=run_bot_polling, daemon=True).start()
     threading.Thread(target=daily_report_scheduler, daemon=True).start()
+    threading.Thread(target=winback_scheduler, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
     print(f"Mini App server {port}-portda ishga tushdi, bot polling fonda ishlayapti...")
     app.run(host="0.0.0.0", port=port)
