@@ -150,6 +150,80 @@ CATEGORY_ALIASES = {
     "boshqalar": "Boshqa mahsulotlar",
 }
 
+
+# ---------- set tarkibi (taom narxiga qo'shib beriladigan narsalar) ----------
+
+SET_ITEMS = [
+    {"key": "non",    "emoji": "🥖",
+     "uz": "non", "ar": "خبز", "en": "bread", "ru": "хлеб",
+     "tr": "ekmek", "ur": "روٹی", "id": "roti"},
+    {"key": "salat",  "emoji": "🥗",
+     "uz": "salat", "ar": "سلطة", "en": "salad", "ru": "салат",
+     "tr": "salata", "ur": "سلاد", "id": "salad"},
+    {"key": "meva",   "emoji": "🍓",
+     "uz": "meva salat", "ar": "سلطة فواكه", "en": "fruit salad",
+     "ru": "фруктовый салат",
+     "tr": "meyve salatası", "ur": "فروٹ سلاد", "id": "salad buah"},
+    {"key": "suv",    "emoji": "💧",
+     "uz": "suv", "ar": "ماء", "en": "water", "ru": "вода",
+     "tr": "su", "ur": "پانی", "id": "air"},
+    {"key": "choy",   "emoji": "🍵",
+     "uz": "choy", "ar": "شاي", "en": "tea", "ru": "чай",
+     "tr": "çay", "ur": "چائے", "id": "teh"},
+    {"key": "shorva", "emoji": "🥣",
+     "uz": "shorva", "ar": "شوربة", "en": "soup", "ru": "суп",
+     "tr": "çorba", "ur": "سوپ", "id": "sup"},
+    {"key": "souse",  "emoji": "🧄",
+     "uz": "souse", "ar": "صلصة", "en": "sauce", "ru": "соус",
+     "tr": "sos", "ur": "ساس", "id": "saus"},
+]
+SET_BY_KEY = {s["key"]: s for s in SET_ITEMS}
+SET_KEYS = [s["key"] for s in SET_ITEMS]
+
+def set_catalog_payload():
+    """Mini App va admin paneliga yuboriladigan katalog."""
+    return [{"key": s["key"], "emoji": s["emoji"],
+             "names": {l: s.get(l) or s["uz"] for l in SUPPORTED_LANGS}}
+            for s in SET_ITEMS]
+
+def parse_set_keys(raw):
+    """'non,salat,suv' yoki ro'yxatni toza kalitlar ro'yxatiga aylantiradi."""
+    if not raw:
+        return []
+    if isinstance(raw, str):
+        parts = raw.replace("+", ",").replace(";", ",").split(",")
+    else:
+        parts = list(raw)
+    out = []
+    for p in parts:
+        k = str(p).strip().lower()
+        if k in SET_BY_KEY and k not in out:
+            out.append(k)
+    return out
+
+def dish_set_keys(dish):
+    return parse_set_keys((dish or {}).get("set_items"))
+
+def set_names(keys, extra="", lang="uz", with_emoji=False):
+    """Set tarkibini mijoz tilida nomlar ro'yxati qilib qaytaradi."""
+    out = []
+    for k in parse_set_keys(keys):
+        s = SET_BY_KEY[k]
+        nom = s.get(lang) or s["uz"]
+        out.append(f"{s['emoji']} {nom}" if with_emoji else nom)
+    for piece in str(extra or "").split(","):
+        piece = piece.strip()
+        if piece:
+            out.append(piece)
+    return out
+
+def set_line(keys, extra="", lang="uz", sep=" · ", with_emoji=False):
+    return sep.join(set_names(keys, extra, lang, with_emoji))
+
+def item_set_line(item, lang="uz", sep=" · ", with_emoji=False):
+    """Buyurtmadagi taom uchun — set buyurtma paytida yozib qo'yilgan."""
+    return set_line(item.get("set"), item.get("set_extra"), lang, sep, with_emoji)
+
 def match_category(raw):
     if not raw:
         return DEFAULT_CATEGORY
@@ -1233,17 +1307,18 @@ def fmt_sum(n):
     return s + " SAR"
 
 def parse_dish_caption(text):
-    """'Nomi;Narxi;Tavsif;Kategoriya' formatini o'qiydi. Kategoriya ixtiyoriy."""
+    """'Nomi;Narxi;Tavsif;Kategoriya;Set' formatini o'qiydi. Oxirgi ikkisi ixtiyoriy."""
     parts = text.split(";")
     name = parts[0].strip()
     price = float(parts[1].strip())
     desc = parts[2].strip() if len(parts) > 2 else ""
     category_raw = parts[3].strip() if len(parts) > 3 else ""
+    set_raw = parts[4].strip() if len(parts) > 4 else ""
     category = match_category(category_raw)
     category_warning = category is None
     if category is None:
         category = DEFAULT_CATEGORY
-    return name, price, desc, category, category_warning
+    return name, price, desc, category, category_warning, parse_set_keys(set_raw)
 
 def download_telegram_file(file_id, dest_path):
     file_info = bot.get_file(file_id)
@@ -1666,6 +1741,12 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         item = {"name": dish["name"], "price": unit, "qty": qty}
         if unit != dish["price"]:
             item["old_price"] = dish["price"]
+        # set tarkibini buyurtma paytidagi holatda saqlaymiz — keyin menyu o'zgarsa ham chek o'zgarmaydi
+        skeys = dish_set_keys(dish)
+        if skeys:
+            item["set"] = skeys
+        if (dish.get("set_extra") or "").strip():
+            item["set_extra"] = dish["set_extra"].strip()
         items.append(item)
         total += unit * qty
         original_total += dish["price"] * qty
@@ -1736,7 +1817,7 @@ def build_customer_receipt_text(order, lang=None):
     lang = lang or get_user_lang(order.get("user_id"))
     text = (
         t("receipt_title", lang, no=order["daily_number"]) + "\n\n"
-        f"{order_items_text(order)}\n\n"
+        f"{order_items_text(order, lang)}\n\n"
         + discount_line_for_customer(order, lang)
         + t("receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
         + cashback_line_for_customer(order, lang)
@@ -1763,13 +1844,16 @@ def discount_line_for_customer(order, lang):
     return t("discount_line", lang, pct=pct,
              old=fmt_sum(old), new=fmt_sum(order["total"]))
 
-def order_items_text(order):
+def order_items_text(order, lang="uz"):
     lines = []
     for it in order["items"]:
         line = f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}"
         if it.get("cancelled"):
             line = f"❌ {line}  (bekor qilindi)"
         lines.append(line)
+        s = item_set_line(it, lang, with_emoji=True)
+        if s and not it.get("cancelled"):
+            lines.append(f"   └ {s}")
     return "\n".join(lines)
 
 # ---------- oshxona cheki (termoprinter) ----------
@@ -1840,6 +1924,11 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
             continue
         L.append(it["name"][:w])
         L.append(_rline(f"  {it['qty']} x {it['price']:.0f}", f"{it['price'] * it['qty']:.0f}", w))
+        # oshpaz va kuryer nima qo'yishni ko'rib tursin (termoprinter emoji chiqara olmaydi)
+        s = item_set_line(it, "uz", sep=", ")
+        if s:
+            for ln in _wrap("+ " + s, w - 2):
+                L.append("  " + ln)
 
     L.append("-" * w)
     pct = order.get("discount_percent") or 0
@@ -3128,6 +3217,61 @@ def cmd_set_category(message):
     save_menu(menu)
     bot.send_message(message.chat.id, f"{dish['name']} — kategoriyasi \"{category}\"ga o'zgartirildi.")
 
+@bot.message_handler(commands=["set_tarkib", "set_tarkibi"])
+def cmd_set_items(message):
+    """Taom narxiga nima qo'shib berilishini belgilaydi. /set_tarkib 3 non,salat,suv"""
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split(maxsplit=2)
+    mavjud = ", ".join(SET_KEYS)
+    if len(parts) < 3:
+        bot.send_message(message.chat.id,
+            "Taom narxiga nima qo'shib berilishini belgilaysiz.\n\n"
+            "Foydalanish:\n"
+            "/set_tarkib <taom_id> non,salat,suv\n"
+            "/set_tarkib <taom_id> yoq — tozalash\n\n"
+            f"Mavjud kalitlar: {mavjud}\n"
+            "Ro'yxatda yo'q narsani qo'shish uchun Mini App'dagi "
+            "«Menyuni boshqarish» bo'limidan foydalaning.\n\n"
+            "Taom raqamlarini /menu bilan ko'rasiz.")
+        return
+    try:
+        dish_id = int(parts[1])
+    except ValueError:
+        bot.send_message(message.chat.id, "Taom raqamini to'g'ri kiriting. Masalan: /set_tarkib 3 non,suv")
+        return
+
+    menu = load_menu()
+    dish = next((d for d in menu if d["id"] == dish_id), None)
+    if not dish:
+        bot.send_message(message.chat.id, f"#{dish_id} raqamli taom topilmadi.")
+        return
+
+    raw = parts[2].strip()
+    if raw.lower() in ("yoq", "yo'q", "-", "tozala", "clear"):
+        dish["set_items"] = []
+        dish["set_extra"] = ""
+        save_menu(menu)
+        bot.send_message(message.chat.id, f"✅ «{dish['name']}» endi oddiy taom — set tarkibi olib tashlandi.")
+        return
+
+    keys = parse_set_keys(raw)
+    noma_lum = [p.strip() for p in raw.replace("+", ",").split(",")
+                if p.strip() and p.strip().lower() not in SET_BY_KEY]
+    if not keys and not noma_lum:
+        bot.send_message(message.chat.id, f"Hech narsa tanilmadi.\nMavjud kalitlar: {mavjud}")
+        return
+    dish["set_items"] = keys
+    dish["set_extra"] = ", ".join(noma_lum)[:80]
+    save_menu(menu)
+
+    korinish = set_line(keys, dish["set_extra"], "uz", with_emoji=True) or "—"
+    javob = f"✅ «{dish['name']}» set tarkibi:\n{korinish}"
+    if noma_lum:
+        javob += ("\n\nℹ️ " + ", ".join(noma_lum) + " — ro'yxatda yo'q, "
+                  "shuning uchun faqat o'zbekcha yozuv sifatida qo'shildi.")
+    bot.send_message(message.chat.id, javob)
+
 @bot.message_handler(commands=["set_stock"])
 def cmd_set_stock(message):
     if not is_owner(message.chat.id):
@@ -3190,6 +3334,8 @@ def cmd_add_dish(message):
     menu.append({"id": new_id, "name": name, "price": price, "desc": desc, "photo_id": None, "local_photo": None, "stock": 0, "category": category})
     save_menu(menu)
     warn = f"\n⚠️ Kategoriya tanilmadi, \"{DEFAULT_CATEGORY}\"ga qo'yildi." if cat_warning else ""
+    if set_items:
+        warn += "\n🍽 Set: " + set_line(set_items, "", "uz", with_emoji=True)
     bot.send_message(message.chat.id, f"Qo'shildi (rasmsiz): #{new_id} {name} — {fmt_sum(price)} | {category}{warn}\n"
                                        f"Diqqat: zaxira 0 — sotuvga chiqarish uchun /set_stock {new_id} soni yozing.")
 
@@ -3215,15 +3361,17 @@ def handle_owner_photo(message):
     if not caption:
         bot.send_message(
             message.chat.id,
-            "Taom rasmini caption bilan yuboring: Nomi;Narxi;Tavsif;Kategoriya\n"
+            "Taom rasmini caption bilan yuboring: Nomi;Narxi;Tavsif;Kategoriya;Set\n"
             f"Kategoriyalar: {', '.join(CATEGORIES)}\n"
+            f"Set (ixtiyoriy, narxga qo'shib beriladigan): {', '.join(SET_KEYS)}\n"
+            "Namuna: Osh;18;Qo'y go'shti bilan;Ovqatlar;non,salat,suv\n"
             "Kategoriyani yozmasangiz \"Boshqa mahsulotlar\"ga tushadi.\n"
             "Yoki logotip sifatida saqlash uchun caption'ga \"logo\" deb yozing."
         )
         return
 
     try:
-        name, price, desc, category, cat_warning = parse_dish_caption(caption)
+        name, price, desc, category, cat_warning, set_items = parse_dish_caption(caption)
     except Exception:
         bot.send_message(message.chat.id, "Caption formati noto'g'ri. Namuna: Osh;35;Palov go'shtli;Ovqatlar")
         return
@@ -3238,10 +3386,13 @@ def handle_owner_photo(message):
         local_filename = None
     menu.append({
         "id": new_id, "name": name, "price": price, "desc": desc,
-        "photo_id": photo_id, "local_photo": local_filename, "stock": 0, "category": category
+        "photo_id": photo_id, "local_photo": local_filename, "stock": 0, "category": category,
+        "set_items": set_items, "set_extra": ""
     })
     save_menu(menu)
     warn = f"\n⚠️ Kategoriya tanilmadi, \"{DEFAULT_CATEGORY}\"ga qo'yildi." if cat_warning else ""
+    if set_items:
+        warn += "\n🍽 Set: " + set_line(set_items, "", "uz", with_emoji=True)
     bot.send_message(message.chat.id, f"Qo'shildi (rasm bilan): #{new_id} {name} — {fmt_sum(price)} | {category}{warn}\n"
                                        f"Diqqat: zaxira 0 — sotuvga chiqarish uchun /set_stock {new_id} soni yozing.")
 
@@ -3343,6 +3494,11 @@ def api_menu():
             "desc": d.get("desc", ""), "stock": d.get("stock"),
             "category": d.get("category", DEFAULT_CATEGORY)
         }
+        skeys = dish_set_keys(d)
+        if skeys:
+            item["set"] = skeys
+        if (d.get("set_extra") or "").strip():
+            item["set_extra"] = d["set_extra"].strip()
         if unit != d["price"]:
             item["old_price"] = d["price"]
         if d.get("local_photo"):
@@ -3360,6 +3516,7 @@ def api_menu():
         "business_name": BUSINESS_NAME,
         "tagline": BUSINESS_TAGLINE,
         "discount": disc,
+        "set_catalog": set_catalog_payload(),
         "shop": shop_status(),
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
@@ -4220,6 +4377,30 @@ ADMIN_PAGE_HTML = """<!doctype html>
   .timeRow label { flex:1; margin:0; }
   .timeRow.off { opacity:0.42; pointer-events:none; }
   .card.hours .saleBtn { width:100%; }
+
+  /* set tarkibi */
+  .setbox {
+    margin:14px 0 4px; padding:13px; border-radius:12px;
+    background:rgba(201,143,46,0.08); border:1px solid rgba(201,143,46,0.32);
+  }
+  .setbox .sb-t { font-size:13.5px; font-weight:700; color:#c98f2e; margin-bottom:3px; }
+  .setbox .sb-s { font-size:12px; color:var(--muted); margin-bottom:11px; line-height:1.5; }
+  .setbox .sb-s b { color:#c98f2e; }
+  .sb-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+  .sb-chip {
+    display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px;
+    background:var(--bg); border:1px solid var(--line); font-size:13px; font-weight:600;
+    color:var(--fg); cursor:pointer; user-select:none;
+  }
+  .sb-chip .bx {
+    width:16px; height:16px; border-radius:4px; border:1.5px solid var(--muted);
+    flex:none; display:flex; align-items:center; justify-content:center;
+  }
+  .sb-chip.on { background:rgba(201,143,46,0.18); border-color:#c98f2e; }
+  .sb-chip.on .bx { background:#c98f2e; border-color:#c98f2e; }
+  .sb-chip.on .bx::after { content:'✓'; font-size:11px; color:#fff; font-weight:900; line-height:1; }
+  .setbox input { margin:0; }
+  .dish .set-tag { font-size:12px; color:#c98f2e; font-weight:600; margin-top:3px; }
 </style>
 </head>
 <body>
@@ -4290,6 +4471,15 @@ ADMIN_PAGE_HTML = """<!doctype html>
   <label>Kategoriya<select id="f_cat"></select></label>
   <label>Zaxira — bugun nechta bor (0 = tugadi)<input id="f_stock" type="number" value="0" inputmode="numeric"></label>
   <label class="chk"><input type="checkbox" id="f_unlimited"> Cheksiz — zaxira hisoblanmasin</label>
+
+  <div class="setbox">
+    <div class="sb-t">🍽 Set tarkibi</div>
+    <div class="sb-s">Shu narxga yana nima qo'shib beriladi? Hech narsa belgilanmasa, taom oddiy
+      ko'rinadi. Belgilansa, menyuda oltin <b>SET</b> nishoni chiqadi.</div>
+    <div class="sb-chips" id="f_setchips"></div>
+    <input id="f_setextra" placeholder="Boshqa — masalan: ko'kat (ixtiyoriy)">
+  </div>
+
   <label>Rasm<input id="f_photo" type="file" accept="image/*"></label>
   <div class="row">
     <button id="saveBtn">Saqlash</button>
@@ -4306,6 +4496,8 @@ if (tg) { tg.ready(); tg.expand(); }
 const AUTH = new URLSearchParams(location.search);
 const CATS = __CATEGORIES__;
 const EMOJI = __EMOJI__;
+let setCatalog = [];
+let chosenSet = [];
 let editingId = null;
 
 const $ = (id) => document.getElementById(id);
@@ -4326,12 +4518,48 @@ $('f_unlimited').addEventListener('change', e => {
   if (e.target.checked) $('f_stock').value = '';
 });
 
+function renderSetChips() {
+  const box = $('f_setchips');
+  if (!box) return;
+  box.innerHTML = '';
+  setCatalog.forEach(function (it) {
+    const el = document.createElement('div');
+    el.className = 'sb-chip' + (chosenSet.indexOf(it.key) >= 0 ? ' on' : '');
+    const bx = document.createElement('span');
+    bx.className = 'bx';
+    el.appendChild(bx);
+    const nom = (it.names && it.names.uz) || it.key;
+    el.appendChild(document.createTextNode(it.emoji + ' ' + nom));
+    el.addEventListener('click', function () {
+      const i = chosenSet.indexOf(it.key);
+      if (i >= 0) chosenSet.splice(i, 1); else chosenSet.push(it.key);
+      renderSetChips();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    });
+    box.appendChild(el);
+  });
+}
+
+function setTagText(d) {
+  const out = [];
+  (d.set || []).forEach(function (k) {
+    const f = setCatalog.filter(function (x) { return x.key === k; })[0];
+    if (f) out.push(f.emoji + ' ' + ((f.names && f.names.uz) || k));
+  });
+  String(d.set_extra || '').split(',').forEach(function (p) {
+    p = p.trim();
+    if (p) out.push(p);
+  });
+  return out.length ? 'SET: ' + out.join(' · ') : '';
+}
+
 function resetForm() {
   editingId = null;
   $('formTitle').textContent = '➕ Yangi taom';
   $('f_name').value = ''; $('f_price').value = ''; $('f_desc').value = '';
   $('f_stock').value = '0'; $('f_photo').value = ''; $('f_cat').selectedIndex = 0;
   $('f_unlimited').checked = false; $('f_stock').disabled = false;
+  chosenSet = []; $('f_setextra').value = ''; renderSetChips();
   $('preview').hidden = true; $('cancelBtn').hidden = true; say('');
 }
 $('cancelBtn').addEventListener('click', resetForm);
@@ -4583,7 +4811,10 @@ async function load() {
       $('list').appendChild(p);
       return;
     }
-    render((await r.json()).dishes || []);
+    const dd = await r.json();
+    setCatalog = dd.set_catalog || [];
+    renderSetChips();
+    render(dd.dishes || []);
   } catch (e) {
     $('list').innerHTML = '';
     const p = document.createElement('p');
@@ -4645,6 +4876,14 @@ function dishRow(d) {
   meta.appendChild(st);
   info.appendChild(meta);
 
+  const stag = setTagText(d);
+  if (stag) {
+    const sl = document.createElement('div');
+    sl.className = 'set-tag';
+    sl.textContent = stag;
+    info.appendChild(sl);
+  }
+
   if (sale.active) {
     const tag = document.createElement('div');
     tag.className = 'sale-tag';
@@ -4680,6 +4919,9 @@ function startEdit(id) {
   $('f_unlimited').checked = d.stock === null;
   $('f_stock').disabled = d.stock === null;
   $('f_cat').value = d.category; $('f_photo').value = '';
+  chosenSet = (d.set || []).slice();
+  $('f_setextra').value = d.set_extra || '';
+  renderSetChips();
   if (d.photo_url) { $('preview').src = d.photo_url; $('preview').hidden = false; } else { $('preview').hidden = true; }
   $('cancelBtn').hidden = false;
   window.scrollTo({top:0, behavior:'smooth'});
@@ -4703,6 +4945,8 @@ $('saveBtn').addEventListener('click', async () => {
   fd.append('desc', $('f_desc').value.trim());
   fd.append('category', $('f_cat').value);
   fd.append('stock', $('f_unlimited').checked ? '-1' : ($('f_stock').value.trim() || '0'));
+  fd.append('set', chosenSet.join(','));
+  fd.append('set_extra', $('f_setextra').value.trim());
   const file = $('f_photo').files[0];
   if (file) fd.append('photo', file);
   $('saveBtn').disabled = true; say('Saqlanmoqda…');
@@ -4939,11 +5183,13 @@ def api_admin_dishes():
             "id": d["id"], "name": d["name"], "price": d["price"],
             "desc": d.get("desc", ""), "stock": d.get("stock"),
             "category": d.get("category", DEFAULT_CATEGORY),
+            "set": dish_set_keys(d),
+            "set_extra": (d.get("set_extra") or "").strip(),
         }
         if d.get("local_photo"):
             item["photo_url"] = f"/static/dishes/{d['local_photo']}"
         out.append(item)
-    return jsonify({"dishes": out})
+    return jsonify({"dishes": out, "set_catalog": set_catalog_payload()})
 
 def read_dish_form():
     """Formadan kelgan maydonlarni o'qiydi. Xato bo'lsa (None, xabar) qaytaradi."""
@@ -4964,7 +5210,10 @@ def read_dish_form():
     except Exception:
         stock = 0
     stock = None if stock < 0 else stock
-    return {"name": name, "price": price, "desc": desc, "category": category, "stock": stock}, None
+    set_items = parse_set_keys(request.form.get("set") or "")
+    set_extra = (request.form.get("set_extra") or "").strip()[:80]
+    return {"name": name, "price": price, "desc": desc, "category": category,
+            "stock": stock, "set_items": set_items, "set_extra": set_extra}, None
 
 def save_uploaded_photo(dish_id):
     """Yuklangan rasmni saqlaydi va fayl nomini qaytaradi. Rasm bo'lmasa None."""
@@ -5005,6 +5254,7 @@ def api_admin_add_dish():
         "id": new_id, "name": fields["name"], "price": fields["price"], "desc": fields["desc"],
         "photo_id": None, "local_photo": local_photo,
         "stock": fields["stock"], "category": fields["category"],
+        "set_items": fields["set_items"], "set_extra": fields["set_extra"],
     })
     save_menu(menu)
     return jsonify({"ok": True, "id": new_id})
@@ -5035,6 +5285,8 @@ def api_admin_update_dish(dish_id):
     dish["desc"] = fields["desc"]
     dish["category"] = fields["category"]
     dish["stock"] = fields["stock"]
+    dish["set_items"] = fields["set_items"]
+    dish["set_extra"] = fields["set_extra"]
     save_menu(menu)
     return jsonify({"ok": True})
 
