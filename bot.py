@@ -1089,6 +1089,38 @@ def trim_cashback_to_total(order):
         cashback_move(order["user_id"], extra, order.get("id"), "taom olib tashlandi")
     return extra
 
+def cashback_holders():
+    """Keshbegi bor mijozlar — ko'pidan ozigacha. [(uid, balans, ism, username)]"""
+    users = load_users()
+    out = []
+    for uid, rec in load_cashback().items():
+        bal = money(rec.get("balance", 0))
+        if bal <= 0:
+            continue
+        u = users.get(str(uid)) or {}
+        out.append((uid, bal, (u.get("name") or "").strip(), u.get("username") or ""))
+    out.sort(key=lambda r: -r[1])
+    return out
+
+def cashback_find_user(needle):
+    """Username yoki ism bo'yicha mijozni topadi. Bitta topilsa uning id sini qaytaradi."""
+    needle = (needle or "").strip().lstrip("@").lower()
+    if not needle:
+        return []
+    hits = []
+    for uid, u in load_users().items():
+        uname = (u.get("username") or "").lower()
+        name = (u.get("name") or "").lower()
+        if needle == uname or needle in name:
+            hits.append(int(uid))
+    return hits
+
+def cashback_holder_line(uid, bal, name, uname):
+    kim = name or "Ism yo'q"
+    if uname:
+        kim += f" @{uname}"
+    return f"{fmt_sum(bal)} \u2014 {kim} (ID {uid})"
+
 def cashback_totals():
     """Barcha mijozlardagi yig'ilib turgan keshbek — bu bizning qarzimiz."""
     data = load_cashback()
@@ -5111,15 +5143,81 @@ def cmd_cashback(message):
     parts = (message.text or "").split()
 
     if is_owner(message.chat.id):
-        if len(parts) > 1:
-            try:
-                target = int(parts[1])
-            except ValueError:
-                bot.send_message(message.chat.id, "Foydalanish: /keshbek yoki /keshbek <user_id>")
+        arg = parts[1] if len(parts) > 1 else ""
+
+        # to'liq ro'yxat — uzun bo'lsa fayl qilib yuboramiz
+        if arg.lower() in ("royxat", "ro'yxat", "list", "hammasi"):
+            holders = cashback_holders()
+            if not holders:
+                bot.send_message(message.chat.id, "Hozircha hech kimda keshbek yo'q.")
                 return
+            jami = money(sum(h[1] for h in holders))
+            if len(holders) <= 40:
+                lines = [f"\U0001F4B3 Keshbegi bor mijozlar: {len(holders)} ta",
+                         f"Jami: {fmt_sum(jami)}", ""]
+                lines += [cashback_holder_line(*h) for h in holders]
+                bot.send_message(message.chat.id, "\n".join(lines))
+            else:
+                import csv, io as _io
+                buf = _io.StringIO()
+                w = csv.writer(buf)
+                w.writerow(["user_id", "ism", "username", "balans", "jami_yozilgan",
+                            "jami_ishlatilgan"])
+                cb = load_cashback()
+                for uid, bal, name, uname in holders:
+                    rec = cb.get(str(uid)) or {}
+                    w.writerow([uid, name, uname, f"{bal:.2f}",
+                                f"{money(rec.get('earned', 0)):.2f}",
+                                f"{money(rec.get('spent', 0)):.2f}"])
+                data = buf.getvalue().encode("utf-8-sig")
+                doc = _io.BytesIO(data)
+                doc.name = f"keshbek-{datetime.now(TIMEZONE).strftime('%Y-%m-%d')}.csv"
+                try:
+                    bot.send_document(
+                        message.chat.id, doc,
+                        caption=(f"\U0001F4B3 Keshbegi bor mijozlar: {len(holders)} ta\n"
+                                 f"Jami: {fmt_sum(jami)}\n\n"
+                                 "Excel yoki Google Sheets'da ochsangiz bo'ladi."))
+                except Exception as e:
+                    print(f"Keshbek ro'yxatini yuborishda xato: {e}")
+                    lines = [cashback_holder_line(*h) for h in holders[:40]]
+                    bot.send_message(message.chat.id,
+                                     "\n".join(lines) + f"\n\n… va yana {len(holders) - 40} ta")
+            return
+
+        if arg:
+            try:
+                target = int(arg)
+            except ValueError:
+                hits = cashback_find_user(arg)        # @username yoki ism bo'yicha qidiramiz
+                if len(hits) == 1:
+                    target = hits[0]
+                elif not hits:
+                    bot.send_message(message.chat.id,
+                        f"\u00ab{arg}\u00bb bo'yicha mijoz topilmadi.\n\n"
+                        "Foydalanish:\n/keshbek \u2014 umumiy holat\n"
+                        "/keshbek royxat \u2014 kimda qancha bor\n"
+                        "/keshbek <user_id yoki @username>")
+                    return
+                else:
+                    users = load_users()
+                    lines = ["Bir nechta mijoz topildi, ID sini tanlang:", ""]
+                    for h in hits[:15]:
+                        u = users.get(str(h)) or {}
+                        kim = (u.get("name") or "Ism yo'q")
+                        if u.get("username"):
+                            kim += f" @{u['username']}"
+                        lines.append(f"/keshbek {h} \u2014 {kim}")
+                    bot.send_message(message.chat.id, "\n".join(lines))
+                    return
             rec = load_cashback().get(str(target)) or {}
+            u = load_users().get(str(target)) or {}
+            kim = (u.get("name") or "").strip() or "Ism yo'q"
+            if u.get("username"):
+                kim += f" @{u['username']}"
             hist = (rec.get("history") or [])[-8:]
-            lines = [f"\U0001F4B3 Mijoz {target}",
+            lines = [f"\U0001F4B3 {kim}",
+                     f"ID: {target}",
                      f"Balans: {fmt_sum(rec.get('balance', 0))}",
                      f"Jami yozilgan: {fmt_sum(rec.get('earned', 0))}",
                      f"Jami ishlatilgan: {fmt_sum(rec.get('spent', 0))}"]
@@ -5134,15 +5232,25 @@ def cmd_cashback(message):
             return
         tot = cashback_totals()
         state = f"\U0001F7E2 yoqilgan — {cfg['percent']:g}%" if cfg["active"] else "\u23F9 o'chirilgan"
+        holders = cashback_holders()
+        top_text = ""
+        if holders:
+            top_text = "Eng ko'p yig'ilganlar:\n"
+            top_text += "\n".join("  " + cashback_holder_line(*h) for h in holders[:10])
+            if len(holders) > 10:
+                top_text += f"\n  \u2026 va yana {len(holders) - 10} ta"
+            top_text += "\n\n"
         bot.send_message(message.chat.id,
             "\U0001F4B3 Keshbek holati\n\n"
             f"Sozlama: {state}\n"
             f"Mijozlarda yig'ilgan: {fmt_sum(tot['balance'])}\n"
             f"Keshbegi bor mijozlar: {tot['people']} ta\n\n"
+            + top_text +
             "Boshqarish:\n"
-            "/keshbek_foiz 5 — foizni o'zgartirish\n"
-            "/keshbek_foiz 0 — keshbekni butunlay o'chirish\n"
-            "/keshbek <user_id> — bitta mijozni ko'rish")
+            "/keshbek royxat \u2014 to'liq ro'yxat\n"
+            "/keshbek <user_id yoki @username> \u2014 bitta mijoz\n"
+            "/keshbek_foiz 5 \u2014 foizni o'zgartirish\n"
+            "/keshbek_foiz 0 \u2014 keshbekni butunlay o'chirish")
         return
 
     if not cfg["active"]:
