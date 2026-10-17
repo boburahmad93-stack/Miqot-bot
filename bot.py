@@ -4137,7 +4137,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
           var dn = sy + 1 < h ? g[si + w] : c0;
           var lf = sx > 0 ? g[si - 1] : c0;
           var rt = sx + 1 < w ? g[si + 1] : c0;
-          var v2 = c0 * 2.6 - (up + dn + lf + rt) * 0.4;
+          var v2 = c0 * 1.8 - (up + dn + lf + rt) * 0.2;
           sh[si] = v2 < 0 ? 0 : (v2 > 255 ? 255 : v2);
         }
       }
@@ -4150,7 +4150,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       // Keskin chegara: harf chetlari toza chiqadi, nuqtalar bulg'amaydi.
       for (var ty = 0; ty < h; ty++){
         for (var tx = 0; tx < w; tx++){
-          if (g[ty * w + tx] < 160) bits[ty*bpr + (tx >> 3)] |= (0x80 >> (tx & 7));
+          if (g[ty * w + tx] < 172) bits[ty*bpr + (tx >> 3)] |= (0x80 >> (tx & 7));
         }
       }
     } else {
@@ -4183,14 +4183,25 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     }
     cx.putImageData(img, 0, 0);
 
-    // GS v 0 — ESC/POS rastr buyrug'i
-    var head = new Uint8Array([0x1d, 0x76, 0x30, 0x00,
+    // GS v 0 — ESC/POS rastr buyrug'i.
+    // Butun logoni bitta buyruq qilib yuborsak, Bluetooth kanali yetkazib
+    // ulgurmaydi: printer o'rtada och qolib siltiydi va chiziqlar uzilib chiqadi.
+    // Shuning uchun uni 24 qatorli bo'laklarga bo'lamiz — har bo'lak mustaqil
+    // buyruq, printer uni to'liq olgandan keyingina bosadi.
+    var BAND = 24;
+    var bands = [];
+    for (var by = 0; by < h; by += BAND){
+      var bh = Math.min(BAND, h - by);
+      var seg = bits.subarray(by * bpr, (by + bh) * bpr);
+      var hd = new Uint8Array([0x1d, 0x76, 0x30, 0x00,
                                bpr & 0xff, (bpr >> 8) & 0xff,
-                               h & 0xff, (h >> 8) & 0xff]);
-    var raster = new Uint8Array(head.length + bits.length);
-    raster.set(head, 0); raster.set(bits, head.length);
+                               bh & 0xff, (bh >> 8) & 0xff]);
+      var one = new Uint8Array(hd.length + seg.length);
+      one.set(hd, 0); one.set(seg, hd.length);
+      bands.push(one);
+    }
 
-    logoCache[width] = { bytes: raster, url: cv.toDataURL('image/png') };
+    logoCache[width] = { bands: bands, url: cv.toDataURL('image/png') };
     var pv = $('logoPrev');
     if (pv){ pv.src = logoCache[width].url; pv.hidden = false; }
     return logoCache[width];
@@ -4204,33 +4215,46 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     return out;
   }
 
+  // Har bir bo'lak alohida yuboriladi, orasida printer nafas oladi.
   function escpos(text, logo){
     var enc = new TextEncoder();
-    var parts = [new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00])];   // reset + kodlash jadvali
-    if (logo){
-      parts.push(new Uint8Array([0x1b,0x61,0x01]));              // o'rtaga
-      parts.push(logo.bytes);
-      parts.push(new Uint8Array([0x0a, 0x1b,0x61,0x00]));        // chapga qaytaramiz
+    var segs = [new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00])];   // reset + kodlash jadvali
+    if (logo && logo.bands && logo.bands.length){
+      segs.push(new Uint8Array([0x1b,0x61,0x01]));              // o'rtaga
+      for (var i = 0; i < logo.bands.length; i++) segs.push(logo.bands[i]);
+      segs.push(new Uint8Array([0x0a, 0x1b,0x61,0x00]));        // chapga qaytaramiz
     }
-    parts.push(sizeBytes());
-    parts.push(enc.encode(text + "\\n"));
-    parts.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00])); // bo'sh joy + kesish
-    return joinBytes(parts);
+    segs.push(sizeBytes());
+    segs.push(enc.encode(text + "\\n"));
+    segs.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00])); // bo'sh joy + kesish
+    return segs;
   }
 
   // 20 bayt — hamma Bluetooth printerda ishlaydigan xavfsiz o'lcham.
   // Kattaroq paket ba'zi printerlarda jimgina yo'qoladi: ulanadi, lekin hech narsa chiqmaydi.
   var CHUNK = 20;
 
-  async function sendBytes(bytes){
-    if (!chr) throw new Error('printer ulanmagan');
+  function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+  async function sendRaw(bytes){
     var cur = chrList[chrIndex] || {};
     for (var i=0; i<bytes.length; i+=CHUNK){
       var part = bytes.slice(i, i+CHUNK);
       if (cur.wnr && chr.writeValueWithoutResponse) await chr.writeValueWithoutResponse(part);
       else if (chr.writeValue) await chr.writeValue(part);
       else await chr.writeValueWithResponse(part);
-      await new Promise(function(r){ setTimeout(r, 12); });
+      await wait(12);
+    }
+  }
+
+  // segs — bo'laklar ro'yxati (yoki bitta Uint8Array).
+  // Har bo'lakdan keyin printerga ulgurish uchun biroz vaqt beramiz.
+  async function sendBytes(segs){
+    if (!chr) throw new Error('printer ulanmagan');
+    if (!Array.isArray(segs)) segs = [segs];
+    for (var s = 0; s < segs.length; s++){
+      await sendRaw(segs[s]);
+      if (segs[s].length > 64) await wait(60);   // rasm bo'lagi — motor yetib olsin
     }
   }
 
