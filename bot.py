@@ -1280,6 +1280,27 @@ def mark_delivered_user(user_id):
     if user_id:
         _delivered_cache["ids"].add(user_id)
 
+# ---------- versiya: qaysi kod ishlayotganini bir qarashda bilish uchun ----------
+
+def _build_version():
+    """bot.py faylining o'zgartirilgan vaqti — har deploy'da yangilanadi."""
+    try:
+        ts = os.path.getmtime(os.path.abspath(__file__))
+    except Exception:
+        ts = time.time()
+    return datetime.fromtimestamp(ts, TIMEZONE).strftime("%d.%m.%Y %H:%M")
+
+APP_VERSION = _build_version()
+
+def no_cache(html, status=200):
+    """Telegram va brauzer eski sahifani keshdan ko'rsatmasin."""
+    return html, status, {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
 def is_owner(chat_id):
     """To'liq admin — menyu, zaxira, adminlarni boshqara oladi."""
     return chat_id in load_admin_ids()
@@ -1883,8 +1904,17 @@ def _rline(left, right, width):
     return left + " " * space + right
 
 def _wrap(text, width):
+    width = max(4, int(width))
     out, line = [], ""
     for word in str(text).split():
+        while len(word) > width:          # bitta uzun so'z — majburan bo'lamiz
+            if line:
+                out.append(line)
+                line = ""
+            out.append(word[:width])
+            word = word[width:]
+        if not word:
+            continue
         if not line:
             line = word
         elif len(line) + 1 + len(word) <= width:
@@ -1895,34 +1925,57 @@ def _wrap(text, width):
         out.append(line)
     return out or [""]
 
+def _labeled(label, value, w):
+    """'Mijoz: Ali' kabi qatorni qog'oz kengligiga moslab bo'ladi."""
+    value = str(value if value is not None else "")
+    if len(label) + len(value) <= w:
+        return [label + value]
+    inner = max(4, w - len(label))
+    pad = " " * len(label)
+    rows = _wrap(value, inner)
+    return [(label if i == 0 else pad) + r for i, r in enumerate(rows)]
+
+def _center(text, w):
+    """Sig'masa bo'lib tashlaydi, aks holda o'rtaga qo'yadi."""
+    rows = _wrap(text, w)
+    return [r.center(w).rstrip() for r in rows]
+
 def build_receipt_lines(order, width=None, safe=True, header=True):
     """Termoprinter uchun chek matni — oddiy qatorlar ro'yxati.
     header=False — tepaga logo rasmi chiqadi, nom yozuvi kerak emas."""
     w = width or RECEIPT_WIDTH
     L = []
     if header:
-        L.append(BUSINESS_NAME.upper().center(w).rstrip())
+        L.extend(_center(BUSINESS_NAME.upper(), w))
     L.append("-" * w)
     created = datetime.fromtimestamp(order.get("created_at", int(time.time())), TIMEZONE)
-    L.append(_rline(f"Buyurtma #{order.get('daily_number', '?')}", created.strftime("%d.%m %H:%M"), w))
+    head_no = f"Buyurtma #{order.get('daily_number', '?')}"
+    head_time = created.strftime("%d.%m %H:%M")
+    if len(head_no) + len(head_time) + 1 <= w:
+        L.append(_rline(head_no, head_time, w))
+    else:                                  # tor qog'ozda ikki qatorga bo'lamiz
+        L.append(head_no)
+        L.append(head_time)
     L.append("")
-    L.append(f"Mijoz: {order.get('customer_name') or '-'}")
+    L.extend(_labeled("Mijoz: ", order.get("customer_name") or "-", w))
     tel = (order.get("phone") or "").strip()
-    L.append(f"Tel: {tel}" if tel else "Tel: yo'q (Telegram orqali)")
-    if order.get("username"):
-        L.append(f"TG: @{order['username']}")
-    if order.get("latitude") is not None:
-        L.append("Manzil: xaritada yuborilgan")
-        L.append(f"  {order['latitude']:.5f}, {order['longitude']:.5f}")
+    if tel:
+        L.extend(_labeled("Tel: ", tel, w))
     else:
-        for i, ln in enumerate(_wrap(order.get("address_text") or "-", w - 8)):
-            L.append(("Manzil: " if i == 0 else "        ") + ln)
+        L.extend(_labeled("Tel: ", "yo'q (Telegram orqali)" if w >= 28 else "yo'q, Telegram", w))
+    if order.get("username"):
+        L.extend(_labeled("TG: ", "@" + str(order["username"]), w))
+    if order.get("latitude") is not None:
+        L.extend(_labeled("Manzil: ", "xaritada yuborilgan" if w >= 28 else "xaritada", w))
+        L.extend(_labeled("  ", f"{order['latitude']:.5f}, {order['longitude']:.5f}", w))
+    else:
+        L.extend(_labeled("Manzil: ", order.get("address_text") or "-", w))
     L.append("-" * w)
 
     for it in order.get("items", []):
         if it.get("cancelled"):
             continue
-        L.append(it["name"][:w])
+        L.extend(_wrap(it["name"], w))
         L.append(_rline(f"  {it['qty']} x {it['price']:.0f}", f"{it['price'] * it['qty']:.0f}", w))
         # oshpaz va kuryer nima qo'yishni ko'rib tursin (termoprinter emoji chiqara olmaydi)
         s = item_set_line(it, "uz", sep=", ")
@@ -1934,7 +1987,7 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
     pct = order.get("discount_percent") or 0
     old = order.get("original_total")
     if pct and old and old > order.get("total", 0):
-        L.append(_rline("Oldingi summa", f"{old:.0f}", w))
+        L.append(_rline("Oldingi" if w < 26 else "Oldingi summa", f"{old:.0f}", w))
         L.append(_rline(f"Aksiya -{pct}%", f"-{old - order['total']:.0f}", w))
     L.append(_rline("JAMI", fmt_sum(order.get("total", 0)), w))
     used_cb = order_cashback_used(order)
@@ -1942,19 +1995,21 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
         L.append(_rline("Keshbek", "-" + fmt_sum(used_cb), w))
         L.append(_rline("TO'LOVGA", fmt_sum(order_payable(order)), w))
     L.append("")
+    # katta yozuvda ustunlar soni yarmiga tushadi — qator sig'ishi kerak
     if used_cb > 0:
-        L.append("To'lov: NAQD + KESHBEK".center(w).rstrip())
+        pay = "To'lov: NAQD + KESHBEK" if w >= 24 else "NAQD + KESHBEK"
     else:
-        L.append("To'lov: NAQD (yetkazishda)".center(w).rstrip())
+        pay = "To'lov: NAQD (yetkazishda)" if w >= 28 else "To'lov: NAQD"
+    L.extend(_center(pay, w))
 
     if order.get("note"):
         L.append("-" * w)
         L.append("IZOH:")
-        for ln in _wrap(order["note"], w):
+        for ln in _wrap(order["note"], w - 2):
             L.append("  " + ln)
 
     L.append("-" * w)
-    L.append("Rahmat! Yana kutamiz".center(w).rstrip())
+    L.extend(_center("Rahmat! Yana kutamiz", w))
     return [ascii_safe(x) for x in L] if safe else L
 
 def build_receipt_text(order, width=None, safe=True, header=True):
@@ -3469,7 +3524,10 @@ def validate_init_data(init_data):
 
 @app.route("/")
 def miniapp_index():
-    return send_from_directory(".", "index.html")
+    resp = send_from_directory(".", "index.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 @app.route("/static/dishes/<path:filename>")
 def serve_dish_photo(filename):
@@ -3710,6 +3768,19 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     image-rendering:pixelated;
   }
 
+  /* chek chiqdimi — tasdiqlash paneli */
+  #confirmBar{
+    position:fixed; inset-inline:0; bottom:0; z-index:90;
+    background:#171a21; border-top:1px solid var(--gold);
+    padding:13px 14px calc(13px + env(safe-area-inset-bottom,0px));
+    display:flex; flex-direction:column; gap:10px;
+    box-shadow:0 -10px 26px rgba(0,0,0,.5);
+  }
+  #confirmBar[hidden]{ display:none; }
+  #confirmBar .cbq{ font-size:14.5px; font-weight:600; line-height:1.4; }
+  #confirmBar .cbrow{ display:flex; gap:9px; }
+  #confirmBar button{ flex:1; padding:13px 0; font-size:14px; font-weight:700; border-radius:11px; }
+
   /* tizim orqali chop etish — faqat chek chiqadi */
   #printArea{ display:none; }
   @media print{
@@ -3725,6 +3796,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       image-rendering:pixelated;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
+    #printArea.sz-n pre{ font-size:11pt; line-height:1.28; }
+    #printArea.sz-h pre{ font-size:13.5pt; line-height:1.42; font-weight:600; }
+    #printArea.sz-b pre{ font-size:18pt; line-height:1.34; font-weight:700; }
+    #confirmBar{ display:none !important; }
     @page{ margin:2mm; }
   }
 </style>
@@ -3741,6 +3816,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   <div class="bar">
     <button class="main" id="btConnect">🖨 Printerni ulash</button>
     <button id="btTest">Sinov cheki</button>
+    <button class="ghost" id="btChan" hidden>Boshqa kanal</button>
     <button class="ghost" id="btAgain">Qayta chiqarish</button>
   </div>
   <div class="opts">
@@ -3750,16 +3826,19 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       <input type="checkbox" id="logo" checked> Logo bilan
       <img id="logoPrev" class="logoprev" alt="" hidden>
     </label>
-    <label>Kengligi
+    <label>Qog'oz
       <select id="w">
-        <option value="32">58 mm</option>
         <option value="48" selected>80 mm</option>
+        <option value="44">76 mm</option>
+        <option value="40">70 mm</option>
+        <option value="32">58 mm</option>
+        <option value="24">48 mm</option>
       </select>
     </label>
     <label>Usul
       <select id="mode">
         <option value="bt" selected>Bevosita Bluetooth</option>
-        <option value="sys">Tizim orqali (RawBT)</option>
+        <option value="sys">Tizim orqali (RawBT / kompyuter)</option>
       </select>
     </label>
   </div>
@@ -3767,11 +3846,24 @@ KITCHEN_PAGE_HTML = """<!doctype html>
 
 <div id="printArea" aria-hidden="true"></div>
 
+<div id="confirmBar" hidden>
+  <div class="cbq" id="cbText"></div>
+  <div class="cbrow">
+    <button class="main" id="cbYes">✅ Ha, chiqdi</button>
+    <button class="ghost" id="cbNo">❌ Chiqmadi</button>
+  </div>
+</div>
+
 <main>
   <div class="msg info" id="hint">
     Printerni yoqing, telefon Bluetooth'ini yoqing, so'ng <b>“Printerni ulash”</b>ni bosing.
   </div>
   <div id="list"></div>
+
+  <details id="diagBox" hidden>
+    <summary>Texnik ma'lumot (printer kanallari)</summary>
+    <pre id="diag" style="font-size:11px;white-space:pre-wrap;line-height:1.5"></pre>
+  </details>
 
   <details>
     <summary>Printer ulanmasa nima qilish kerak</summary>
@@ -3790,6 +3882,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     <p>iPhone'da bevosita ulanish umuman ishlamaydi — u yerda “Matnni nusxalash” orqali
        printer ilovasiga joylashtirasiz. Oshxonaga Android qo'ygan ma'qul.</p>
   </details>
+<p style="text-align:center;font-size:11px;color:var(--dim);margin:18px 0 6px">
+  Kod versiyasi: __VER__
+</p>
+
 </main>
 
 <script>
@@ -3845,6 +3941,39 @@ KITCHEN_PAGE_HTML = """<!doctype html>
 
   function btSupported(){ return !!(navigator.bluetooth && navigator.bluetooth.requestDevice); }
 
+  var chrList = [];     // printerdagi barcha yozish kanallari
+  var chrIndex = 0;
+
+  function renderChannels(){
+    var nom = (dev && dev.name) ? dev.name : 'nomsiz';
+    var qism = chrList.length > 1 ? (' · kanal ' + (chrIndex + 1) + '/' + chrList.length) : '';
+    setState('Printer ulandi: ' + nom + qism, true);
+    var btn = $('btChan');
+    if (btn) btn.hidden = chrList.length < 2;
+    var box = $('diagBox');
+    if (box){
+      box.hidden = !chrList.length;
+      var rows = chrList.map(function(x, i){
+        return (i === chrIndex ? '▶ ' : '  ') + (i + 1) + ') ' + x.uuid +
+               '\\n     xizmat: ' + x.svc +
+               '\\n     yozish: ' + (x.wnr ? 'javobsiz ' : '') + (x.w ? 'javobli' : '');
+      });
+      $('diag').textContent = 'Qurilma: ' + nom + '\\nPaket: ' + CHUNK + ' bayt\\n\\n' + rows.join('\\n');
+    }
+  }
+
+  async function nextChannel(){
+    if (chrList.length < 2){
+      say('Bu printerda boshqa kanal yo‘q.', 'err');
+      return;
+    }
+    chrIndex = (chrIndex + 1) % chrList.length;
+    chr = chrList[chrIndex].c;
+    renderChannels();
+    say('Kanal ' + (chrIndex + 1) + '/' + chrList.length +
+        ' ga o‘tdik. Endi «Sinov cheki» ni bosing.', 'info');
+  }
+
   async function connect(){
     if (!btSupported()){
       say("Bu brauzer Bluetooth printerni qo'llab-quvvatlamaydi. Android'da <b>Chrome</b> bilan oching, " +
@@ -3864,16 +3993,24 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       });
       var server = await dev.gatt.connect();
       chr = null;
+      chrList = [];
       var svcs = await server.getPrimaryServices();
-      for (var i=0; i<svcs.length && !chr; i++){
+      for (var i=0; i<svcs.length; i++){
         var cs = await svcs[i].getCharacteristics();
         for (var j=0; j<cs.length; j++){
-          if (cs[j].properties.write || cs[j].properties.writeWithoutResponse){ chr = cs[j]; break; }
+          var pr = cs[j].properties;
+          if (pr.write || pr.writeWithoutResponse){
+            chrList.push({ c: cs[j], svc: svcs[i].uuid, uuid: cs[j].uuid,
+                           wnr: !!pr.writeWithoutResponse, w: !!pr.write });
+          }
         }
       }
-      if (!chr) throw new Error('yozish kanali topilmadi');
-      setState('Printer ulandi: ' + (dev.name || 'nomsiz'), true);
-      say('✅ Printer ulandi. Yangi buyurtmalar o‘zi chiqadi.', 'ok');
+      if (!chrList.length) throw new Error('yozish kanali topilmadi');
+      // ba'zi printerlarda bir nechta yozish kanali bo'ladi, faqat bittasi chop etadi
+      chrIndex = 0;
+      chr = chrList[0].c;
+      renderChannels();
+      say('✅ Printer ulandi. Avval «Sinov cheki» ni bosib ko‘ring.', 'ok');
       flushFailed();
     }catch(e){
       chr = null;
@@ -3890,7 +4027,20 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   var hasLogo = false;            // serverda logo bormi
   var logoCache = {};             // kenglik -> {bytes, url}
 
-  function dots(){ return $('w').value === '32' ? 384 : 576; }
+  // Bitta belgi 12 nuqta eni — shundan qog'ozning nuqtalardagi kengligi chiqadi.
+  function paperCols(){ return parseInt($('w').value, 10) || 48; }
+  function dots(){ return paperCols() * 12; }
+
+  // Yozuv doim eng katta: bo'yi ham eni ham ikki barobar.
+  // Shuning uchun bir qatorga yarmicha belgi sig'adi va chek shunga qarab tuziladi.
+  function fsize(){ return 'b'; }
+  function effWidth(){ return Math.max(10, Math.floor(paperCols() / 2)); }
+  function sizeBytes(){
+    var s = fsize();
+    if (s === 'h') return new Uint8Array([0x1d, 0x21, 0x01]);   // bo'yi x2
+    if (s === 'b') return new Uint8Array([0x1d, 0x21, 0x11]);   // bo'yi va eni x2
+    return new Uint8Array([0x1d, 0x21, 0x00]);                  // oddiy
+  }
   function logoOn(){ var c = $('logo'); return !!(c && c.checked && hasLogo); }
 
   function loadImage(src){
@@ -4025,24 +4175,33 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       parts.push(logo.bytes);
       parts.push(new Uint8Array([0x0a, 0x1b,0x61,0x00]));        // chapga qaytaramiz
     }
+    parts.push(sizeBytes());
     parts.push(enc.encode(text + "\\n"));
     parts.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00])); // bo'sh joy + kesish
     return joinBytes(parts);
   }
 
+  // 20 bayt — hamma Bluetooth printerda ishlaydigan xavfsiz o'lcham.
+  // Kattaroq paket ba'zi printerlarda jimgina yo'qoladi: ulanadi, lekin hech narsa chiqmaydi.
+  var CHUNK = 20;
+
   async function sendBytes(bytes){
-    var CH = 180;                       // katta paketlarni bo'lib yuboramiz
-    for (var i=0; i<bytes.length; i+=CH){
-      var part = bytes.slice(i, i+CH);
-      if (chr.writeValueWithoutResponse) await chr.writeValueWithoutResponse(part);
-      else await chr.writeValue(part);
-      await new Promise(function(r){ setTimeout(r, 22); });
+    if (!chr) throw new Error('printer ulanmagan');
+    var cur = chrList[chrIndex] || {};
+    for (var i=0; i<bytes.length; i+=CHUNK){
+      var part = bytes.slice(i, i+CHUNK);
+      if (cur.wnr && chr.writeValueWithoutResponse) await chr.writeValueWithoutResponse(part);
+      else if (chr.writeValue) await chr.writeValue(part);
+      else await chr.writeValueWithResponse(part);
+      await new Promise(function(r){ setTimeout(r, 12); });
     }
   }
 
   function systemPrint(text, logo){
-    // Android chop etish oynasi ochiladi — u yerdan RawBT yoki printer xizmati tanlanadi
+    // Chop etish oynasi ochiladi — RawBT, printer yoki kompyuterdagi printer tanlanadi.
+    // Oyna yopilgunicha kutamiz, chunki brauzer chop etilgan-etilmaganini aytmaydi.
     var area = document.getElementById('printArea');
+    area.className = 'sz-' + fsize();
     area.innerHTML = '';
     if (logo){
       var im = document.createElement('img');
@@ -4053,8 +4212,43 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     var pre = document.createElement('pre');
     pre.textContent = text;
     area.appendChild(pre);
-    window.print();
+
+    return new Promise(function(resolve){
+      var done = false;
+      function fin(){
+        if (done) return;
+        done = true;
+        window.removeEventListener('afterprint', fin);
+        clearTimeout(guard);
+        setTimeout(resolve, 150);
+      }
+      window.addEventListener('afterprint', fin);
+      var guard = setTimeout(fin, 60000);
+      try{ window.print(); }catch(e){ fin(); }
+    });
   }
+
+  /* ---------- chek chiqdimi? ---------- */
+  var confirmResolve = null;
+
+  function askPrinted(no){
+    if (confirmResolve){ var old = confirmResolve; confirmResolve = null; old(false); }
+    return new Promise(function(resolve){
+      confirmResolve = resolve;
+      $('cbText').textContent = (no ? ('#' + no + ' cheki') : 'Sinov cheki') +
+                                " qog'ozga chiqdimi?";
+      $('confirmBar').hidden = false;
+    });
+  }
+
+  function closeConfirm(val){
+    $('confirmBar').hidden = true;
+    var r = confirmResolve;
+    confirmResolve = null;
+    if (r) r(val);
+  }
+  $('cbYes').addEventListener('click', function(){ closeConfirm(true); });
+  $('cbNo').addEventListener('click', function(){ closeConfirm(false); });
 
   function mode(){ return $('mode').value; }
 
@@ -4066,7 +4260,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       seen = {};                            // cheklar yangi matn bilan qayta kelsin
       var list = document.getElementById('list');
       if (list) list.innerHTML = '';
-      try{ localStorage.setItem('miqot_logo', $('logo').checked ? '1' : '0'); }catch(e){}
+      try{
+        localStorage.setItem('miqot_logo', $('logo').checked ? '1' : '0');
+        localStorage.setItem('miqot_w', $('w').value);
+      }catch(e){}
       if (logoOn()) buildLogo(dots()).catch(function(){});
       poll();
     });
@@ -4074,9 +4271,11 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   try{
     var savedLogo = localStorage.getItem('miqot_logo');
     if (savedLogo === '0') $('logo').checked = false;
+    var savedW = localStorage.getItem('miqot_w');
+    if (savedW && $('w')) $('w').value = savedW;
   }catch(e){}
 
-  async function printText(text){
+  async function printText(text, no){
     var logo = null;
     if (logoOn()){
       try{
@@ -4086,9 +4285,14 @@ KITCHEN_PAGE_HTML = """<!doctype html>
         say("Logo yuklanmadi — chek nom yozuvi bilan chiqadi.", 'info');
       }
     }
-    if (mode() === 'sys'){ systemPrint(text, logo); return; }
+    if (mode() === 'sys'){
+      // Brauzer chop etish muvaffaqiyatli bo'ldimi deb aytmaydi — shuning uchun o'zingizdan so'raymiz.
+      await systemPrint(text, logo);
+      return await askPrinted(no);
+    }
     if (!chr) throw new Error('printer ulanmagan');
     await sendBytes(escpos(text, logo));
+    return true;
   }
 
   /* ---------- buyurtmalar ---------- */
@@ -4105,7 +4309,14 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     if (printing && !manual) return false;
     printing = true;
     try{
-      await printText(o.receipt);
+      var ok = await printText(o.receipt, o.no);
+      if (!ok){
+        // chiqmadi — buyurtma ro'yxatda qoladi, yo'qolib ketmaydi
+        failed[o.id] = o;
+        say("⚠️ #" + o.no + " cheki chiqmadi. Buyurtma ro'yxatda qoldi — " +
+            "printerni tekshirib, qaytadan «Chiqarish» bosing.", 'err');
+        return false;
+      }
       await markDone([o.id]);
       delete failed[o.id];
       var card = document.querySelector('[data-oid="' + o.id + '"]');
@@ -4177,7 +4388,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   var offline = 0;
   async function poll(){
     try{
-      var r = await fetch(url('/api/print/pending?w=' + $('w').value +
+      var r = await fetch(url('/api/print/pending?w=' + effWidth() +
                               (logoOn() ? '&logo=1' : '')), { cache:'no-store' });
       if (!r.ok){
         setState(r.status === 403 ? 'Ruxsat yo‘q — botdan qaytadan oching' : 'Server javob bermadi', false);
@@ -4226,19 +4437,39 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   /* ---------- tugmalar ---------- */
   $('btConnect').addEventListener('click', connect);
 
+  $('btChan').addEventListener('click', nextChannel);
+
+  // Sinov cheki ataylab qisqa va LOGOSIZ — muammo matndami yoki logodami, shundan bilinadi.
   $('btTest').addEventListener('click', async function(){
-    var w = parseInt($('w').value, 10);
-    var line = '-'.repeat(w);
-    var t = [
-      'MIQOT FOOD'.padStart(Math.floor((w + 10)/2)),
-      line, 'SINOV CHEKI', line,
-      'Agar bu matn to‘g‘ri chiqsa,'.slice(0,w),
-      'printer tayyor.',
-      line, ''
-    ].join('\\n');
+    // O'lchagich chek: qog'ozga nechta belgi sig'ishini ko'z bilan tekshirish uchun.
+    var w = effWidth();
+    var ruler = '';
+    for (var i = 1; i <= w; i++) ruler += String(i % 10);
+    var t = ['SINOV ' + w, ruler, 'Yuqoridagi raqamlar', 'bitta qatorga sigsa -', 'qogoz togri tanlangan.', ''].join(String.fromCharCode(10));
     if (mode() === 'bt' && !chr){ say('Avval printerni ulang.', 'err'); return; }
-    try{ await printText(t); say('✅ Sinov cheki yuborildi.', 'ok'); }
-    catch(e){ say('❌ Chiqmadi: ' + e.message, 'err'); }
+    try{
+      if (mode() === 'sys'){
+        await systemPrint(t, null);
+        var okk = await askPrinted(null);
+        say(okk ? '\u2705 Chiqdi. Raqamlar bitta qatorga sigdimi?'
+                : '\u274c Chiqmadi. Chop etish oynasida printerni tekshiring.',
+            okk ? 'ok' : 'err');
+        return;
+      }
+      await sendBytes(escpos(t, null));
+      var ok = await askPrinted(null);
+      if (ok){
+        say('\u2705 Chiqdi. Agar raqamlar qatori qog\u2018ozdan chiqib ketgan bo\u2018lsa, ' +
+            '\u00abQog\u2018oz\u00bb dan kichikroq o\u2018lcham tanlang.', 'ok');
+      } else if (chrList.length > 1){
+        say('Chiqmadi. \u00abBoshqa kanal\u00bb ni bosib, yana sinab ko\u2018ring \u2014 ' +
+            'bu printerda ' + chrList.length + ' ta kanal bor.', 'err');
+      } else {
+        say('Chiqmadi. Printerda qog\u2018oz borligini tekshiring. Yordam bermasa, ' +
+            '\u00abUsul\u00bb ni \u00abTizim orqali\u00bb ga o\u2018zgartiring.', 'err');
+      }
+    }
+    catch(e){ say('\u274c Chiqmadi: ' + e.message, 'err'); }
   });
 
   $('btAgain').addEventListener('click', async function(){
@@ -4261,8 +4492,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     $('auto').disabled = sys;
     if (sys){
       $('auto').checked = false;
-      say("Tizim rejimi: har bir chek uchun Android chop etish oynasi ochiladi, " +
-          "u yerdan <b>RawBT</b>ni tanlaysiz. Bu Bluetooth Classic printerlar uchun.", 'info');
+      say("Tizim rejimi: har bir chek uchun chop etish oynasi ochiladi \u2014 " +
+          "telefonda <b>RawBT</b>ni, kompyuterda printeringizni tanlaysiz.<br>" +
+          "Chop etgandan keyin pastdan <b>\u00abHa, chiqdi\u00bb</b> ni bosing, " +
+          "shunda buyurtma ro\u2019yxatdan o\u2018chadi.", 'info');
     } else {
       $('auto').checked = true;
       say("Bevosita rejim: printerni ulasangiz cheklar o‘zi chiqadi.", 'info');
@@ -4965,6 +5198,10 @@ $('saveBtn').addEventListener('click', async () => {
 
 load();
 </script>
+<p style="text-align:center;font-size:11px;color:var(--muted);margin:20px 0 10px">
+  Kod versiyasi: __VER__
+</p>
+
 </body>
 </html>"""
 
@@ -4984,8 +5221,9 @@ def admin_page():
                "tugmasini qaytadan bosing.</h3>", 403
     html = (ADMIN_PAGE_HTML
             .replace("__CATEGORIES__", json.dumps(CATEGORIES, ensure_ascii=False))
-            .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False)))
-    return html, 200, {"Content-Type": "text/html; charset=utf-8"}
+            .replace("__EMOJI__", json.dumps(CATEGORY_EMOJI, ensure_ascii=False))
+            .replace("__VER__", APP_VERSION))
+    return no_cache(html)
 
 # ---------- oshxona printeri uchun API ----------
 
@@ -4994,7 +5232,7 @@ def kitchen_page():
     if not admin_from_request():
         return ("<h3 style='font-family:sans-serif;padding:24px;line-height:1.6'>Ruxsat yo'q.<br><br>"
                 "Telegramda botga <b>/start</b> yuboring va \"🖨 Oshxona\" tugmasini bosing.</h3>"), 403
-    return KITCHEN_PAGE_HTML, 200, {"Content-Type": "text/html; charset=utf-8"}
+    return no_cache(KITCHEN_PAGE_HTML.replace("__VER__", APP_VERSION))
 
 @app.route("/api/print/pending")
 def api_print_pending():
@@ -5005,7 +5243,7 @@ def api_print_pending():
         width = int(request.args.get("w") or RECEIPT_WIDTH)
     except Exception:
         width = RECEIPT_WIDTH
-    width = max(24, min(64, width))
+    width = max(10, min(64, width))
     # logo rasm sifatida chiqsa, chek matnida nom yozuvi takrorlanmasin
     with_logo = request.args.get("logo") == "1"
 
@@ -5386,6 +5624,19 @@ def cmd_report(message):
         return
     today = datetime.now(TIMEZONE).date()
     bot.send_message(message.chat.id, build_daily_report_text(today))
+
+@bot.message_handler(commands=["versiya", "version"])
+def cmd_version(message):
+    """Serverdagi kod qachon yangilangani — deploy yetib keldimi, shundan bilinadi."""
+    if not is_owner(message.chat.id):
+        return
+    bot.send_message(message.chat.id,
+        f"\U0001F6E0 Kod versiyasi: {APP_VERSION}\n"
+        f"Server vaqti: {datetime.now(TIMEZONE).strftime('%d.%m.%Y %H:%M')}\n\n"
+        "Agar versiya siz yuklagan vaqtdan eski bo'lsa — Railway hali yangi kodni "
+        "ishga tushirmagan. Deploy tugashini kuting yoki Railway'da xatolik bor-yo'qligini qarang.\n\n"
+        "Versiya to'g'ri, lekin o'zgarish ko'rinmasa — Telegram eski sahifani ko'rsatyapti: "
+        "botga /start yuboring va tugmani yangi xabardan bosing.")
 
 @bot.message_handler(commands=["keshbek", "cashback"])
 def cmd_cashback(message):
