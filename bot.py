@@ -2004,7 +2004,7 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
             L.append("  " + ln)
 
     L.append("-" * w)
-    L.extend(_wrap("Rahmat! Yana kutamiz", w))
+    L.extend(_wrap("Ibodatga quvvat bo'lsin", w))
     return [ascii_safe(x) for x in L] if safe else L
 
 def build_receipt_text(order, width=None, safe=True, header=True):
@@ -3787,11 +3787,11 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       font-size:11pt; line-height:1.28; white-space:pre;
     }
     #printArea img.plogo{
-      display:block; margin:0 auto 2mm; max-width:100%;
+      display:block; margin:0 auto 2.5mm; width:100%; max-width:100%; height:auto;
       image-rendering:pixelated;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
-    #printArea.sz-n pre{ font-size:10.5pt; line-height:1.18; }
+    #printArea.sz-n pre{ font-size:12pt; line-height:1.12; font-weight:600; }
     #printArea.sz-h pre{ font-size:13pt; line-height:1.2; font-weight:600; }
     #printArea.sz-b pre{ font-size:17pt; line-height:1.18; font-weight:700; }
     #printArea, #printArea pre, #printArea img{
@@ -4033,9 +4033,9 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   function paperCols(){ return parseInt($('w').value, 10) || 48; }
   function dots(){ return paperCols() * 12; }
 
-  // Yozuv o'rtacha: bo'yi ikki barobar, eni oddiy.
-  // Shuning uchun bir qatorga tanlangan belgilar soni to'liq sig'adi.
-  function fsize(){ return 'h'; }
+  // Oddiy o'lcham: harflar mutanosib, bo'yiga cho'zilmaydi.
+  // Kattaligi brauzerda CSS orqali (sz-n) o'rtacha qilib berilgan.
+  function fsize(){ return 'n'; }
   function effWidth(){ return Math.max(16, paperCols()); }
   function sizeBytes(){
     var s = fsize();
@@ -4057,7 +4057,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   async function buildLogo(width){
     if (logoCache[width]) return logoCache[width];
     var im = await loadImage(url('/static/logo.jpg'));
-    var maxH = 220;                                  // qog'oz behuda ketmasin
+    var maxH = 420;                                  // qog'oz behuda ketmasin
     var w = width;
     var h = Math.round(im.height * (w / im.width));
     if (h > maxH){ h = maxH; w = Math.round(im.width * (h / im.height)); }
