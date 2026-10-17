@@ -3828,11 +3828,15 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     </label>
     <label>Qog'oz
       <select id="w">
-        <option value="48" selected>80 mm</option>
-        <option value="44">76 mm</option>
-        <option value="40">70 mm</option>
-        <option value="32">58 mm</option>
-        <option value="24">48 mm</option>
+        <option value="48" selected>48 belgi (80 mm)</option>
+        <option value="46">46 belgi</option>
+        <option value="44">44 belgi</option>
+        <option value="42">42 belgi (72 mm)</option>
+        <option value="40">40 belgi</option>
+        <option value="38">38 belgi</option>
+        <option value="36">36 belgi</option>
+        <option value="32">32 belgi (58 mm)</option>
+        <option value="28">28 belgi</option>
       </select>
     </label>
     <label>Usul
@@ -4031,10 +4035,10 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   function paperCols(){ return parseInt($('w').value, 10) || 48; }
   function dots(){ return paperCols() * 12; }
 
-  // Yozuv doim eng katta: bo'yi ham eni ham ikki barobar.
-  // Shuning uchun bir qatorga yarmicha belgi sig'adi va chek shunga qarab tuziladi.
-  function fsize(){ return 'b'; }
-  function effWidth(){ return Math.max(10, Math.floor(paperCols() / 2)); }
+  // Yozuv o'rtacha: bo'yi ikki barobar, eni oddiy.
+  // Shuning uchun bir qatorga tanlangan belgilar soni to'liq sig'adi.
+  function fsize(){ return 'h'; }
+  function effWidth(){ return Math.max(16, paperCols()); }
   function sizeBytes(){
     var s = fsize();
     if (s === 'h') return new Uint8Array([0x1d, 0x21, 0x01]);   // bo'yi x2
