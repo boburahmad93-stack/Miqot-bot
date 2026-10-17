@@ -1930,6 +1930,10 @@ def _labeled(label, value, w):
     value = str(value if value is not None else "")
     if len(label) + len(value) <= w:
         return [label + value]
+    if len(label) + 6 > w:               # yorliqning o'zi qatorni to'ldirib qo'ysa
+        out = _wrap(label.strip(), w)
+        out += ["  " + r for r in _wrap(value, max(4, w - 2))]
+        return out
     inner = max(4, w - len(label))
     pad = " " * len(label)
     rows = _wrap(value, inner)
@@ -1946,16 +1950,11 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
     w = width or RECEIPT_WIDTH
     L = []
     if header:
-        L.extend(_center(BUSINESS_NAME.upper(), w))
+        L.extend(_wrap(BUSINESS_NAME.upper(), w))
     L.append("-" * w)
     created = datetime.fromtimestamp(order.get("created_at", int(time.time())), TIMEZONE)
-    head_no = f"Buyurtma #{order.get('daily_number', '?')}"
-    head_time = created.strftime("%d.%m %H:%M")
-    if len(head_no) + len(head_time) + 1 <= w:
-        L.append(_rline(head_no, head_time, w))
-    else:                                  # tor qog'ozda ikki qatorga bo'lamiz
-        L.append(head_no)
-        L.append(head_time)
+    L.append(f"Buyurtma #{order.get('daily_number', '?')}")
+    L.extend(_labeled("Sana: ", created.strftime("%d.%m.%Y %H:%M"), w))
     L.append("")
     L.extend(_labeled("Mijoz: ", order.get("customer_name") or "-", w))
     tel = (order.get("phone") or "").strip()
@@ -1976,31 +1975,27 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
         if it.get("cancelled"):
             continue
         L.extend(_wrap(it["name"], w))
-        L.append(_rline(f"  {it['qty']} x {it['price']:.0f}", f"{it['price'] * it['qty']:.0f}", w))
-        # oshpaz va kuryer nima qo'yishni ko'rib tursin (termoprinter emoji chiqara olmaydi)
-        s = item_set_line(it, "uz", sep=", ")
-        if s:
-            for ln in _wrap("+ " + s, w - 2):
-                L.append("  " + ln)
+        # narx qatorning chap tomonida — o'ng chet kesilsa ham ko'rinadi
+        L.extend(_labeled("  ", f"{it['qty']} x {it['price']:.0f} = {it['price'] * it['qty']:.0f}", w))
 
     L.append("-" * w)
     pct = order.get("discount_percent") or 0
     old = order.get("original_total")
     if pct and old and old > order.get("total", 0):
-        L.append(_rline("Oldingi" if w < 26 else "Oldingi summa", f"{old:.0f}", w))
-        L.append(_rline(f"Aksiya -{pct}%", f"-{old - order['total']:.0f}", w))
-    L.append(_rline("JAMI", fmt_sum(order.get("total", 0)), w))
+        L.extend(_labeled("Oldingi: " if w < 26 else "Oldingi summa: ", f"{old:.0f}", w))
+        L.extend(_labeled(f"Aksiya -{pct}%: ", f"-{old - order['total']:.0f}", w))
+    L.extend(_labeled("JAMI: ", fmt_sum(order.get("total", 0)), w))
     used_cb = order_cashback_used(order)
     if used_cb > 0:
-        L.append(_rline("Keshbek", "-" + fmt_sum(used_cb), w))
-        L.append(_rline("TO'LOVGA", fmt_sum(order_payable(order)), w))
+        L.extend(_labeled("Keshbek: ", "-" + fmt_sum(used_cb), w))
+        L.extend(_labeled("TO'LOVGA: ", fmt_sum(order_payable(order)), w))
     L.append("")
     # katta yozuvda ustunlar soni yarmiga tushadi — qator sig'ishi kerak
     if used_cb > 0:
         pay = "To'lov: NAQD + KESHBEK" if w >= 24 else "NAQD + KESHBEK"
     else:
         pay = "To'lov: NAQD (yetkazishda)" if w >= 28 else "To'lov: NAQD"
-    L.extend(_center(pay, w))
+    L.extend(_wrap(pay, w))
 
     if order.get("note"):
         L.append("-" * w)
@@ -2009,7 +2004,7 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
             L.append("  " + ln)
 
     L.append("-" * w)
-    L.extend(_center("Rahmat! Yana kutamiz", w))
+    L.extend(_wrap("Rahmat! Yana kutamiz", w))
     return [ascii_safe(x) for x in L] if safe else L
 
 def build_receipt_text(order, width=None, safe=True, header=True):
