@@ -4057,7 +4057,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   async function buildLogo(width){
     if (logoCache[width]) return logoCache[width];
     var im = await loadImage(url('/static/logo.jpg'));
-    var maxH = 420;                                  // qog'oz behuda ketmasin
+    var maxH = 520;                                  // qog'oz behuda ketmasin
     var w = width;
     var h = Math.round(im.height * (w / im.width));
     if (h > maxH){ h = maxH; w = Math.round(im.width * (h / im.height)); }
@@ -4118,21 +4118,56 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       }
     }
 
-    // Floyd-Steinberg: kulrangni nuqtalarga taqsimlaymiz
+    // Logomi yoki suratmi? Yassi grafikada piksellarning aksari deyarli oq yoki
+    // deyarli qora bo'ladi. Shunga qarab usulni tanlaymiz.
+    var flat = 0;
+    for (var fq = 0; fq < g.length; fq++){
+      if (g[fq] > 225 || g[fq] < 40) flat++;
+    }
+    var isLogo = flat > g.length * 0.62;
+
+    // Yozuvli logoni keskinlashtiramiz — mayda harflar ezilib ketmasin.
+    if (isLogo){
+      var sh = new Float32Array(g.length);
+      for (var sy = 0; sy < h; sy++){
+        for (var sx = 0; sx < w; sx++){
+          var si = sy * w + sx;
+          var c0 = g[si];
+          var up = sy > 0 ? g[si - w] : c0;
+          var dn = sy + 1 < h ? g[si + w] : c0;
+          var lf = sx > 0 ? g[si - 1] : c0;
+          var rt = sx + 1 < w ? g[si + 1] : c0;
+          var v2 = c0 * 2.6 - (up + dn + lf + rt) * 0.4;
+          sh[si] = v2 < 0 ? 0 : (v2 > 255 ? 255 : v2);
+        }
+      }
+      g = sh;
+    }
+
     var bpr = w / 8;
     var bits = new Uint8Array(bpr * h);
-    for (var y = 0; y < h; y++){
-      for (var x = 0; x < w; x++){
-        var idx = y * w + x;
-        var old = g[idx];
-        var nv = old < 128 ? 0 : 255;
-        var err = old - nv;
-        if (nv === 0) bits[y*bpr + (x >> 3)] |= (0x80 >> (x & 7));
-        if (x + 1 < w) g[idx+1] += err * 7 / 16;
-        if (y + 1 < h){
-          if (x > 0) g[idx+w-1] += err * 3 / 16;
-          g[idx+w] += err * 5 / 16;
-          if (x + 1 < w) g[idx+w+1] += err * 1 / 16;
+    if (isLogo){
+      // Keskin chegara: harf chetlari toza chiqadi, nuqtalar bulg'amaydi.
+      for (var ty = 0; ty < h; ty++){
+        for (var tx = 0; tx < w; tx++){
+          if (g[ty * w + tx] < 160) bits[ty*bpr + (tx >> 3)] |= (0x80 >> (tx & 7));
+        }
+      }
+    } else {
+      // Surat: Floyd-Steinberg bilan kulrangni nuqtalarga taqsimlaymiz
+      for (var y = 0; y < h; y++){
+        for (var x = 0; x < w; x++){
+          var idx = y * w + x;
+          var old = g[idx];
+          var nv = old < 128 ? 0 : 255;
+          var err = old - nv;
+          if (nv === 0) bits[y*bpr + (x >> 3)] |= (0x80 >> (x & 7));
+          if (x + 1 < w) g[idx+1] += err * 7 / 16;
+          if (y + 1 < h){
+            if (x > 0) g[idx+w-1] += err * 3 / 16;
+            g[idx+w] += err * 5 / 16;
+            if (x + 1 < w) g[idx+w+1] += err * 1 / 16;
+          }
         }
       }
     }
