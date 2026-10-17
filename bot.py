@@ -3791,13 +3791,16 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       image-rendering:pixelated;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
-    #printArea.sz-n pre{ font-size:11pt; line-height:1.28; }
-    #printArea.sz-h pre{ font-size:13.5pt; line-height:1.42; font-weight:600; }
-    #printArea.sz-b pre{ font-size:18pt; line-height:1.34; font-weight:700; }
+    #printArea.sz-n pre{ font-size:10.5pt; line-height:1.18; }
+    #printArea.sz-h pre{ font-size:13pt; line-height:1.2; font-weight:600; }
+    #printArea.sz-b pre{ font-size:17pt; line-height:1.18; font-weight:700; }
+    #printArea, #printArea pre, #printArea img{
+      page-break-inside:avoid; break-inside:avoid;
+    }
     #confirmBar{ display:none !important; }
-    @page{ margin:2mm; }
   }
 </style>
+<style id="pageStyle">@page{ size:80mm auto; margin:2mm; }</style>
 </head>
 <body>
 
@@ -4196,7 +4199,16 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     }
   }
 
+  // Chop etish varaqini qog'ozga moslaymiz. Busiz brauzer A4 deb o'ylab,
+  // uzun chekni ikkinchi varaqqa o'tkazib yuboradi.
+  function applyPageSize(){
+    var mm = Math.round(paperCols() * 1.5) + 6;     // 1 belgi ≈ 1.5 mm
+    var st = document.getElementById('pageStyle');
+    if (st) st.textContent = '@page{ size:' + mm + 'mm auto; margin:2mm; }';
+  }
+
   function systemPrint(text, logo){
+    applyPageSize();
     // Chop etish oynasi ochiladi — RawBT, printer yoki kompyuterdagi printer tanlanadi.
     // Oyna yopilgunicha kutamiz, chunki brauzer chop etilgan-etilmaganini aytmaydi.
     var area = document.getElementById('printArea');
