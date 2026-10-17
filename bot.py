@@ -1976,7 +1976,8 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
             continue
         L.extend(_wrap(it["name"], w))
         # narx qatorning chap tomonida — o'ng chet kesilsa ham ko'rinadi
-        L.extend(_labeled("  ", f"{it['qty']} x {it['price']:.0f} = {it['price'] * it['qty']:.0f}", w))
+        qty_line = f"{it['qty']} x {fmt_sum(it['price'])} = {fmt_sum(it['price'] * it['qty'])}"
+        L.extend(_labeled("  ", qty_line, w))
 
     L.append("-" * w)
     pct = order.get("discount_percent") or 0
@@ -3787,8 +3788,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       font-size:11pt; line-height:1.28; white-space:pre;
     }
     #printArea img.plogo{
-      display:block; margin:0 auto 2.5mm; width:100%; max-width:100%; height:auto;
-      image-rendering:pixelated;
+      display:block; margin:0 auto 3mm; width:72%; max-width:100%; height:auto;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
     #printArea.sz-n pre{ font-size:12pt; line-height:1.12; font-weight:600; }
@@ -4217,7 +4217,8 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     if (logo){
       var im = document.createElement('img');
       im.className = 'plogo';
-      im.src = logo.url;
+      // Printer drayveri o'zi to'g'ri nuqtalaydi — asl surat aniqroq chiqadi.
+      im.src = url('/static/logo.jpg');
       area.appendChild(im);
     }
     var pre = document.createElement('pre');
