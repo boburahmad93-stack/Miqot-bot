@@ -3837,6 +3837,13 @@ KITCHEN_PAGE_HTML = """<!doctype html>
         <option value="28">28 belgi</option>
       </select>
     </label>
+    <label title="Logo chiqmay qolsa yoki chekda oq chiziqlar bo'lsa shuni o'zgartiring">Tezlik
+      <select id="spd">
+        <option value="0" selected>Tez</option>
+        <option value="1">O'rtacha</option>
+        <option value="3">Sekin</option>
+      </select>
+    </label>
     <label>Usul
       <select id="mode">
         <option value="bt" selected>Bevosita Bluetooth</option>
@@ -4188,7 +4195,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     // ulgurmaydi: printer o'rtada och qolib siltiydi va chiziqlar uzilib chiqadi.
     // Shuning uchun uni 24 qatorli bo'laklarga bo'lamiz — har bo'lak mustaqil
     // buyruq, printer uni to'liq olgandan keyingina bosadi.
-    var BAND = 24;
+    var BAND = 64;
     var bands = [];
     for (var by = 0; by < h; by += BAND){
       var bh = Math.min(BAND, h - by);
@@ -4230,32 +4237,56 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     return segs;
   }
 
-  // 20 bayt — hamma Bluetooth printerda ishlaydigan xavfsiz o'lcham.
-  // Kattaroq paket ba'zi printerlarda jimgina yo'qoladi: ulanadi, lekin hech narsa chiqmaydi.
-  var CHUNK = 20;
+  // Paket o'lchami. Kattasi tezroq, lekin ba'zi printerlar qabul qilmaydi.
+  // Shuning uchun kattadan boshlaymiz va xatolik chiqsa o'zimiz pasayamiz.
+  var CHUNK_STEPS = [182, 100, 60, 20];
+  var chunkIx = 0;
+  function baseIx(){
+    var s = $('spd');
+    var v = s ? parseInt(s.value, 10) : 0;
+    return (v >= 0 && v < CHUNK_STEPS.length) ? v : 0;
+  }
+  function chunkSize(){ return CHUNK_STEPS[Math.max(chunkIx, baseIx())]; }
+  function slower(){
+    var cur = Math.max(chunkIx, baseIx());
+    if (cur < CHUNK_STEPS.length - 1){ chunkIx = cur + 1; return true; }
+    return false;
+  }
+  var CHUNK = 20;                      // eski nom — moslik uchun
 
   function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 
-  async function sendRaw(bytes){
+  async function writeOne(part){
     var cur = chrList[chrIndex] || {};
-    for (var i=0; i<bytes.length; i+=CHUNK){
-      var part = bytes.slice(i, i+CHUNK);
-      if (cur.wnr && chr.writeValueWithoutResponse) await chr.writeValueWithoutResponse(part);
-      else if (chr.writeValue) await chr.writeValue(part);
-      else await chr.writeValueWithResponse(part);
-      await wait(12);
+    if (cur.wnr && chr.writeValueWithoutResponse) return chr.writeValueWithoutResponse(part);
+    if (chr.writeValue) return chr.writeValue(part);
+    return chr.writeValueWithResponse(part);
+  }
+
+  // Bitta bo'lakni yuboramiz. Paket kattaligi qabul qilinmasa, pasayib qayta boshlaymiz.
+  async function sendRaw(bytes){
+    for (;;){
+      var size = chunkSize();
+      try{
+        for (var i = 0; i < bytes.length; i += size){
+          await writeOne(bytes.slice(i, i + size));
+          // Kichik paketda nafas kerak, kattasida await o'zi tutib turadi.
+          if (size <= 20) await wait(6);
+        }
+        return;
+      }catch(e){
+        if (!slower()) throw e;        // eng kichigida ham bo'lmadi — xatolikni ko'rsatamiz
+        await wait(120);               // printer o'ziga kelsin va boshidan yuboramiz
+      }
     }
   }
 
   // segs — bo'laklar ro'yxati (yoki bitta Uint8Array).
-  // Har bo'lakdan keyin printerga ulgurish uchun biroz vaqt beramiz.
+  // Rasm bo'laklari orasida kutmaymiz: pauza qog'ozda oq chiziq qoldiradi.
   async function sendBytes(segs){
     if (!chr) throw new Error('printer ulanmagan');
     if (!Array.isArray(segs)) segs = [segs];
-    for (var s = 0; s < segs.length; s++){
-      await sendRaw(segs[s]);
-      if (segs[s].length > 64) await wait(60);   // rasm bo'lagi — motor yetib olsin
-    }
+    for (var s = 0; s < segs.length; s++) await sendRaw(segs[s]);
   }
 
   // Chop etish varaqini qog'ozga moslaymiz. Busiz brauzer A4 deb o'ylab,
