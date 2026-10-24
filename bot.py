@@ -2670,6 +2670,14 @@ def _winback_failed(uid, err):
     print(f"Uxlaganlarga xabar yuborishda xato ({uid}): {err}")
     return False
 
+def wb_who(uid, users=None):
+    """Hisobotda mijozni tanib olish uchun: ism, @username va raqami."""
+    users = users if users is not None else load_users()
+    u = users.get(str(uid)) or {}
+    name = (u.get("name") or "").strip() or "ismsiz"
+    uname = (u.get("username") or "").strip()
+    return f"{name}" + (f" (@{uname})" if uname else "") + f" — {uid}"
+
 def customer_name_of(uid, users=None):
     users = users if users is not None else load_users()
     return ((users.get(str(uid)) or {}).get("name") or "").strip() or "mijoz"
@@ -2679,6 +2687,7 @@ def run_winback(report_to=None):
     g1, g2 = winback_scan()
     users = load_users()
     sent1 = sent2 = 0
+    ok_list, fail_list = [], []        # hisobotda kimga ketgani ko'rinsin
 
     for uid, _days in g1:
         lang = get_user_lang(uid)
@@ -2692,7 +2701,9 @@ def run_winback(report_to=None):
                              reply_markup=kb)
             winback_mark(uid, "s7")
             sent1 += 1
+            ok_list.append(f"{WINBACK_DAYS_1}k • " + wb_who(uid, users))
         except Exception as e:
+            fail_list.append(wb_who(uid, users) + f" — {e}")
             _winback_failed(uid, e)
         time.sleep(0.06)
 
@@ -2711,7 +2722,9 @@ def run_winback(report_to=None):
                              reply_markup=kb)
             winback_mark(uid, "s21")
             sent2 += 1
+            ok_list.append(f"{WINBACK_DAYS_2}k • " + wb_who(uid, users))
         except Exception as e:
+            fail_list.append(wb_who(uid, users) + f" — {e}")
             # xabar yetib bormadi — bonusni qaytarib olamiz, keyingi safar qayta uriniladi
             cashback_move(uid, -WINBACK_BONUS, None, "xabar yetmadi, bonus qaytarildi")
             _winback_failed(uid, e)
@@ -2723,6 +2736,12 @@ def run_winback(report_to=None):
                 f"{WINBACK_DAYS_2} kunlik \u2014 {sent2} ta xabar yuborildi.")
         if sent2:
             text += f"\n\U0001F381 Berilgan bonus: {fmt_sum(sent2 * WINBACK_BONUS)}"
+        if ok_list:
+            text += "\n\nXabar ketganlar:\n" + "\n".join("  " + x for x in ok_list[:25])
+            if len(ok_list) > 25:
+                text += f"\n  ...va yana {len(ok_list) - 25} ta"
+        if fail_list:
+            text += "\n\n⚠️ Yetib bormaganlar:\n" + "\n".join("  " + x for x in fail_list[:15])
         targets = [report_to] if report_to else list(load_admin_ids())
         for admin_id in targets:
             try:
@@ -2759,9 +2778,50 @@ def cmd_sleepers(message):
     if not is_owner(message.chat.id):
         return
     parts = (message.text or "").split()
-    if len(parts) > 1 and parts[1].lower() in ("yubor", "send"):
+    arg = parts[1].lower() if len(parts) > 1 else ""
+
+    if arg in ("yubor", "send"):
         bot.send_message(message.chat.id, "Yuborilmoqda... Tugagach hisobot keladi.")
         threading.Thread(target=run_winback, args=(message.chat.id,), daemon=True).start()
+        return
+
+    if arg in ("sinov", "test"):
+        # Mijoz aynan nimani ko'rishini o'zingizga yuboramiz. Bonus berilmaydi,
+        # hech kim "yuborilgan" deb belgilanmaydi.
+        uid = message.chat.id
+        lang = get_user_lang(uid)
+        users_t = load_users()
+        kb1 = types.InlineKeyboardMarkup()
+        kb1.add(types.InlineKeyboardButton(t("btn_feedback", lang), callback_data="wb:fb"))
+        ob1 = order_webapp_button(uid, users_t, lang)
+        if ob1:
+            kb1.add(ob1)
+        kb2 = types.InlineKeyboardMarkup()
+        ob2 = order_webapp_button(uid, users_t, lang)
+        if ob2:
+            kb2.add(ob2)
+        kb2.add(types.InlineKeyboardButton(t("btn_feedback", lang), callback_data="wb:fb"))
+        bot.send_message(uid, f"\U0001F9EA Sinov — {WINBACK_DAYS_1} kunlik xabar:")
+        bot.send_message(uid, t("wb_7", lang, ism=customer_name_of(uid, users_t)), reply_markup=kb1)
+        bot.send_message(uid, f"\U0001F9EA Sinov — {WINBACK_DAYS_2} kunlik xabar:")
+        bot.send_message(uid, t("wb_21", lang, ism=customer_name_of(uid, users_t),
+                                bonus=fmt_sum(WINBACK_BONUS), biz=BUSINESS_NAME), reply_markup=kb2)
+        return
+
+    if arg in ("royxat", "ro'yxat", "list", "kim"):
+        g1, g2 = winback_scan()
+        users_l = load_users()
+        if not g1 and not g2:
+            bot.send_message(message.chat.id, "Hozir xabar kutayotgan mijoz yo'q.")
+            return
+        txt = "\U0001F634 Xabar kutayotganlar\n"
+        if g1:
+            txt += f"\n{WINBACK_DAYS_1} kunlik ({len(g1)} ta):\n" + "\n".join(
+                f"  {wb_who(u, users_l)} — {d:.0f} kun" for u, d in g1[:30])
+        if g2:
+            txt += f"\n\n{WINBACK_DAYS_2} kunlik ({len(g2)} ta):\n" + "\n".join(
+                f"  {wb_who(u, users_l)} — {d:.0f} kun" for u, d in g2[:30])
+        bot.send_message(message.chat.id, txt)
         return
 
     now = int(time.time())
@@ -2791,7 +2851,9 @@ def cmd_sleepers(message):
         f"{WINBACK_DAYS_2} kunlik \u2014 {done2} ta\n"
         + (f"Botni bloklagan: {bloklagan} ta\n" if bloklagan else "")
         + f"\nHar kuni soat {WINBACK_HOUR}:00 da o'zi tekshiradi.\n"
-        "Hoziroq yuborish: /uxlaganlar yubor")
+        "Hoziroq yuborish: /uxlaganlar yubor\n"
+        "Kimlar kutayotganini ko'rish: /uxlaganlar royxat\n"
+        "Xabar qanday ko'rinishini sinash: /uxlaganlar sinov")
 
 # ---------- admin: menyuni boshqarish ----------
 
@@ -3913,6 +3975,45 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     m.className = 'msg ' + (kind || 'info');
     m.innerHTML = text;
   }
+  // Telegram ichidagi brauzer Bluetooth'ga ruxsat bermaydi — tashqi Chrome kerak.
+  function openInChrome(){
+    var u = location.href;
+    try{
+      var tg = window.Telegram && window.Telegram.WebApp;
+      if (tg && tg.openLink){ tg.openLink(u, { try_instant_view: false }); return; }
+    }catch(e){}
+    if (/Android/i.test(navigator.userAgent)){
+      var bare = u.replace("https://", "").replace("http://", "");
+      location.href = "intent://" + bare + "#Intent;scheme=https;package=com.android.chrome;end";
+      return;
+    }
+    window.open(u, "_blank");
+  }
+
+  function copyLink(){
+    var u = location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(u).then(function(){
+        say("Havola nusxalandi. Chrome'ni oching va manzil qatoriga qo‘ying.", 'ok');
+      }).catch(function(){ window.prompt("Havolani nusxalang:", u); });
+    } else {
+      window.prompt("Havolani nusxalang:", u);
+    }
+  }
+
+  function sayNeedChrome(){
+    say("Bluetooth bu yerda ishlamaydi — sahifa Telegram ichidagi brauzerda ochilgan. " +
+        "Uni Chrome'da ochsangiz printer ulanadi.<br>" +
+        "<button type=\"button\" id=\"goChrome\" style=\"margin:8px 6px 0 0;padding:9px 13px;" +
+        "border-radius:9px;font-weight:700\">Chrome'da ochish</button>" +
+        "<button type=\"button\" id=\"cpLink\" style=\"margin:8px 0 0 0;padding:9px 13px;" +
+        "border-radius:9px\">Havolani nusxalash</button>", 'err');
+    var g = document.getElementById('goChrome');
+    if (g) g.onclick = openInChrome;
+    var c = document.getElementById('cpLink');
+    if (c) c.onclick = copyLink;
+  }
+
   function setState(txt, ok){
     $('state').textContent = txt;
     $('dot').classList.toggle('on', !!ok);
@@ -3985,8 +4086,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
 
   async function connect(){
     if (!btSupported()){
-      say("Bu brauzer Bluetooth printerni qo'llab-quvvatlamaydi. Android'da <b>Chrome</b> bilan oching, " +
-          "yoki pastdagi “boshqa yo'l”dan foydalaning.", 'err');
+      sayNeedChrome();
       return;
     }
     try{
@@ -4600,7 +4700,8 @@ KITCHEN_PAGE_HTML = """<!doctype html>
           "shunda buyurtma ro\u2019yxatdan o\u2018chadi.", 'info');
     } else {
       $('auto').checked = true;
-      say("Bevosita rejim: printerni ulasangiz cheklar o‘zi chiqadi.", 'info');
+      if (!btSupported()) sayNeedChrome();
+      else say("Bevosita rejim: printerni ulasangiz cheklar o‘zi chiqadi.", 'info');
     }
     poll();
   });
@@ -4623,10 +4724,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     });
   }
 
-  if (!btSupported()){
-    say("Bu brauzerda printerga bevosita ulab bo‘lmaydi (Android Chrome kerak). " +
-        "Buyurtmalar baribir ko‘rinadi — “Matnni nusxalash” orqali chiqarasiz.", 'err');
-  }
+  if (!btSupported()) sayNeedChrome();
 
   poll();
   setInterval(poll, 5000);
