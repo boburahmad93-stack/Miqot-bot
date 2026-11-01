@@ -1720,11 +1720,11 @@ def handle_checkout_steps(message):
 
 # ---------- buyurtma yaratish (chat va Mini App uchun umumiy) ----------
 
-def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False):
+def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None):
     """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi."""
     with DATA_LOCK:
         order, error = _create_order_locked(items_cart, customer_name, phone, latitude, longitude,
-                                            address_text, note, tg_user_id, username, use_cashback)
+                                            address_text, note, tg_user_id, username, use_cashback, extra)
     if error:
         return None, error
     # xabarlarni qulfdan tashqarida yuboramiz — boshqa mijozlar kutib qolmasin
@@ -1738,7 +1738,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
             pass
     return order, None
 
-def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False):
+def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None):
     full_menu = load_menu()
     menu = {d["id"]: d for d in full_menu}
     items = []
@@ -1815,6 +1815,8 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         "user_id": tg_user_id,
         "username": username,
     }
+    if extra:
+        order.update(extra)
     orders.append(order)
     save_orders(orders)
     if cb_used > 0:
@@ -2035,6 +2037,9 @@ def order_address_line(order):
     return f"📍 {order.get('address_text') or '—'}"
 
 def order_contact_line(order):
+    if order.get("source") == "instagram":
+        ig = order.get("ig_username")
+        return f"📷 Instagram: @{ig}" if ig else "📷 Instagram"
     if order.get("username"):
         return f"@{order['username']}"
     return "username yo'q"
@@ -2145,6 +2150,8 @@ def register_order_reply_target(recipient_id, sent_message, order):
     try:
         if order.get("user_id") and sent_message is not None:
             support_message_map[(recipient_id, sent_message.message_id)] = order["user_id"]
+        elif order.get("ig_user_id") and sent_message is not None:
+            support_message_map[(recipient_id, sent_message.message_id)] = f"ig:{order['ig_user_id']}"
     except Exception as e:
         print(f"Reply manzilini eslab qolishda xato: {e}")
 
@@ -2183,6 +2190,8 @@ def tell_customer(order, text_uz_key, **kw):
     """Mijozga o'z tilida xabar yuboradi."""
     uid = order.get("user_id")
     if not uid:
+        if order.get("ig_user_id"):
+            ig_notify_customer(order, t(text_uz_key, "uz", **kw))
         return
     try:
         lang = get_user_lang(uid)
@@ -2348,6 +2357,10 @@ def cb_update_status(call):
                                                  amt=fmt_sum(earned), bal=fmt_sum(new_balance)))
     except Exception:
         pass
+
+    if order.get("ig_user_id"):
+        ig_notify_customer(order, t("status_update", "uz", no=order["daily_number"],
+                                    st=status_name(new_status, "uz")))
 
     if new_status == "Yetkazildi":
         mark_delivered_user(order.get("user_id"))
@@ -2972,6 +2985,8 @@ def cmd_menu_admin(message):
         "Menyu:\n" + "\n".join(lines) +
         "\n\n🏷 Aksiya: /aksiya 17 (yoqish) | /aksiya off (o'chirish)\n"
         "🕒 Ish vaqti: /yopiq | /ochiq | /ish_vaqti 06:00 22:00\n"
+        "🖨 Oshxona havolasi (Chrome uchun): /oshxona\n"
+        "🧾 Bugungi cheklar holati: /cheklar\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
         "🎁 Viktorina: /viktorina | g'olib: /gholib\n"
         "📣 E'lon yuborish: /elon matn | mijozlar soni: /mijozlar\n"
@@ -5825,6 +5840,100 @@ def cmd_report(message):
     today = datetime.now(TIMEZONE).date()
     bot.send_message(message.chat.id, build_daily_report_text(today))
 
+@bot.message_handler(commands=["cheklar", "checks"])
+def cmd_checks(message):
+    """Bugungi buyurtmalar oshxona ro‘yxatida bormi — shuni ko‘rsatadi.
+
+    Oshxona sahifasiga faqat printed=False bo‘lgan buyurtmalar tushadi.
+    Shuning uchun “buyurtma keldi, lekin chek yo‘q” bo‘lsa, sabab shu yerdan ko‘rinadi.
+    """
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split()
+    arg = parts[1].lower() if len(parts) > 1 else ""
+    day = today_key()
+
+    if arg in ("qayta", "again", "reset"):
+        only = None
+        if len(parts) > 2 and parts[2].lstrip("#").isdigit():
+            only = int(parts[2].lstrip("#"))
+        with DATA_LOCK:
+            orders = load_orders()
+            n = 0
+            for o in orders:
+                if o.get("day_key") != day or is_cancelled(o):
+                    continue
+                if only is not None and o.get("daily_number") != only:
+                    continue
+                if o.get("printed"):
+                    o["printed"] = False
+                    n += 1
+            if n:
+                save_orders(orders)
+        if n:
+            bot.send_message(message.chat.id,
+                f"♻️ {n} ta buyurtma oshxona ro‘yxatiga qaytarildi. "
+                "Oshxona sahifasini oching — cheklar ko‘rinadi.")
+        else:
+            bot.send_message(message.chat.id, "Qaytariladigan buyurtma topilmadi.")
+        return
+
+    today_orders = [o for o in load_orders() if o.get("day_key") == day]
+    if not today_orders:
+        bot.send_message(message.chat.id,
+            f"Bugun ({day}) hali buyurtma yo‘q.\n\n"
+            "Eslatma: oshxona ro‘yxatida faqat <b>bugungi</b> buyurtmalar ko‘rinadi. "
+            "Kechagisini ko‘rish uchun oshxona sahifasidagi «Qayta chiqarish» ishlamaydi — "
+            "u ham faqat bugungi raqamlar bilan ishlaydi.", parse_mode="HTML")
+        return
+
+    today_orders.sort(key=lambda o: o.get("daily_number") or 0)
+    rows, waiting = [], 0
+    for o in today_orders:
+        if is_cancelled(o):
+            mark = "❌ bekor"
+        elif o.get("printed"):
+            mark = "✅ chiqarilgan"
+        else:
+            mark = "⏳ navbatda"
+            waiting += 1
+        rows.append(f"#{o.get('daily_number')} {o.get('customer_name') or '-'} "
+                    f"— {fmt_sum(o.get('total', 0))} — {mark}")
+
+    txt = (f"\U0001F9FE Bugungi cheklar ({day})\n\n" + "\n".join(rows) +
+           f"\n\nOshxona ro‘yxatida ko‘rinadigani: {waiting} ta")
+    if waiting == 0:
+        txt += ("\n\n⚠️ Hammasi “chiqarilgan” deb belgilangan, shuning uchun "
+                "oshxona bo‘limi bo‘sh ko‘rinadi.\n"
+                "Qaytarish: /cheklar qayta  (yoki bittasi: /cheklar qayta 3)")
+    bot.send_message(message.chat.id, txt)
+
+@bot.message_handler(commands=["oshxona", "kitchen"])
+def cmd_kitchen_link(message):
+    """Oshxona sahifasining havolasi — Chrome'da ochish uchun.
+
+    Telegram ichidagi brauzer (ayniqsa Androidda) Bluetooth'ga ruxsat bermaydi,
+    shuning uchun havolani alohida berib qo'yamiz.
+    """
+    if not is_owner(message.chat.id):
+        return
+    if not WEBAPP_URL:
+        bot.send_message(message.chat.id, "WEBAPP_URL sozlanmagan.")
+        return
+    uid = message.chat.id
+    uname = message.from_user.username if message.from_user else None
+    ts, sig = sign_user_params(uid, uname)
+    params = f"uid={uid}&uname={urllib.parse.quote(uname or '')}&ts={ts}&sig={sig}&v={ts}"
+    link = f"{WEBAPP_URL}/kitchen?{params}"
+    bot.send_message(message.chat.id,
+        "\U0001F5A8 Oshxona sahifasi havolasi:\n\n"
+        f"`{link}`\n\n"
+        "Telefonda Bluetooth printer ishlashi uchun shuni *Chrome*da oching — "
+        "Telegram ichidagi brauzerda Bluetooth yopiq.\n\n"
+        "Keyin Chrome menyusidan «Asosiy ekranga qo‘shish» ni tanlang, "
+        "shunda har safar shu ikonkadan ochasiz.",
+        parse_mode="Markdown", disable_web_page_preview=True)
+
 @bot.message_handler(commands=["versiya", "version"])
 def cmd_version(message):
     """Serverdagi kod qachon yangilangani — deploy yetib keldimi, shundan bilinadi."""
@@ -6276,6 +6385,11 @@ def handle_admin_reply(message):
     customer_id = support_message_map.get((message.chat.id, message.reply_to_message.message_id))
     if not customer_id:
         return
+    if isinstance(customer_id, str) and customer_id.startswith("ig:"):
+        res = ig_send_text(customer_id[3:], f"{BUSINESS_NAME}: {message.text}")
+        bot.send_message(message.chat.id, "✅ Javob Instagram'ga yuborildi." if res
+                         else "❌ Yuborilmadi (Instagram 24 soatlik oyna yopilgan bo'lishi mumkin).")
+        return
     try:
         clang = get_user_lang(customer_id)
         bot.send_message(customer_id, t("reply_from", clang, biz=BUSINESS_NAME) + f"\n{message.text}")
@@ -6348,6 +6462,485 @@ def handle_customer_free_text(message):
             pass
     bot.send_message(message.chat.id, t("msg_received", get_user_lang(sender.id, getattr(sender, "language_code", None))))
 
+
+# ======================================================================
+#  INSTAGRAM BOT — Direct'dagi buyurtmalar ham shu Telegram tizimga tushadi
+# ======================================================================
+#  Railway Variables (sozlamalar):
+#    IG_ACCESS_TOKEN  — Meta Developers'da yaratilgan Instagram tokeni
+#    IG_APP_SECRET    — Meta ilovaning Instagram App Secret'i (imzo tekshiruvi)
+#    IG_VERIFY_TOKEN  — webhook tasdiqlash uchun o'zingiz o'ylab topgan so'z
+#    IG_USER_ID       — @miqotfood'ning Instagram ID'si (o'z izohlariga javob bermaslik uchun)
+#    IG_MIN_ORDER     — eng kam buyurtma summasi (standart 30)
+#    IG_COMMENT_ALL   — "1" bo'lsa har qanday izohga Direct yuboradi, aks holda faqat "menyu" kabi so'zlarga
+#  Webhook manzili:  {WEBAPP_URL}/ig/webhook
+# ----------------------------------------------------------------------
+
+IG_ACCESS_TOKEN = os.environ.get("IG_ACCESS_TOKEN", "")
+IG_APP_SECRET = os.environ.get("IG_APP_SECRET", "")
+IG_VERIFY_TOKEN = os.environ.get("IG_VERIFY_TOKEN", "")
+IG_USER_ID = os.environ.get("IG_USER_ID", "")
+# Yangi Meta ilovalari "Unified login" ishlatadi -> graph.facebook.com (token muddatsiz).
+# Eski "Instagram login" tokeni bo'lsa IG_API_HOST=graph.instagram.com qo'ying.
+IG_API_HOST = os.environ.get("IG_API_HOST", "")
+IG_API_VERSION = os.environ.get("IG_API_VERSION", "v21.0")
+IG_API = ""
+
+def ig_detect_host():
+    """Token qaysi Meta serveriga tegishli ekanini o'zi aniqlaydi (instagram yoki facebook)."""
+    global IG_API_HOST, IG_API
+    if not IG_API_HOST and IG_ACCESS_TOKEN:
+        for host in ("graph.instagram.com", "graph.facebook.com"):
+            try:
+                r = httpreq.get(f"https://{host}/{IG_API_VERSION}/me",
+                                params={"fields": "id", "access_token": IG_ACCESS_TOKEN}, timeout=10)
+                if r.ok:
+                    IG_API_HOST = host
+                    break
+            except Exception:
+                pass
+    IG_API_HOST = IG_API_HOST or "graph.facebook.com"
+    IG_API = f"https://{IG_API_HOST}/{IG_API_VERSION}"
+    print(f"[IG] API: {IG_API}")
+IG_MIN_ORDER = float(os.environ.get("IG_MIN_ORDER", "30"))
+IG_COMMENT_ALL = os.environ.get("IG_COMMENT_ALL", "0") == "1"
+IG_TG_BOT_URL = os.environ.get("IG_TG_BOT_URL", "https://t.me/miqotfoodbuyurtmabot")
+
+IG_SESSIONS_FILE = os.path.join(DATA_DIR, "ig_sessions.json")
+IG_LOCK = threading.RLock()
+_ig_profile_cache = {}
+
+# quick-reply tugmalari
+IGQ_MENU = ("🍽 Menyu", "MENU")
+IGQ_CART = ("🛒 Savat", "CART")
+IGQ_CHECKOUT = ("✅ Buyurtma berish", "CHECKOUT")
+IGQ_CLEAR = ("🗑 Tozalash", "CLEAR")
+IGQ_CONFIRM = ("✅ Tasdiqlash", "CONFIRM")
+IGQ_CANCEL = ("❌ Bekor qilish", "CANCEL")
+IGQ_MORE = ("➡️ Yana taomlar", "MORE")
+
+
+IG_TOKEN_FILE = os.path.join(DATA_DIR, "ig_token.json")
+# avval yangilangan token faylda bo'lsa, o'shani olamiz (Railway'dagi eski token 60 kunda eskiradi)
+_saved_tok = load_json(IG_TOKEN_FILE, {}).get("token")
+if _saved_tok:
+    IG_ACCESS_TOKEN = _saved_tok
+
+
+def ig_enabled():
+    return bool(IG_ACCESS_TOKEN)
+
+
+def ig_token_refresher():
+    """Har 20 kunda tokenni yangilaydi — 60 kunlik muddat hech qachon tugamaydi."""
+    global IG_ACCESS_TOKEN
+    ig_detect_host()
+    if IG_API_HOST != "graph.instagram.com":
+        return  # Unified login tokeni muddatsiz — yangilash shart emas
+    while True:
+        try:
+            if IG_ACCESS_TOKEN:
+                r = httpreq.get("https://graph.instagram.com/refresh_access_token",
+                                params={"grant_type": "ig_refresh_token",
+                                        "access_token": IG_ACCESS_TOKEN}, timeout=15)
+                if r.ok and r.json().get("access_token"):
+                    IG_ACCESS_TOKEN = r.json()["access_token"]
+                    save_json(IG_TOKEN_FILE, {"token": IG_ACCESS_TOKEN, "at": int(time.time())})
+                    print("[IG] token yangilandi")
+                else:
+                    print(f"[IG] tokenni yangilab bo'lmadi: {r.status_code} {r.text[:200]}")
+        except Exception as e:
+            print(f"[IG] token yangilash xatosi: {e}")
+        time.sleep(20 * 86400)
+
+
+# ---------- sessiya (savat, qadam) ----------
+
+def ig_sessions():
+    return load_json(IG_SESSIONS_FILE, {})
+
+def ig_get(uid):
+    with IG_LOCK:
+        return ig_sessions().get(str(uid)) or {"cart": {}, "step": None}
+
+def ig_put(uid, st):
+    with IG_LOCK:
+        data = ig_sessions()
+        st["updated"] = int(time.time())
+        data[str(uid)] = st
+        # 7 kundan eski sessiyalarni tozalaymiz
+        cutoff = time.time() - 7 * 86400
+        data = {k: v for k, v in data.items() if v.get("updated", 0) > cutoff}
+        save_json(IG_SESSIONS_FILE, data)
+
+
+# ---------- Instagram API ----------
+
+def ig_api_post(path, payload):
+    try:
+        r = httpreq.post(f"{IG_API}/{path}", json=payload,
+                         params={"access_token": IG_ACCESS_TOKEN}, timeout=15)
+        if r.status_code >= 400:
+            print(f"[IG] {path} xato {r.status_code}: {r.text[:300]}")
+            return None
+        return r.json()
+    except Exception as e:
+        print(f"[IG] {path} ulanish xatosi: {e}")
+        return None
+
+def ig_quick(buttons):
+    return [{"content_type": "text", "title": title[:20], "payload": payload}
+            for title, payload in buttons][:13]
+
+def ig_send_text(igsid, text, quick=None):
+    msg = {"text": (text or "")[:1000]}
+    if quick:
+        msg["quick_replies"] = ig_quick(quick)
+    return ig_api_post("me/messages", {"recipient": {"id": str(igsid)}, "message": msg})
+
+def ig_send_carousel(igsid, elements):
+    return ig_api_post("me/messages", {
+        "recipient": {"id": str(igsid)},
+        "message": {"attachment": {"type": "template", "payload": {
+            "template_type": "generic", "elements": elements[:10]}}},
+    })
+
+def ig_username(igsid):
+    if igsid in _ig_profile_cache:
+        return _ig_profile_cache[igsid]
+    name = None
+    try:
+        r = httpreq.get(f"{IG_API}/{igsid}", params={"fields": "username,name",
+                                                      "access_token": IG_ACCESS_TOKEN}, timeout=10)
+        if r.ok:
+            j = r.json()
+            name = j.get("username") or j.get("name")
+    except Exception:
+        pass
+    _ig_profile_cache[igsid] = name
+    return name
+
+
+# ---------- menyu va savat ----------
+
+def ig_available_menu():
+    menu = load_menu()
+    out = []
+    for _, dishes in group_menu_by_category(menu):
+        for d in dishes:
+            stock = d.get("stock")
+            if stock is not None and stock <= 0:
+                continue
+            out.append(d)
+    return out
+
+def ig_cart_lines(cart):
+    menu = {d["id"]: d for d in load_menu()}
+    disc = get_discount()
+    lines, total = [], 0.0
+    for did, qty in cart.items():
+        d = menu.get(int(did))
+        if not d or qty <= 0:
+            continue
+        unit = discounted_price(d["price"], disc)
+        total += unit * qty
+        lines.append(f"• {d['name']} × {qty} = {fmt_sum(unit * qty)}")
+    return lines, money(total)
+
+def ig_send_menu(igsid, page=0):
+    st = shop_status()
+    if not st["open"]:
+        ig_send_text(igsid, closed_message("uz", st))
+        return
+    dishes = ig_available_menu()
+    if not dishes:
+        ig_send_text(igsid, "Bugungi menyu hali tayyor emas. Birozdan keyin qayta yozing 🙏")
+        return
+    disc = get_discount()
+    chunk = dishes[page * 10:(page + 1) * 10]
+    elements = []
+    for d in chunk:
+        unit = discounted_price(d["price"], disc)
+        price = fmt_sum(unit)
+        if unit != d["price"]:
+            price = f"{fmt_sum(unit)} (avval {fmt_sum(d['price'])})"
+        sub = price + ((" · " + d["desc"]) if d.get("desc") else "")
+        el = {"title": d["name"][:80], "subtitle": sub[:80],
+              "buttons": [{"type": "postback", "title": "➕ Savatga", "payload": f"ADD:{d['id']}"}]}
+        if d.get("local_photo") and WEBAPP_URL:
+            el["image_url"] = f"{WEBAPP_URL}/static/dishes/{d['local_photo']}"
+        elements.append(el)
+    if page == 0:
+        head = "🍽 Bugungi menyu"
+        if disc.get("active"):
+            head += f" — 🔥 {disc.get('percent')}% chegirma!"
+        ig_send_text(igsid, head + "\nTaomni tanlab «➕ Savatga» ni bosing 👇")
+    ig_send_carousel(igsid, elements)
+    quick = [IGQ_CART]
+    if len(dishes) > (page + 1) * 10:
+        quick.insert(0, IGQ_MORE)
+        s = ig_get(igsid); s["menu_page"] = page + 1; ig_put(igsid, s)
+    ig_send_text(igsid, "Tanlab bo'lgach «🛒 Savat» ni bosing.", quick)
+
+def ig_send_cart(igsid):
+    s = ig_get(igsid)
+    lines, total = ig_cart_lines(s.get("cart", {}))
+    if not lines:
+        ig_send_text(igsid, "🛒 Savatingiz bo'sh.", [IGQ_MENU])
+        return
+    text = "🛒 Savatingiz:\n" + "\n".join(lines) + f"\n\nJami: {fmt_sum(total)}\n🚚 Yetkazib berish BEPUL"
+    if total < IG_MIN_ORDER:
+        text += f"\n\n⚠️ Eng kam buyurtma {fmt_sum(IG_MIN_ORDER)}. Yana {fmt_sum(IG_MIN_ORDER - total)} qo'shing."
+        ig_send_text(igsid, text, [IGQ_MENU, IGQ_CLEAR])
+    else:
+        ig_send_text(igsid, text, [IGQ_CHECKOUT, IGQ_MENU, IGQ_CLEAR])
+
+def ig_add(igsid, dish_id):
+    dish = next((d for d in load_menu() if d["id"] == int(dish_id)), None)
+    if not dish:
+        ig_send_text(igsid, "Bu taom menyuda qolmadi.", [IGQ_MENU])
+        return
+    s = ig_get(igsid)
+    cart = s.setdefault("cart", {})
+    key = str(dish["id"])
+    new_qty = cart.get(key, 0) + 1
+    stock = dish.get("stock")
+    if stock is not None and new_qty > stock:
+        ig_send_text(igsid, f"«{dish['name']}» dan faqat {stock} dona qoldi.", [IGQ_CART, IGQ_MENU])
+        return
+    cart[key] = new_qty
+    ig_put(igsid, s)
+    _, total = ig_cart_lines(cart)
+    ig_send_text(igsid, f"✅ {dish['name']} qo'shildi (×{new_qty}).\nSavat: {fmt_sum(total)}",
+                 [IGQ_CART, IGQ_MENU, IGQ_CHECKOUT])
+
+
+# ---------- rasmiylashtirish ----------
+
+def ig_start_checkout(igsid):
+    st = shop_status()
+    if not st["open"]:
+        ig_send_text(igsid, closed_message("uz", st))
+        return
+    s = ig_get(igsid)
+    _, total = ig_cart_lines(s.get("cart", {}))
+    if total <= 0:
+        ig_send_text(igsid, "🛒 Savatingiz bo'sh.", [IGQ_MENU])
+        return
+    if total < IG_MIN_ORDER:
+        ig_send_cart(igsid)
+        return
+    s["step"] = "name"
+    ig_put(igsid, s)
+    ig_send_text(igsid, "👤 Ismingizni yozing:")
+
+def ig_handle_step(igsid, text):
+    s = ig_get(igsid)
+    step = s.get("step")
+    text = (text or "").strip()
+    if step == "name":
+        if len(text) < 2:
+            ig_send_text(igsid, "Ismingizni yozing, iltimos:")
+            return
+        s["name"] = text[:60]
+        s["step"] = "phone"
+        ig_put(igsid, s)
+        ig_send_text(igsid, "📞 Telefon raqamingizni yozing (masalan 05XXXXXXXX):")
+    elif step == "phone":
+        digits = re.sub(r"\D", "", text)
+        if len(digits) < 9:
+            ig_send_text(igsid, "Raqam noto'g'ri ko'rinadi. Qaytadan yozing (masalan 05XXXXXXXX):")
+            return
+        s["phone"] = text[:25]
+        s["step"] = "address"
+        ig_put(igsid, s)
+        ig_send_text(igsid, "📍 Manzilingizni yozing (mahalla, mehmonxona/bino, xona raqami) "
+                            "yoki Google Maps havolasini yuboring:")
+    elif step == "address":
+        if len(text) < 4:
+            ig_send_text(igsid, "Manzilni batafsilroq yozing, iltimos:")
+            return
+        s["address"] = text[:300]
+        s["step"] = "confirm"
+        ig_put(igsid, s)
+        lines, total = ig_cart_lines(s.get("cart", {}))
+        ig_send_text(igsid,
+                     "Buyurtmangizni tekshiring:\n\n" + "\n".join(lines)
+                     + f"\n\nJami: {fmt_sum(total)} (naqd, yetkazib berish BEPUL)"
+                     + f"\n👤 {s['name']}\n📞 {s['phone']}\n📍 {s['address']}",
+                     [IGQ_CONFIRM, IGQ_CANCEL])
+    elif step == "confirm":
+        ig_send_text(igsid, "Tasdiqlaysizmi?", [IGQ_CONFIRM, IGQ_CANCEL])
+
+def ig_confirm(igsid):
+    s = ig_get(igsid)
+    if s.get("step") != "confirm" or not s.get("cart"):
+        ig_send_cart(igsid)
+        return
+    st = shop_status()
+    if not st["open"]:
+        ig_send_text(igsid, closed_message("uz", st))
+        return
+    uname = ig_username(igsid)
+    order, error = create_order(
+        items_cart=s["cart"], customer_name=s.get("name") or "Mijoz", phone=s.get("phone") or "",
+        latitude=None, longitude=None, address_text=s.get("address"), note="",
+        tg_user_id=None, username=None,
+        extra={"source": "instagram", "ig_user_id": str(igsid), "ig_username": uname},
+    )
+    if error:
+        ig_send_text(igsid, "❗ " + error, [IGQ_CART, IGQ_MENU])
+        return
+    ig_put(igsid, {"cart": {}, "step": None, "greeted": True,
+                   "name": s.get("name"), "phone": s.get("phone"), "address": s.get("address")})
+    ig_send_text(igsid, build_customer_receipt_text(order, "uz")
+                 + f"\n\n🎁 Telegram botimizdan buyurtma bersangiz har safar 5% keshbek olasiz: {IG_TG_BOT_URL}")
+
+def ig_welcome(igsid):
+    ig_send_text(igsid,
+                 f"Assalomu alaykum! {BUSINESS_NAME}'ga xush kelibsiz 🍽\n"
+                 "Makkada uy ovqatini BEPUL yetkazib beramiz 🚚\n\n"
+                 "Shu yerning o'zida buyurtma berishingiz mumkin 👇",
+                 [IGQ_MENU, IGQ_CART])
+
+
+# ---------- adminga oddiy xabarni yuborish ----------
+
+def ig_forward_to_admins(igsid, text):
+    uname = ig_username(igsid)
+    who = f"@{uname}" if uname else f"ID {igsid}"
+    body = f"📷 Instagram xabar — {who}:\n\n{text}\n\n↩️ Shu xabarga \"Reply\" qilsangiz, javob Instagram'ga boradi."
+    for rid in notify_recipients():
+        try:
+            sent = bot.send_message(rid, body)
+            support_message_map[(rid, sent.message_id)] = f"ig:{igsid}"
+        except Exception as e:
+            print(f"[IG] adminga yuborishda xato: {e}")
+
+
+# ---------- kelgan hodisalarni ishlash ----------
+
+def ig_handle_payload(igsid, payload):
+    if payload == "MENU":
+        ig_send_menu(igsid)
+    elif payload == "MORE":
+        ig_send_menu(igsid, ig_get(igsid).get("menu_page", 1))
+    elif payload == "CART":
+        ig_send_cart(igsid)
+    elif payload == "CHECKOUT":
+        ig_start_checkout(igsid)
+    elif payload == "CLEAR":
+        s = ig_get(igsid); s["cart"] = {}; s["step"] = None; ig_put(igsid, s)
+        ig_send_text(igsid, "🗑 Savat tozalandi.", [IGQ_MENU])
+    elif payload == "CONFIRM":
+        ig_confirm(igsid)
+    elif payload == "CANCEL":
+        s = ig_get(igsid); s["step"] = None; ig_put(igsid, s)
+        ig_send_text(igsid, "Bekor qilindi. Savatingiz saqlanib qoldi.", [IGQ_CART, IGQ_MENU])
+    elif payload.startswith("ADD:"):
+        ig_add(igsid, payload.split(":", 1)[1])
+
+def ig_handle_messaging(ev):
+    sender = str((ev.get("sender") or {}).get("id") or "")
+    if not sender or sender == IG_USER_ID:
+        return
+    msg = ev.get("message") or {}
+    if msg.get("is_echo") or msg.get("is_deleted"):
+        return
+    if ev.get("postback"):
+        ig_handle_payload(sender, ev["postback"].get("payload") or "")
+        return
+    qr = (msg.get("quick_reply") or {}).get("payload")
+    if qr:
+        ig_handle_payload(sender, qr)
+        return
+    text = (msg.get("text") or "").strip()
+    if not text:
+        if msg.get("attachments"):
+            ig_forward_to_admins(sender, "[rasm/ovozli xabar/fayl — Instagram'da ko'ring]")
+        return
+    s = ig_get(sender)
+    low = text.lower()
+    if s.get("step") and low in ("bekor", "cancel", "отмена", "stop"):
+        ig_handle_payload(sender, "CANCEL")
+        return
+    if s.get("step"):
+        ig_handle_step(sender, text)
+        return
+    if looks_like_menu_request(text):
+        ig_send_menu(sender)
+        return
+    if not s.get("greeted"):
+        s["greeted"] = True
+        ig_put(sender, s)
+        ig_welcome(sender)
+        return
+    # oddiy savol/shikoyat — adminga
+    ig_forward_to_admins(sender, text)
+
+def ig_handle_comment(val):
+    frm = val.get("from") or {}
+    if not frm.get("id") or str(frm.get("id")) == IG_USER_ID:
+        return
+    text = val.get("text") or ""
+    if not (IG_COMMENT_ALL or looks_like_menu_request(text)):
+        return
+    cid = val.get("id")
+    if not cid:
+        return
+    # 1) Direct'ga shaxsiy javob (har izohga bir marta ruxsat)
+    res = ig_api_post("me/messages", {
+        "recipient": {"comment_id": cid},
+        "message": {"text": f"Assalomu alaykum! {BUSINESS_NAME} menyusi 🍽\n"
+                            "Shu yerga «menyu» deb yozing — taomlarni ko'rsatib, "
+                            "buyurtmani shu yerning o'zida qabul qilamiz. Yetkazib berish BEPUL 🚚"},
+    })
+    # 2) izohning o'ziga ochiq javob
+    if res is not None:
+        ig_api_post(f"{cid}/replies", {"message": "Direct'ga yozdik 📩"})
+
+def ig_process(body):
+    try:
+        for entry in body.get("entry", []):
+            for ev in entry.get("messaging", []) or []:
+                ig_handle_messaging(ev)
+            for ch in entry.get("changes", []) or []:
+                if ch.get("field") == "comments":
+                    ig_handle_comment(ch.get("value") or {})
+    except Exception as e:
+        print(f"[IG] hodisani ishlashda xato: {e}")
+
+
+@app.route("/ig/webhook", methods=["GET"])
+def ig_webhook_verify():
+    if (request.args.get("hub.mode") == "subscribe" and IG_VERIFY_TOKEN
+            and request.args.get("hub.verify_token") == IG_VERIFY_TOKEN):
+        return request.args.get("hub.challenge", ""), 200
+    return "forbidden", 403
+
+@app.route("/ig/webhook", methods=["POST"])
+def ig_webhook_receive():
+    raw = request.get_data()
+    if IG_APP_SECRET:
+        sig = request.headers.get("X-Hub-Signature-256", "")
+        expected = "sha256=" + hmac.new(IG_APP_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return "bad signature", 403
+    if not ig_enabled():
+        return "ok", 200
+    body = json.loads(raw or b"{}")
+    # Meta tez javob kutadi — ishni fonda bajaramiz
+    threading.Thread(target=ig_process, args=(body,), daemon=True).start()
+    return "ok", 200
+
+
+def ig_notify_customer(order, text):
+    """Buyurtma Instagram'dan bo'lsa, mijozga Instagram orqali xabar."""
+    igsid = order.get("ig_user_id")
+    if igsid and ig_enabled():
+        ig_send_text(igsid, text)
+
+
 # ---------- ishga tushirish ----------
 
 def run_bot_polling():
@@ -6360,6 +6953,8 @@ if __name__ == "__main__":
     threading.Thread(target=run_bot_polling, daemon=True).start()
     threading.Thread(target=daily_report_scheduler, daemon=True).start()
     threading.Thread(target=winback_scheduler, daemon=True).start()
+    if ig_enabled():
+        threading.Thread(target=ig_token_refresher, daemon=True).start()
     port = int(os.environ.get("PORT", 8080))
     print(f"Mini App server {port}-portda ishga tushdi, bot polling fonda ishlayapti...")
     app.run(host="0.0.0.0", port=port)
