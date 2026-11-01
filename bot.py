@@ -3719,7 +3719,16 @@ def api_order():
 
     # keshbekni faqat shaxsi tasdiqlangan foydalanuvchi ishlata oladi —
     # imzosiz so'rov bilan birovning hisobidan yechib bo'lmaydi
+    ig_extra = None
+    if not user.get("id"):
+        try:
+            _igsid = ig_identity_from_request(body)
+        except Exception:
+            _igsid = None
+        if _igsid:
+            ig_extra = {"source": "instagram", "ig_user_id": _igsid, "ig_username": ig_username(_igsid)}
     order, error = create_order(
+        extra=ig_extra,
         use_cashback=bool(body.get("use_cashback")) and verified,
         items_cart=items_cart,
         customer_name=customer_name,
@@ -3733,6 +3742,11 @@ def api_order():
     )
     if error:
         return jsonify({"error": error}), 409
+    if ig_extra:
+        threading.Thread(target=ig_send_text, args=(ig_extra["ig_user_id"],
+            build_customer_receipt_text(order, "uz")
+            + f"\n\n🎁 Telegram botimizdan buyurtma bersangiz har safar 5% keshbek olasiz: {IG_TG_BOT_URL}"),
+            daemon=True).start()
     return jsonify({
         "ok": True,
         "order_id": order["daily_number"],
@@ -6678,6 +6692,42 @@ def ig_cart_lines(cart):
         lines.append(f"• {d['name']} × {qty} = {fmt_sum(unit * qty)}")
     return lines, money(total)
 
+# ---------- Mini App (Telegram'dagi sahifaning o'zi, Instagram brauzerida) ----------
+
+def ig_sign(igsid, ts):
+    return hmac.new(BOT_TOKEN.encode(), f"ig:{igsid}:{ts}".encode(), hashlib.sha256).hexdigest()
+
+def ig_verify(igsid, ts, sig):
+    if not (igsid and ts and sig):
+        return False
+    return hmac.compare_digest(ig_sign(igsid, ts), str(sig))
+
+def ig_menu_url(igsid):
+    ts = int(time.time())
+    return f"{WEBAPP_URL}/?ig={igsid}&its={ts}&isig={ig_sign(igsid, ts)}&v={ts}"
+
+def ig_send_app_card(igsid):
+    """Bitta karta: Mini App'ni ochish tugmasi + chatda tanlash varianti."""
+    st = shop_status()
+    if not st["open"]:
+        ig_send_text(igsid, closed_message("uz", st))
+        return
+    if not WEBAPP_URL:
+        ig_send_menu(igsid)
+        return
+    el = {
+        "title": f"{BUSINESS_NAME} — bugungi menyu 🍽",
+        "subtitle": "Yetkazib berish BEPUL 🚚 · Taomni tanlab, shu yerda buyurtma bering",
+        "buttons": [
+            {"type": "web_url", "url": ig_menu_url(igsid), "title": "🛍 Menyuni ochish"},
+            {"type": "postback", "title": "💬 Chatda tanlash", "payload": "CHATMENU"},
+        ],
+    }
+    if os.path.exists(LOGO_PATH):
+        el["image_url"] = f"{WEBAPP_URL}/static/logo.jpg"
+    if ig_send_carousel(igsid, [el]) is None:
+        ig_send_menu(igsid)   # karta ketmasa — oddiy menyu
+
 def ig_send_menu(igsid, page=0):
     st = shop_status()
     if not st["open"]:
@@ -6853,6 +6903,8 @@ def ig_forward_to_admins(igsid, text):
 
 def ig_handle_payload(igsid, payload):
     if payload == "MENU":
+        ig_send_app_card(igsid)
+    elif payload == "CHATMENU":
         ig_send_menu(igsid)
     elif payload == "MORE":
         ig_send_menu(igsid, ig_get(igsid).get("menu_page", 1))
@@ -6899,7 +6951,7 @@ def ig_handle_messaging(ev):
         ig_handle_step(sender, text)
         return
     if looks_like_menu_request(text):
-        ig_send_menu(sender)
+        ig_send_app_card(sender)
         return
     if not s.get("greeted"):
         s["greeted"] = True
@@ -6971,6 +7023,20 @@ def ig_notify_customer(order, text):
     if igsid and ig_enabled():
         ig_send_text(igsid, text)
 
+
+
+def ig_identity_from_request(body):
+    """Mini App Instagram'dan ochilgan bo'lsa — mijozning Instagram ID'si (imzo tekshiriladi)."""
+    igsid, ts, sig = body.get("ig"), body.get("its"), body.get("isig")
+    if not igsid:
+        # index.html bu maydonlarni yubormaydi — sahifa manzilidan (Referer) olamiz
+        try:
+            ref = request.headers.get("Referer", "")
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(ref).query)
+            igsid, ts, sig = (q.get("ig") or [None])[0], (q.get("its") or [None])[0], (q.get("isig") or [None])[0]
+        except Exception:
+            return None
+    return str(igsid) if ig_verify(igsid, ts, sig) else None
 
 # ---------- ishga tushirish ----------
 
