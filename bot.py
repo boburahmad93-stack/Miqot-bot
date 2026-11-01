@@ -7038,6 +7038,123 @@ def ig_identity_from_request(body):
             return None
     return str(igsid) if ig_verify(igsid, ts, sig) else None
 
+
+# ---------- Maxfiylik siyosati va ma'lumotlarni o'chirish (Meta App Review uchun) ----------
+PRIVACY_CONTACT_EMAIL = os.environ.get("PRIVACY_CONTACT_EMAIL", "abi_93-07@mail.ru")
+PRIVACY_UPDATED = "2026-11-01"
+
+_LEGAL_CSS = """
+:root{--bg:#f7f5f0;--card:#fff;--ink:#1d2433;--muted:#5b6475;--acc:#0b1f4b;--gold:#c99a2e;--line:#e6e1d6}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1320;--card:#161d2e;--ink:#e8ebf2;--muted:#a3abbd;--acc:#f0c869;--gold:#f0c869;--line:#26304a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,Segoe UI,Roboto,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+header{border-bottom:3px solid var(--gold);padding-bottom:16px;margin-bottom:24px}
+h1{font-size:26px;margin:0 0 4px;color:var(--acc)}h2{font-size:19px;margin:28px 0 8px;color:var(--acc)}
+.muted{color:var(--muted);font-size:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:16px 0}
+ul{padding-left:20px}a{color:var(--acc)}.lang{display:flex;gap:8px;margin-top:10px}
+.lang a{font-size:14px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+"""
+
+def _legal_page(title, body_html):
+    return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            f"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<title>{title} — {BUSINESS_NAME}</title><style>{_LEGAL_CSS}</style></head>"
+            f"<body><main>{body_html}</main></body></html>")
+
+@app.route("/privacy")
+def privacy_page():
+    e = PRIVACY_CONTACT_EMAIL
+    html = f"""
+<header><h1>Privacy Policy</h1>
+<div class="muted">{BUSINESS_NAME} · Makkah, Saudi Arabia · Last updated {PRIVACY_UPDATED}</div>
+<div class="lang"><a href="#en">English</a><a href="#uz">O'zbekcha</a></div></header>
+
+<section id="en">
+<p>{BUSINESS_NAME} is a home-cooked food delivery service in Makkah. Customers order through our Telegram bot,
+our web menu, and our Instagram account (@miqotfood). This policy explains what information we collect and how we use it.</p>
+
+<h2>Information we collect</h2>
+<ul>
+<li><b>Order details:</b> the dishes you choose, quantities, order total and order history.</li>
+<li><b>Contact and delivery details you give us:</b> your name, phone number, delivery address and, if you share it, your location.</li>
+<li><b>Messaging identifiers:</b> your Telegram user ID and username, or your Instagram-scoped user ID and username, and the messages you send to our account.</li>
+<li><b>Cashback balance</b> (Telegram customers only).</li>
+</ul>
+
+<h2>How we use it</h2>
+<ul>
+<li>To receive, prepare and deliver your order and to contact you about it.</li>
+<li>To send you order confirmations and status updates in the same app you ordered from.</li>
+<li>To answer your questions and comments.</li>
+<li>To calculate cashback and keep basic sales records.</li>
+</ul>
+<p>We do <b>not</b> sell your information, use it for advertising profiles, or share it with anyone except as needed to deliver your order.</p>
+
+<h2>Instagram data</h2>
+<p>When you message @miqotfood or comment asking for the menu, our app receives your message, your Instagram-scoped ID and username
+through Meta's Instagram API. We use this only to reply to you, show you the menu, and take your order. Comments are used only to send
+you a single private reply with the menu.</p>
+
+<h2>Service providers</h2>
+<p>Our system runs on Railway (cloud hosting). Messages are delivered through Meta (Instagram) and Telegram, under their own privacy policies.</p>
+
+<h2>How long we keep it</h2>
+<p>Order records are kept for up to 24 months for accounting and service quality, then deleted. Unfinished Instagram chat sessions are removed after 7 days.</p>
+
+<h2>Deleting your data</h2>
+<p>You can ask us to delete your data at any time — see <a href="/data-deletion">Data deletion instructions</a>. We complete requests within 30 days.</p>
+
+<h2>Contact</h2>
+<p>Email: <a href="mailto:{e}">{e}</a> · Instagram: @miqotfood · Telegram: @miqotfoodbuyurtmabot</p>
+</section>
+
+<section id="uz" class="card">
+<h2>Maxfiylik siyosati (qisqacha)</h2>
+<p>{BUSINESS_NAME} Makkada uy ovqatini yetkazib beradi. Buyurtmani bajarish uchun quyidagilarni saqlaymiz: tanlagan taomlaringiz,
+ismingiz, telefon raqamingiz, manzilingiz (yoki joylashuvingiz), Telegram yoki Instagram foydalanuvchi ID va nomingiz, keshbek balansingiz.</p>
+<p>Bu ma'lumotlar faqat buyurtmani yetkazish, siz bilan bog'lanish va buyurtma holatini xabar qilish uchun ishlatiladi.
+Hech kimga sotilmaydi va reklama uchun ishlatilmaydi.</p>
+<p>Ma'lumotlaringizni o'chirishni xohlasangiz, Direct yoki Telegram'da «ma'lumotlarimni o'chiring» deb yozing yoki
+<a href="mailto:{e}">{e}</a> manziliga xat yuboring — 30 kun ichida o'chiramiz.</p>
+</section>
+"""
+    return _legal_page("Privacy Policy", html)
+
+@app.route("/data-deletion")
+def data_deletion_page():
+    e = PRIVACY_CONTACT_EMAIL
+    html = f"""
+<header><h1>Data Deletion Instructions</h1>
+<div class="muted">{BUSINESS_NAME} · Last updated {PRIVACY_UPDATED}</div></header>
+<p>You can ask {BUSINESS_NAME} to delete all personal data we hold about you (name, phone number, address, order history,
+messaging IDs and cashback balance).</p>
+<div class="card"><b>How to request deletion — any one of these:</b>
+<ul>
+<li>Send a Direct message to <b>@miqotfood</b> on Instagram: <i>"Delete my data"</i>.</li>
+<li>Send the same message to our Telegram bot <b>@miqotfoodbuyurtmabot</b>.</li>
+<li>Email <a href="mailto:{e}">{e}</a> with your Instagram username or phone number.</li>
+</ul></div>
+<p>We confirm your request and delete your data within <b>30 days</b>. Records we are legally required to keep for accounting
+are anonymised (your name, phone and address are removed).</p>
+<p>You can also remove our app's access at any time in Instagram: <i>Settings → Website permissions → Apps and websites</i>.</p>
+<div class="card"><b>O'zbekcha:</b> ma'lumotlaringizni o'chirish uchun Instagram'da @miqotfood'ga yoki Telegram'da
+@miqotfoodbuyurtmabot'ga «ma'lumotlarimni o'chiring» deb yozing yoki <a href="mailto:{e}">{e}</a> ga xat yuboring.
+30 kun ichida o'chiramiz.</div>
+<p><a href="/privacy">Privacy Policy</a></p>
+"""
+    return _legal_page("Data Deletion", html)
+
+@app.route("/terms")
+def terms_page():
+    html = f"""
+<header><h1>Terms of Service</h1><div class="muted">{BUSINESS_NAME} · Last updated {PRIVACY_UPDATED}</div></header>
+<p>By ordering from {BUSINESS_NAME} through Telegram, our web menu or Instagram you agree that: prices and menu items are shown at the
+time of ordering; payment is made in cash on delivery unless agreed otherwise; we deliver within our service area in Makkah;
+we may contact you by phone or message about your order; and you may cancel by contacting us before the order is prepared.</p>
+<p>See our <a href="/privacy">Privacy Policy</a> for how we handle your data.</p>
+"""
+    return _legal_page("Terms of Service", html)
+
 # ---------- ishga tushirish ----------
 
 def run_bot_polling():
