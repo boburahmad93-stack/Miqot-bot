@@ -3595,9 +3595,19 @@ def validate_init_data(init_data):
         print(f"initData validatsiya xatosi: {e}")
         return None
 
+FB_DOMAIN_VERIFICATION = os.environ.get("FB_DOMAIN_VERIFICATION", "8wzj9py65823fj786xfth1evp0esou")
+
 @app.route("/")
 def miniapp_index():
-    resp = send_from_directory(".", "index.html")
+    try:
+        with open("index.html", encoding="utf-8") as fh:
+            html = fh.read()
+        if FB_DOMAIN_VERIFICATION and "facebook-domain-verification" not in html:
+            tag = f'<meta name="facebook-domain-verification" content="{FB_DOMAIN_VERIFICATION}" />'
+            html = re.sub(r"(<head[^>]*>)", lambda m: m.group(1) + "\n" + tag, html, count=1, flags=re.I)
+        resp = app.response_class(html, mimetype="text/html")
+    except Exception:
+        resp = send_from_directory(".", "index.html")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     return resp
@@ -7058,6 +7068,7 @@ ul{padding-left:20px}a{color:var(--acc)}.lang{display:flex;gap:8px;margin-top:10
 def _legal_page(title, body_html):
     return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             f"<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<meta name='facebook-domain-verification' content='{FB_DOMAIN_VERIFICATION}'>"
             f"<title>{title} — {BUSINESS_NAME}</title><style>{_LEGAL_CSS}</style></head>"
             f"<body><main>{body_html}</main></body></html>")
 
