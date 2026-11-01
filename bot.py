@@ -6576,7 +6576,38 @@ def ig_put(uid, st):
 
 # ---------- Instagram API ----------
 
+_ig_msg_route = None  # ishlagan (host, yo'l) juftligi eslab qolinadi
+
+def ig_send_message(payload):
+    """Xabar yuborish: Meta tokeni turiga qarab to'g'ri manzilni o'zi topadi."""
+    global _ig_msg_route
+    routes = [_ig_msg_route] if _ig_msg_route else []
+    for host in ("graph.facebook.com", "graph.instagram.com"):
+        if IG_USER_ID:
+            routes.append((host, f"{IG_USER_ID}/messages"))
+        routes.append((host, "me/messages"))
+    last_err = None
+    for host, path in routes:
+        try:
+            r = httpreq.post(f"https://{host}/{IG_API_VERSION}/{path}", json=payload,
+                             params={"access_token": IG_ACCESS_TOKEN}, timeout=15)
+            if r.ok:
+                if _ig_msg_route != (host, path):
+                    _ig_msg_route = (host, path)
+                    print(f"[IG] xabar yuborish manzili: {host}/{path}")
+                return r.json()
+            last_err = f"{host}/{path} {r.status_code}: {r.text[:300]}"
+            # mijozga tegishli xato (masalan 24 soat o'tgan) bo'lsa boshqa manzilni sinamaymiz
+            if _ig_msg_route == (host, path):
+                break
+        except Exception as e:
+            last_err = f"{host}/{path} ulanish xatosi: {e}"
+    print(f"[IG] xabar yuborilmadi: {last_err}")
+    return None
+
 def ig_api_post(path, payload):
+    if path == "me/messages":
+        return ig_send_message(payload)
     try:
         r = httpreq.post(f"{IG_API}/{path}", json=payload,
                          params={"access_token": IG_ACCESS_TOKEN}, timeout=15)
