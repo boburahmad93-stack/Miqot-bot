@@ -45,6 +45,8 @@ MENU_FILE = os.path.join(DATA_DIR, "menu.json")
 ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 CASHBACK_FILE = os.path.join(DATA_DIR, "cashback.json")
+ACCOUNT_FILE = os.path.join(DATA_DIR, "hisob.json")      # nasiya va avans
+TGDRAFT_FILE = os.path.join(DATA_DIR, "tg_drafts.json")  # Telegramdan ko'chirilgan buyurtmalar
 WINBACK_FILE = os.path.join(DATA_DIR, "winback.json")
 
 # ---------- mijozni qaytarish sozlamalari (oson o'zgartirish uchun shu yerda) ----------
@@ -530,6 +532,36 @@ TEXTS = {
         "tr": "\U0001F4B3 {amt} nakit iade bakiyenize geri yüklendi.\nToplam: {bal}",
         "ur": "\U0001F4B3 {amt} \u06A9\u06CC\u0634 \u0628\u06CC\u06A9 \u0622\u067E \u06A9\u06D2 \u0628\u06CC\u0644\u0646\u0633 \u0645\u06CC\u06BA \u0648\u0627\u067E\u0633 \u06A9\u0631 \u062F\u06CC\u0627 \u06AF\u06CC\u0627\u06D4\n\u06A9\u0644: {bal}",
         "id": "\U0001F4B3 Cashback {amt} telah dikembalikan ke saldo Anda.\nTotal: {bal}",
+    },
+    "acct_charged": {
+        "uz": "\U0001F4D2 Buyurtmangiz hisobingizga yozildi: {amt}\nHozirgi hisobingiz: {bal}",
+        "ru": "\U0001F4D2 \u0417\u0430\u043a\u0430\u0437 \u0437\u0430\u043f\u0438\u0441\u0430\u043d \u043d\u0430 \u0432\u0430\u0448 \u0441\u0447\u0451\u0442: {amt}\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0431\u0430\u043b\u0430\u043d\u0441: {bal}",
+        "en": "\U0001F4D2 Your order was charged to your account: {amt}\nCurrent balance: {bal}",
+        "ar": "\U0001F4D2 \u062a\u0645 \u062a\u0642\u064a\u064a\u062f \u0637\u0644\u0628\u0643 \u0639\u0644\u0649 \u062d\u0633\u0627\u0628\u0643: {amt}\n\u0627\u0644\u0631\u0635\u064a\u062f: {bal}",
+    },
+    "acct_paid": {
+        "uz": "\U0001F4B5 To\u2018lovingiz qabul qilindi: {amt}\nHozirgi hisobingiz: {bal}",
+        "ru": "\U0001F4B5 \u041e\u043f\u043b\u0430\u0442\u0430 \u043f\u0440\u0438\u043d\u044f\u0442\u0430: {amt}\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0431\u0430\u043b\u0430\u043d\u0441: {bal}",
+        "en": "\U0001F4B5 Payment received: {amt}\nCurrent balance: {bal}",
+        "ar": "\U0001F4B5 \u062a\u0645 \u0627\u0633\u062a\u0644\u0627\u0645 \u0627\u0644\u062f\u0641\u0639\u0629: {amt}\n\u0627\u0644\u0631\u0635\u064a\u062f: {bal}",
+    },
+    "acct_my_debt": {
+        "uz": "\U0001F4D2 Hisobingiz: {bal}\n\nYa\u2019ni {amt} qarzingiz bor. Keyingi buyurtmada yoki naqd to\u2018lab yuborishingiz mumkin.",
+        "ru": "\U0001F4D2 \u0412\u0430\u0448 \u0441\u0447\u0451\u0442: {bal}\n\n\u0414\u043e\u043b\u0433: {amt}.",
+        "en": "\U0001F4D2 Your account: {bal}\n\nYou owe {amt}.",
+        "ar": "\U0001F4D2 \u062d\u0633\u0627\u0628\u0643: {bal}\n\n\u0639\u0644\u064a\u0643 {amt}.",
+    },
+    "acct_my_adv": {
+        "uz": "\U0001F4D2 Hisobingiz: {bal}\n\nOldindan to\u2018langan {amt} bor \u2014 buyurtmalaringiz shundan yechiladi.",
+        "ru": "\U0001F4D2 \u0412\u0430\u0448 \u0441\u0447\u0451\u0442: {bal}\n\n\u041f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u0430: {amt}.",
+        "en": "\U0001F4D2 Your account: {bal}\n\nPrepaid: {amt}.",
+        "ar": "\U0001F4D2 \u062d\u0633\u0627\u0628\u0643: {bal}\n\n\u0631\u0635\u064a\u062f \u0645\u062f\u0641\u0648\u0639 \u0645\u0642\u062f\u0645\u0627\u064b: {amt}.",
+    },
+    "acct_my_zero": {
+        "uz": "\U0001F4D2 Hisobingiz toza \u2014 qarz ham, avans ham yo\u2018q.",
+        "ru": "\U0001F4D2 \u0421\u0447\u0451\u0442 \u0447\u0438\u0441\u0442: \u043d\u0438 \u0434\u043e\u043b\u0433\u0430, \u043d\u0438 \u043f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u044b.",
+        "en": "\U0001F4D2 Your account is clear \u2014 no debt, no prepaid balance.",
+        "ar": "\U0001F4D2 \u062d\u0633\u0627\u0628\u0643 \u0646\u0638\u064a\u0641 \u2014 \u0644\u0627 \u062f\u064a\u0646 \u0648\u0644\u0627 \u0631\u0635\u064a\u062f.",
     },
     "cb_balance": {
         "uz": "\U0001F4B3 Keshbek hisobingiz: {bal}\n\nHar bir yetkazilgan buyurtmadan {pct}% keshbek yig'iladi. Menyuni oching, savatda \u00abKeshbekdan foydalanish\u00bb ni belgilasangiz, keshbegingiz summadan chegiriladi.",
@@ -1104,7 +1136,8 @@ def credit_order_cashback(order):
     """Yetkazilgan buyurtma uchun keshbek yozadi. (yozilgan_summa, yangi_balans).
     Keshbek bilan to'langan qismdan qayta keshbek hisoblanmaydi."""
     uid = order.get("user_id")
-    if not uid or order.get("cashback_credited") or is_cancelled(order):
+    # Telegram orqali qo'lda kiritilgan buyurtmalarga keshbek yozilmaydi
+    if not uid or order.get("cashback_credited") or is_cancelled(order) or order.get("no_cashback"):
         return 0.0, cashback_balance(uid)
     amount = cashback_for(order_payable(order))
     order["cashback_credited"] = True
@@ -1201,6 +1234,220 @@ def cashback_totals():
     bal = money(sum(money(r.get("balance", 0)) for r in data.values()))
     people = sum(1 for r in data.values() if money(r.get("balance", 0)) > 0)
     return {"balance": bal, "people": people, "all": len(data)}
+
+# ======================================================================
+#  MIJOZ HISOBI — nasiya (minus) va avans (plyus)
+#
+#  Keshbekdan butunlay ajratilgan: keshbek — bonus, hisob — haqiqiy pul.
+#  Balans manfiy bo'lishi mumkin, chegara yo'q.
+# ======================================================================
+
+def load_account():
+    return load_json(ACCOUNT_FILE, {})
+
+def save_account(data):
+    save_json(ACCOUNT_FILE, data)
+
+def account_balance(user_id):
+    if not user_id:
+        return 0.0
+    rec = load_account().get(str(user_id)) or {}
+    return money(rec.get("balance", 0))
+
+def fmt_signed(x):
+    """−120 SAR / +380 SAR — belgisi bilan."""
+    v = money(x)
+    if v < 0:
+        return "−" + fmt_sum(-v)
+    if v > 0:
+        return "+" + fmt_sum(v)
+    return fmt_sum(0)
+
+def account_move(user_id, delta, order_id=None, note=""):
+    """Hisobni o'zgartiradi. Minusga tushishi mumkin — bu nasiya.
+    Yangi balansni qaytaradi."""
+    delta = money(delta)
+    if not user_id or delta == 0:
+        return account_balance(user_id)
+    with DATA_LOCK:
+        data = load_account()
+        uid = str(user_id)
+        rec = data.get(uid) or {"balance": 0.0, "history": []}
+        new_bal = money(money(rec.get("balance", 0)) + delta)
+        rec["balance"] = new_bal
+        hist = rec.get("history") or []
+        hist.append({"ts": int(time.time()), "delta": delta,
+                     "order_id": order_id, "note": note, "bal": new_bal})
+        rec["history"] = hist[-60:]
+        data[uid] = rec
+        save_account(data)
+    return new_bal
+
+def account_holders():
+    """Nol bo'lmagan hisoblar: [(uid, balans, ism, username)].
+    Avval eng katta qarzdorlar, keyin avansi borlar."""
+    users = load_users()
+    out = []
+    for uid, rec in load_account().items():
+        bal = money(rec.get("balance", 0))
+        if bal == 0:
+            continue
+        u = users.get(str(uid)) or {}
+        out.append((int(uid), bal, (u.get("name") or "").strip(), u.get("username") or ""))
+    out.sort(key=lambda r: r[1])          # eng katta minus birinchi
+    return out
+
+def account_totals():
+    data = load_account()
+    debt = adv = 0.0
+    nd = na = 0
+    for rec in data.values():
+        bal = money(rec.get("balance", 0))
+        if bal < 0:
+            debt = money(debt - bal)
+            nd += 1
+        elif bal > 0:
+            adv = money(adv + bal)
+            na += 1
+    return {"debt": debt, "debtors": nd, "advance": adv, "advanced": na}
+
+def account_line(uid, bal, name, uname):
+    kim = name or "Ism yo'q"
+    if uname:
+        kim += f" @{uname}"
+    belgi = "🔴" if bal < 0 else "🟢"
+    return f"{belgi} {fmt_signed(bal)} — {kim} (ID {uid})"
+
+def order_on_account(order):
+    return bool(order.get("on_account"))
+
+# ======================================================================
+#  TELEGRAMDAN TUSHGAN BUYURTMA
+#
+#  Admin mijozning xabarini botga forward qiladi; bot undan ism, t.me
+#  havolasi va joylashuvni ajratib oladi. Keyin admin savatni yig'adi.
+#  Bunday buyurtmalarga keshbek yozilmaydi.
+# ======================================================================
+
+TGDRAFT_TTL = 24 * 3600          # qoralama shuncha vaqt yashaydi
+
+def load_tgdrafts():
+    return load_json(TGDRAFT_FILE, {})
+
+def save_tgdrafts(data):
+    save_json(TGDRAFT_FILE, data)
+
+def tgdraft_clean(data):
+    """Eskirganlarini tashlab yuboramiz."""
+    now = int(time.time())
+    return {k: v for k, v in data.items() if now - int(v.get("ts", 0)) < TGDRAFT_TTL}
+
+def tgdraft_get(token):
+    return tgdraft_clean(load_tgdrafts()).get(str(token))
+
+def tgdraft_put(token, draft):
+    with DATA_LOCK:
+        data = tgdraft_clean(load_tgdrafts())
+        draft["ts"] = int(time.time())
+        data[str(token)] = draft
+        save_tgdrafts(data)
+    return draft
+
+def tgdraft_drop(token):
+    with DATA_LOCK:
+        data = tgdraft_clean(load_tgdrafts())
+        data.pop(str(token), None)
+        save_tgdrafts(data)
+
+TGDRAFT_JOIN_WINDOW = 20 * 60     # shuncha vaqt ichida qo'shish taklif qilinadi
+
+def tgdraft_same_sender(admin_id, uid, uname, name):
+    """Shu adminning, AYNAN SHU mijozdan ochilgan oxirgi qoralamasi.
+
+    Mijozni ajratmasak, 20 daqiqa ichida tushgan ikkinchi buyurtma
+    birinchisining ustiga yopishib ketadi — shuning uchun kimligini
+    tekshiramiz."""
+    now = int(time.time())
+    best = None
+    for token, d in tgdraft_clean(load_tgdrafts()).items():
+        if d.get("admin_id") != admin_id or d.get("used"):
+            continue
+        if now - int(d.get("ts", 0)) > TGDRAFT_JOIN_WINDOW:
+            continue
+        mos = False
+        if uid and d.get("user_id") and int(d["user_id"]) == int(uid):
+            mos = True
+        elif uname and d.get("username") and d["username"].lower() == uname.lower():
+            mos = True
+        elif name and d.get("name") and d["name"].strip().lower() == name.strip().lower() \
+                and not uid and not d.get("user_id"):
+            mos = True
+        if not mos:
+            continue
+        if best is None or d["ts"] > best[1]["ts"]:
+            best = (token, d)
+    return best
+
+def tgdraft_merge(dst, src):
+    """src dagi bo'sh bo'lmagan maydonlarni dst ga ko'chiradi (dst ustun turadi)."""
+    for k in ("user_id", "username", "tme", "name", "phone", "address", "map_link"):
+        if not dst.get(k) and src.get(k):
+            dst[k] = src[k]
+    if dst.get("lat") is None and src.get("lat") is not None:
+        dst["lat"], dst["lon"] = src["lat"], src["lon"]
+    if src.get("text"):
+        dst["text"] = ((dst.get("text", "") + "\n" + src["text"]).strip())[:900]
+    return dst
+
+_COORD_RE = re.compile(r"(-?\d{1,3}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})")
+
+def parse_map_link(text):
+    """Xarita havolasidan yoki oddiy matndan koordinata ajratadi.
+    Qaytaradi: (lat, lon) yoki (None, None)."""
+    if not text:
+        return None, None
+    s = str(text)
+
+    # Yandex: ll=UZUNLIK,KENGLIK (tartibi teskari)
+    m = re.search(r"[?&](?:ll|whatshere\[point\])=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)", s, re.I)
+    if m:
+        lon, lat = float(m.group(1)), float(m.group(2))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return lat, lon
+
+    # Google: @KENGLIK,UZUNLIK  yoki  q=KENGLIK,UZUNLIK  yoki  !3dKENGLIK!4dUZUNLIK
+    for pat in (r"@(-?\d+\.\d+),(-?\d+\.\d+)",
+                r"[?&](?:q|query|destination|daddr)=(-?\d+\.\d+)(?:,|%2C)(-?\d+\.\d+)",
+                r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)"):
+        m = re.search(pat, s, re.I)
+        if m:
+            lat, lon = float(m.group(1)), float(m.group(2))
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                return lat, lon
+
+    # Oddiy matn: 21.39042, 39.87661
+    m = _COORD_RE.search(s)
+    if m:
+        lat, lon = float(m.group(1)), float(m.group(2))
+        if -90 <= lat <= 90 and -180 <= lon <= 180:
+            return lat, lon
+    return None, None
+
+def first_url(text):
+    if not text:
+        return ""
+    m = re.search(r"https?://\S+", str(text))
+    return m.group(0) if m else ""
+
+def extract_phone(text):
+    """Matndan telefon raqamini ajratadi (Saudiya va O'zbekiston formatlari)."""
+    if not text:
+        return ""
+    m = re.search(r"(\+?\d[\d\s\-()]{7,17}\d)", str(text))
+    if not m:
+        return ""
+    raw = re.sub(r"[^\d+]", "", m.group(1))
+    return raw if len(re.sub(r"\D", "", raw)) >= 9 else ""
 
 # ---------- mijozni qaytarish: kimga nima yuborilgani ----------
 
@@ -1508,6 +1755,204 @@ def send_menu(chat_id):
                 kb.add(types.InlineKeyboardButton("➕ Savatga qo'shish", callback_data=f"add:{dish['id']}"))
             send_dish_card(chat_id, dish, caption, kb)
     bot.send_message(chat_id, "Tanlab bo'lgach, pastdagi \"🛒 Savat\" tugmasini bosing.")
+
+def _fwd_info(message):
+    """Forward qilingan xabardan kim yuborganini aniqlaydi.
+    Telegram'ning eski va yangi maydonlarini ham tekshiramiz."""
+    uid = uname = name = None
+
+    fu = getattr(message, "forward_from", None)
+    if fu is not None:
+        uid = getattr(fu, "id", None)
+        uname = getattr(fu, "username", None)
+        name = " ".join(x for x in [getattr(fu, "first_name", "") or "",
+                                    getattr(fu, "last_name", "") or ""] if x).strip()
+
+    if uid is None:
+        org = getattr(message, "forward_origin", None)
+        su = getattr(org, "sender_user", None) if org is not None else None
+        if su is not None:
+            uid = getattr(su, "id", None)
+            uname = getattr(su, "username", None)
+            name = " ".join(x for x in [getattr(su, "first_name", "") or "",
+                                        getattr(su, "last_name", "") or ""] if x).strip()
+        elif org is not None:
+            name = (getattr(org, "sender_user_name", None) or "").strip() or None
+
+    if not name:
+        name = (getattr(message, "forward_sender_name", None) or "").strip() or None
+
+    return uid, uname, name
+
+def is_forwarded(message):
+    return bool(getattr(message, "forward_date", None)
+                or getattr(message, "forward_from", None)
+                or getattr(message, "forward_origin", None)
+                or getattr(message, "forward_sender_name", None)
+                or getattr(message, "forward_from_chat", None))
+
+def tgdraft_card(token, d):
+    """Adminga ko'rinadigan qoralama kartasi."""
+    satrlar = ["\U0001F4E5 Telegramdan buyurtma (qoralama)", ""]
+    satrlar.append(f"\U0001F464 Mijoz: {d.get('name') or '—'}")
+    if d.get("username"):
+        satrlar.append(f"   @{d['username']}")
+    if d.get("tme"):
+        satrlar.append(f"   {d['tme']}")
+    satrlar.append(f"\U0001F4DE Tel: {d.get('phone') or '— (sahifada yozasiz)'}")
+    if d.get("lat") is not None:
+        satrlar.append(f"\U0001F4CD Joylashuv: {d['lat']:.5f}, {d['lon']:.5f}")
+    elif d.get("map_link"):
+        satrlar.append(f"\U0001F517 Xarita havolasi: {d['map_link']}")
+    else:
+        satrlar.append(f"\U0001F4CD Manzil: {(d.get('address') or '—')[:120]}")
+    if d.get("text"):
+        satrlar.append("")
+        satrlar.append("\U0001F4AC Xabar:")
+        satrlar.append(d["text"][:400])
+    satrlar.append("")
+    satrlar.append("Yetmagan narsa bo'lsa — mijozning boshqa xabarini (joylashuv, "
+                   "telefon) shu yerga yana forward qiling, qoralamaga qo'shiladi.")
+    satrlar.append("⚠️ Bu buyurtmaga keshbek yozilmaydi.")
+    return "\n".join(satrlar)
+
+def tgdraft_kb(token, admin_id, admin_uname, join_to=None):
+    kb = types.InlineKeyboardMarkup()
+    if WEBAPP_URL:
+        ts, sig = sign_user_params(admin_id, admin_uname)
+        params = (f"draft={urllib.parse.quote(token)}&uid={admin_id}"
+                  f"&uname={urllib.parse.quote(admin_uname or '')}&ts={ts}&sig={sig}&v={ts}")
+        kb.add(types.InlineKeyboardButton(
+            "\U0001F6D2 Savatni yig'ish",
+            web_app=types.WebAppInfo(url=f"{WEBAPP_URL}/tgorder?{params}")))
+    if join_to:
+        kb.add(types.InlineKeyboardButton("🔗 Oldingi qoralamaga qo'shish",
+                                          callback_data=f"tgd:join:{token}:{join_to}"))
+    kb.add(types.InlineKeyboardButton("❌ Qoralamani o'chirish",
+                                      callback_data=f"tgd:del:{token}"))
+    return kb
+
+@bot.message_handler(func=lambda m: (is_forwarded(m)
+                                     and is_staff_or_admin(m.chat.id)
+                                     and m.from_user.id not in checkout_state
+                                     and m.from_user.id not in repeat_state),
+                     content_types=["text", "location", "contact", "photo", "venue"])
+def handle_forwarded_order(message):
+    """Mijozning xabari forward qilindi \u2014 undan buyurtma qoralamasini yasaymiz.
+
+    Matnli xabar har doim YANGI qoralama ochadi: 20 daqiqa ichida ikkita
+    alohida buyurtma tushishi mumkin, ularni qo'shib yuborish xato bo'lardi.
+    Joylashuv, kontakt va venue esa o'z-o'zidan buyurtma emas \u2014 ular
+    aynan o'sha mijozning ochiq qoralamasiga qo'shiladi.
+    """
+    admin_id = message.chat.id
+    uid, uname, name = _fwd_info(message)
+    qoshimcha = message.content_type in ("location", "contact", "venue")
+    oldingi = tgdraft_same_sender(admin_id, uid, uname, name)
+
+    if qoshimcha and oldingi:
+        token, d = oldingi
+        join_to = None
+    else:
+        token = hashlib.md5(f"{admin_id}:{time.time()}:{uid or name}".encode()).hexdigest()[:12]
+        d = {"admin_id": admin_id}
+        join_to = oldingi[0] if oldingi else None
+
+    if uid and not d.get("user_id"):
+        d["user_id"] = uid
+    if uname and not d.get("username"):
+        d["username"] = uname
+        d["tme"] = f"https://t.me/{uname}"
+    if name and not d.get("name"):
+        d["name"] = name
+    if uid and not d.get("tme"):
+        d["tme"] = f"tg://user?id={uid}"
+
+    if message.content_type == "location" and message.location:
+        d["lat"] = message.location.latitude
+        d["lon"] = message.location.longitude
+    elif message.content_type == "venue" and getattr(message, "venue", None):
+        d["lat"] = message.venue.location.latitude
+        d["lon"] = message.venue.location.longitude
+        d["address"] = (getattr(message.venue, "address", "") or "").strip()
+    elif message.content_type == "contact" and getattr(message, "contact", None):
+        d["phone"] = (message.contact.phone_number or "").strip()
+        if not d.get("name"):
+            d["name"] = " ".join(x for x in [message.contact.first_name or "",
+                                             message.contact.last_name or ""] if x).strip()
+        if getattr(message.contact, "user_id", None) and not d.get("user_id"):
+            d["user_id"] = message.contact.user_id
+
+    matn = (message.text or message.caption or "").strip()
+    if matn:
+        d["text"] = ((d.get("text", "") + "\n" + matn).strip())[:900]
+        link = first_url(matn)
+        if link and not d.get("map_link"):
+            d["map_link"] = link
+        if d.get("lat") is None:
+            la, lo = parse_map_link(matn)
+            if la is not None:
+                d["lat"], d["lon"] = la, lo
+        if not d.get("phone"):
+            tel = extract_phone(matn)
+            if tel:
+                d["phone"] = tel
+        if not d.get("address") and d.get("lat") is None:
+            d["address"] = matn[:200]
+
+    tgdraft_put(token, d)
+    matn_karta = tgdraft_card(token, d)
+    if qoshimcha and oldingi:
+        matn_karta = "\u2795 Oldingi qoralamaga qo'shildi.\n\n" + matn_karta
+    elif join_to:
+        matn_karta += ("\n\n\u2139\ufe0f Shu mijozdan yaqinda boshqa qoralama ham ochilgan. "
+                       "Bu bitta buyurtmaning davomi bo'lsa, pastdagi "
+                       "\u00abOldingi qoralamaga qo'shish\u00bb ni bosing.")
+    bot.send_message(admin_id, matn_karta,
+                     reply_markup=tgdraft_kb(token, admin_id,
+                                             message.from_user.username, join_to),
+                     disable_web_page_preview=True)
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("tgd:join:"))
+def cb_tgdraft_join(call):
+    """Yangi qoralamani oldingisiga qo'shadi."""
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    parts = call.data.split(":")
+    if len(parts) < 4:
+        bot.answer_callback_query(call.id, "Noto'g'ri so'rov.")
+        return
+    yangi_t, eski_t = parts[2], parts[3]
+    yangi, eski = tgdraft_get(yangi_t), tgdraft_get(eski_t)
+    if not yangi or not eski:
+        bot.answer_callback_query(call.id, "Qoralamalardan biri topilmadi.", show_alert=True)
+        return
+    eski = tgdraft_merge(eski, yangi)
+    tgdraft_put(eski_t, eski)
+    tgdraft_drop(yangi_t)
+    bot.answer_callback_query(call.id, "Qo'shildi.")
+    try:
+        bot.edit_message_text("\u2795 Oldingi qoralamaga qo'shildi.\n\n" + tgdraft_card(eski_t, eski),
+                              call.message.chat.id, call.message.message_id,
+                              reply_markup=tgdraft_kb(eski_t, call.message.chat.id,
+                                                      call.from_user.username),
+                              disable_web_page_preview=True)
+    except Exception:
+        pass
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("tgd:del:"))
+def cb_tgdraft_del(call):
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo'q.")
+        return
+    tgdraft_drop(call.data.split(":", 2)[2])
+    bot.answer_callback_query(call.id, "Qoralama o'chirildi.")
+    try:
+        bot.edit_message_text("❌ Qoralama o'chirildi.",
+                              call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
 
 @bot.message_handler(func=lambda m: m.text == "🍽 Menyu" and m.from_user.id not in checkout_state)
 def handle_menu_button(message):
@@ -1994,11 +2439,22 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
         L.extend(_labeled("TO'LOVGA: ", fmt_sum(order_payable(order)), w))
     L.append("")
     # katta yozuvda ustunlar soni yarmiga tushadi — qator sig'ishi kerak
-    if used_cb > 0:
+    if order_on_account(order):
+        pay = "To'lov: HISOBGA (naqd emas)" if w >= 28 else "To'lov: HISOBGA"
+    elif used_cb > 0:
         pay = "To'lov: NAQD + KESHBEK" if w >= 24 else "NAQD + KESHBEK"
     else:
         pay = "To'lov: NAQD (yetkazishda)" if w >= 28 else "To'lov: NAQD"
     L.extend(_wrap(pay, w))
+
+    # Kuryer bilsin: mijozning eski qarzi yoki avansi bormi
+    try:
+        bal = account_balance(order.get("user_id"))
+    except Exception:
+        bal = 0
+    if bal:
+        yorliq = "Qarzi: " if bal < 0 else "Avansi: "
+        L.extend(_labeled(yorliq, fmt_sum(abs(bal)), w))
 
     if order.get("note"):
         L.append("-" * w)
@@ -2030,6 +2486,21 @@ def order_money_lines(order):
     return (f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))}\n"
             f"\U0001F4B3 Keshbek bilan: \u2212{fmt_sum(used)}\n"
             f"\U0001F4B5 Naqd olinadi: {fmt_sum(order_payable(order))}\n")
+
+def order_account_line(order):
+    """Admin kartasida: hisobga yozilganmi va mijozning balansi qancha."""
+    uid = order.get("user_id")
+    if not uid:
+        return ""
+    bal = account_balance(uid)
+    if order_on_account(order):
+        amt = money(order.get("account_amount") or order_payable(order))
+        return (f"\U0001F4D2 Hisobga yozilgan: {fmt_sum(amt)} (naqd olinmaydi)\n"
+                f"   Mijoz hisobi: {fmt_signed(bal)}\n")
+    if bal != 0:
+        holat = "qarzi bor" if bal < 0 else "avansi bor"
+        return f"\U0001F4D2 Mijoz hisobi: {fmt_signed(bal)} ({holat})\n"
+    return ""
 
 def order_address_line(order):
     if order.get("latitude") is not None:
@@ -2102,6 +2573,13 @@ def status_keyboard(order, include_contact=True):
             nom = it["name"] if len(it["name"]) <= 18 else it["name"][:17] + "…"
             kb.add(types.InlineKeyboardButton(f"➖ {nom} ({it['qty']}) olib tashlash",
                                               callback_data=f"rmitem:{order['id']}:{idx}"))
+    if order.get("user_id"):
+        if order_on_account(order):
+            kb.add(types.InlineKeyboardButton("↩️ Hisobdan qaytarish",
+                                              callback_data=f"acct:{order['id']}:0"))
+        else:
+            kb.add(types.InlineKeyboardButton("📒 Hisobga yozish (nasiya/avans)",
+                                              callback_data=f"acct:{order['id']}:1"))
     kb.add(types.InlineKeyboardButton("❌ Buyurtmani bekor qilish", callback_data=f"cancel:{order['id']}"))
     if include_contact and order.get("user_id"):
         kb.add(types.InlineKeyboardButton("✉️ Mijozga yozish", url=f"tg://user?id={order['user_id']}"))
@@ -2118,6 +2596,7 @@ def notify_owner_new_order(order):
             + f"\n{order_items_text(order)}\n\n"
             + order_discount_line(order)
             + order_money_lines(order)
+            + order_account_line(order)
             + f"Holat: {order['status']}"
         )
         kb = status_keyboard(order)
@@ -2308,6 +2787,73 @@ def cb_remove_item(call):
     refresh_order_card(call, order)
     tell_customer(order, "item_cancelled", no=order["daily_number"],
                   dish=it["name"], sum=fmt_sum(order["total"]))
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("acct:"))
+def cb_account_charge(call):
+    """Buyurtmani mijoz hisobiga yozadi yoki qaytarib oladi."""
+    if not is_staff_or_admin(call.message.chat.id):
+        bot.answer_callback_query(call.id, "Ruxsat yo\'q.")
+        return
+    _, oid_str, flag = call.data.split(":", 2)
+    order_id = int(oid_str)
+    charge = flag == "1"
+
+    err = None
+    uid = None
+    amount = 0.0
+    with DATA_LOCK:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        if not order:
+            err = "Buyurtma topilmadi."
+        elif not order.get("user_id"):
+            err = "Bu buyurtmada mijoz aniqlanmagan."
+        elif charge and order_on_account(order):
+            err = "Allaqachon hisobga yozilgan."
+        elif not charge and not order_on_account(order):
+            err = "Bu buyurtma hisobda emas."
+        else:
+            uid = order["user_id"]
+            if charge:
+                amount = money(order_payable(order))
+                order["on_account"] = True
+                order["account_amount"] = amount
+            else:
+                amount = money(order.get("account_amount") or order_payable(order))
+                order["on_account"] = False
+                order.pop("account_amount", None)
+            save_orders(orders)
+
+    if err:
+        bot.answer_callback_query(call.id, err, show_alert=True)
+        return
+
+    delta = -amount if charge else amount
+    bal = account_move(uid, delta, order_id,
+                       "buyurtma hisobga yozildi" if charge else "hisobdan qaytarildi")
+
+    bot.answer_callback_query(call.id,
+        ("Hisobga yozildi: " if charge else "Qaytarildi: ") + fmt_sum(amount) +
+        " \u2014 balans " + fmt_signed(bal))
+
+    # Buyurtma kartasidagi tugmalarni yangilaymiz
+    try:
+        orders = load_orders()
+        order = next((o for o in orders if o["id"] == order_id), None)
+        if order:
+            bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id,
+                                          reply_markup=status_keyboard(order))
+    except Exception:
+        pass
+
+    # Mijozga xabar \u2014 o\'z haqqi va qarzini ko\'rib tursin
+    if charge:
+        try:
+            lang = get_user_lang(uid)
+            bot.send_message(uid, t("acct_charged", lang,
+                                    amt=fmt_sum(amount), bal=fmt_signed(bal)))
+        except Exception:
+            pass
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("status:"))
 def cb_update_status(call):
@@ -2987,6 +3533,8 @@ def cmd_menu_admin(message):
         "🕒 Ish vaqti: /yopiq | /ochiq | /ish_vaqti 06:00 22:00\n"
         "🖨 Oshxona havolasi (Chrome uchun): /oshxona\n"
         "🧾 Bugungi cheklar holati: /cheklar\n"
+        "📒 Nasiya va avans: /hisob\n"
+        "📥 Telegramdan buyurtma: mijoz xabarini botga forward qiling\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
         "🎁 Viktorina: /viktorina | g'olib: /gholib\n"
         "📣 E'lon yuborish: /elon matn | mijozlar soni: /mijozlar\n"
@@ -5465,6 +6013,339 @@ def admin_page():
             .replace("__VER__", APP_VERSION))
     return no_cache(html)
 
+TGORDER_PAGE_HTML = """<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1230">
+<title>Telegram buyurtmasi</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{ --bg:#0a1230; --card:#141c3d; --line:#26305c; --ink:#eef1ff;
+         --dim:#9aa4cc; --gold:#f2c14e; --ok:#43d17c; --err:#ff6b6b; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font:15px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; padding-bottom:110px; }
+  header{ position:sticky; top:0; z-index:5; background:var(--bg);
+          border-bottom:1px solid var(--line); padding:12px 14px; }
+  h1{ font-size:16px; margin:0 0 2px; }
+  .sub{ font-size:12px; color:var(--dim); }
+  .wrap{ padding:12px 14px; }
+  .card{ background:var(--card); border:1px solid var(--line);
+         border-radius:13px; padding:12px; margin-bottom:12px; }
+  label{ display:block; font-size:12px; color:var(--dim); margin:9px 0 4px; }
+  input, textarea{ width:100%; padding:10px 11px; border-radius:9px;
+     border:1px solid var(--line); background:#0e1535; color:var(--ink); font:inherit; }
+  textarea{ min-height:58px; resize:vertical; }
+  .catname{ font-size:13px; color:var(--gold); margin:16px 0 7px; font-weight:700; }
+  .dish{ display:flex; align-items:center; gap:10px; padding:9px 0;
+         border-bottom:1px solid var(--line); }
+  .dish:last-child{ border-bottom:0; }
+  .dname{ flex:1; min-width:0; }
+  .dname b{ display:block; font-weight:600; font-size:14px; }
+  .dname span{ font-size:12px; color:var(--dim); }
+  .qty{ display:flex; align-items:center; gap:8px; }
+  .qty button{ width:32px; height:32px; border-radius:9px; border:1px solid var(--line);
+     background:#0e1535; color:var(--ink); font-size:17px; font-weight:700; }
+  .qty b{ min-width:20px; text-align:center; font-size:15px; }
+  .out{ opacity:.45; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:10px; }
+  .msg.info{ background:#16204a; color:var(--dim); }
+  .msg.err{ background:#3a1620; color:var(--err); }
+  .msg.ok{ background:#102c1d; color:var(--ok); }
+  .bottom{ position:fixed; left:0; right:0; bottom:0; background:var(--card);
+     border-top:1px solid var(--line); padding:11px 14px calc(11px + env(safe-area-inset-bottom)); }
+  .sum{ display:flex; justify-content:space-between; font-size:15px; margin-bottom:9px; }
+  .sum b{ color:var(--gold); }
+  .go{ width:100%; padding:14px; border-radius:11px; border:0; font-size:15px;
+       font-weight:700; background:var(--gold); color:#1a1200; }
+  .go[disabled]{ opacity:.5; }
+  .note{ font-size:11.5px; color:var(--dim); margin-top:8px; text-align:center; }
+  a{ color:var(--gold); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Telegramdan tushgan buyurtma</h1>
+  <div class="sub" id="who">Yuklanmoqda...</div>
+</header>
+
+<div class="wrap">
+  <div id="msg" class="msg info">Menyu yuklanmoqda...</div>
+
+  <div class="card">
+    <label>Mijoz ismi</label>
+    <input id="f_name" placeholder="Ism">
+    <label>Telefon</label>
+    <input id="f_phone" placeholder="05xxxxxxxx" inputmode="tel">
+    <label>Manzil</label>
+    <textarea id="f_addr" placeholder="Manzil yoki mo'ljal"></textarea>
+    <div id="locbox" class="sub" style="margin-top:7px"></div>
+    <label>Izoh (oshxona uchun)</label>
+    <textarea id="f_note" placeholder="Masalan: achchiq qilmang"></textarea>
+  </div>
+
+  <div class="card" id="menu"></div>
+</div>
+
+<div class="bottom">
+  <div class="sum"><span id="cnt">0 ta taom</span><b id="total">0</b></div>
+  <button class="go" id="go" disabled>Buyurtmani yaratish</button>
+  <div class="note">Bu buyurtmaga keshbek yozilmaydi</div>
+</div>
+
+<script>
+(function(){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  try{ if (tg){ tg.ready(); tg.expand(); } }catch(e){}
+
+  var Q = new URLSearchParams(location.search);
+  function auth(){
+    var p = new URLSearchParams();
+    ['draft','uid','uname','ts','sig'].forEach(function(k){
+      if (Q.get(k) !== null) p.set(k, Q.get(k));
+    });
+    return p.toString();
+  }
+  function $(id){ return document.getElementById(id); }
+  function say(text, kind){
+    var m = $('msg');
+    m.className = 'msg ' + (kind || 'info');
+    m.textContent = text;
+  }
+  function esc(s){
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  var MENU = [], CART = {}, CUR = 'SAR', draft = {};
+
+  function fmt(n){
+    var v = Math.round(n * 100) / 100;
+    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)) + ' ' + CUR;
+  }
+
+  function renderTotals(){
+    var n = 0, s = 0;
+    MENU.forEach(function(d){
+      var q = CART[d.id] || 0;
+      n += q; s += q * d.price;
+    });
+    $('cnt').textContent = n + ' ta taom';
+    $('total').textContent = fmt(s);
+    $('go').disabled = (n === 0);
+  }
+
+  function setQty(id, delta){
+    var d = MENU.filter(function(x){ return x.id === id; })[0];
+    if (!d) return;
+    var q = (CART[id] || 0) + delta;
+    if (q < 0) q = 0;
+    if (d.stock !== null && d.stock !== undefined && q > d.stock) q = d.stock;
+    CART[id] = q;
+    var el = document.querySelector('[data-q="' + id + '"]');
+    if (el) el.textContent = q;
+    renderTotals();
+  }
+
+  function renderMenu(){
+    var byCat = {}, order = [];
+    MENU.forEach(function(d){
+      var c = d.category || 'Boshqa';
+      if (!byCat[c]){ byCat[c] = []; order.push(c); }
+      byCat[c].push(d);
+    });
+    var html = '';
+    order.forEach(function(c){
+      html += '<div class="catname">' + esc(c) + '</div>';
+      byCat[c].forEach(function(d){
+        var tugagan = (d.stock !== null && d.stock !== undefined && d.stock <= 0);
+        html += '<div class="dish' + (tugagan ? ' out' : '') + '">' +
+                  '<div class="dname"><b>' + esc(d.name) + '</b><span>' + fmt(d.price) +
+                  (tugagan ? ' \u2014 tugagan' :
+                    (d.stock !== null && d.stock !== undefined ? ' \u2014 ' + d.stock + ' dona' : '')) +
+                  '</span></div>' +
+                  '<div class="qty">' +
+                    '<button type="button" data-m="' + d.id + '">\u2212</button>' +
+                    '<b data-q="' + d.id + '">0</b>' +
+                    '<button type="button" data-p="' + d.id + '"' + (tugagan ? ' disabled' : '') + '>+</button>' +
+                  '</div></div>';
+      });
+    });
+    $('menu').innerHTML = html || '<div class="sub">Menyu bo\u2018sh.</div>';
+    $('menu').addEventListener('click', function(e){
+      var t = e.target;
+      if (t.dataset && t.dataset.p) setQty(parseInt(t.dataset.p, 10), 1);
+      else if (t.dataset && t.dataset.m) setQty(parseInt(t.dataset.m, 10), -1);
+    });
+  }
+
+  function fillDraft(){
+    $('f_name').value = draft.name || '';
+    $('f_phone').value = draft.phone || '';
+    $('f_addr').value = draft.address || '';
+    $('f_note').value = '';
+    var kim = draft.name || 'mijoz';
+    if (draft.username) kim += ' (@' + draft.username + ')';
+    $('who').textContent = kim;
+    var box = $('locbox'), parts = [];
+    if (draft.lat !== null && draft.lat !== undefined){
+      parts.push('\U0001F4CD Joylashuv olindi: ' + Number(draft.lat).toFixed(5) +
+                 ', ' + Number(draft.lon).toFixed(5));
+    }
+    if (draft.map_link){
+      parts.push('\U0001F517 <a href="' + esc(draft.map_link) + '" target="_blank">xarita havolasi</a>');
+    }
+    if (draft.tme){
+      parts.push('\U0001F4AC <a href="' + esc(draft.tme) + '" target="_blank">mijozga yozish</a>');
+    }
+    box.innerHTML = parts.join('<br>');
+  }
+
+  async function load(){
+    try{
+      var r = await fetch('/api/tgorder/data?' + auth());
+      var data = await r.json();
+      if (!r.ok){ say(data.error || 'Xatolik', 'err'); return; }
+      MENU = data.menu || [];
+      draft = data.draft || {};
+      CUR = data.currency || 'SAR';
+      fillDraft();
+      renderMenu();
+      renderTotals();
+      say('Taomlarni tanlang, keyin pastdagi tugmani bosing.', 'info');
+    }catch(e){
+      say('Server bilan aloqa yo\u2018q: ' + (e && e.message ? e.message : e), 'err');
+    }
+  }
+
+  $('go').addEventListener('click', async function(){
+    var cart = {};
+    Object.keys(CART).forEach(function(k){ if (CART[k] > 0) cart[k] = CART[k]; });
+    if (!Object.keys(cart).length){ say('Savat bo\u2018sh.', 'err'); return; }
+    $('go').disabled = true;
+    say('Yuborilmoqda...', 'info');
+    try{
+      var r = await fetch('/api/tgorder/create?' + auth(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cart: cart,
+          name: $('f_name').value.trim(),
+          phone: $('f_phone').value.trim(),
+          address: $('f_addr').value.trim(),
+          note: $('f_note').value.trim()
+        })
+      });
+      var data = await r.json();
+      if (!r.ok || data.error){
+        say(data.error || 'Xatolik', 'err');
+        $('go').disabled = false;
+        return;
+      }
+      say('\u2705 Buyurtma #' + data.no + ' yaratildi.', 'ok');
+      setTimeout(function(){ try{ tg && tg.close(); }catch(e){} }, 1200);
+    }catch(e){
+      say('Yuborilmadi: ' + (e && e.message ? e.message : e), 'err');
+      $('go').disabled = false;
+    }
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
+"""
+
+# ---------- Telegramdan tushgan buyurtma ----------
+
+@app.route("/tgorder")
+def tgorder_page():
+    if not admin_from_request():
+        return ("<h3 style='font-family:sans-serif;padding:24px'>Ruxsat yo'q.<br><br>"
+                "Botdagi buyurtma qoralamasidan \"Savatni yig'ish\" tugmasini bosing.</h3>"), 403
+    return no_cache(TGORDER_PAGE_HTML)
+
+@app.route("/api/tgorder/data")
+def api_tgorder_data():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    token = request.args.get("draft") or ""
+    d = tgdraft_get(token)
+    if not d:
+        return jsonify({"error": "Qoralama topilmadi yoki eskirdi. Mijoz xabarini qaytadan forward qiling."}), 404
+
+    disc = get_discount()
+    menu = []
+    for x in load_menu():
+        if x.get("hidden"):
+            continue
+        menu.append({
+            "id": x["id"],
+            "name": x["name"],
+            "price": discounted_price(x["price"], disc),
+            "stock": x.get("stock"),
+            "category": x.get("category", DEFAULT_CATEGORY),
+        })
+    sira = {c: i for i, c in enumerate(CATEGORIES)}
+    menu.sort(key=lambda m: (sira.get(m["category"], 99), m["name"].lower()))
+    return jsonify({"draft": d, "menu": menu, "currency": "SAR"})
+
+@app.route("/api/tgorder/create", methods=["POST"])
+def api_tgorder_create():
+    admin = admin_from_request()
+    if not admin:
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    token = request.args.get("draft") or ""
+    d = tgdraft_get(token)
+    if not d:
+        return jsonify({"error": "Qoralama topilmadi yoki eskirdi."}), 404
+
+    body = request.get_json(force=True, silent=True) or {}
+    raw_cart = body.get("cart") or {}
+    cart = {}
+    for k, v in raw_cart.items():
+        try:
+            dish_id, qty = int(k), int(v)
+        except Exception:
+            continue
+        if qty > 0:
+            cart[dish_id] = qty
+    if not cart:
+        return jsonify({"error": "Savat bo'sh."}), 400
+
+    name = (body.get("name") or d.get("name") or "Mijoz").strip()[:60]
+    phone = (body.get("phone") or d.get("phone") or "").strip()[:30]
+    address = (body.get("address") or d.get("address") or "").strip()[:300]
+    note = (body.get("note") or "").strip()[:300]
+    lat, lon = d.get("lat"), d.get("lon")
+    if lat is None and not address:
+        address = (d.get("map_link") or d.get("text") or "\u2014")[:300]
+
+    extra = {
+        "source": "telegram",
+        "no_cashback": True,            # qo'lda kiritilgan \u2014 keshbek yo'q
+        "entered_by": admin["id"],
+    }
+    if d.get("tme"):
+        extra["tme"] = d["tme"]
+    if d.get("map_link"):
+        extra["map_link"] = d["map_link"]
+
+    order, error = create_order(
+        cart, name, phone, lat, lon, address, note,
+        d.get("user_id"), d.get("username"),
+        use_cashback=False, extra=extra)
+    if error:
+        return jsonify({"error": error}), 400
+
+    d["used"] = True
+    tgdraft_drop(token)
+    return jsonify({"ok": True, "id": order["id"], "no": order.get("daily_number")})
+
 # ---------- oshxona printeri uchun API ----------
 
 @app.route("/kitchen")
@@ -6097,6 +6978,130 @@ def cmd_cashback(message):
     key = "cb_balance" if bal > 0 else "cb_zero"
     bot.send_message(message.chat.id, t(key, lang, bal=fmt_sum(bal), pct=f"{cfg['percent']:g}"),
                      reply_markup=main_keyboard(message.from_user.id, message.from_user.username))
+
+@bot.message_handler(commands=["hisob", "nasiya", "account"])
+def cmd_account(message):
+    """Mijoz hisobi: nasiya (minus) va avans (plyus).
+
+    Mijoz uchun \u2014 o\'z balansi.
+    Admin uchun \u2014 ro\'yxat, bitta mijoz, pul qo\'shish va yechish.
+    """
+    parts = (message.text or "").split()
+    owner = is_owner(message.chat.id)
+
+    # ----- mijoz o\'z hisobini ko\'radi -----
+    if not owner:
+        lang = get_user_lang(message.from_user.id)
+        bal = account_balance(message.from_user.id)
+        if bal < 0:
+            txt = t("acct_my_debt", lang, bal=fmt_signed(bal), amt=fmt_sum(-bal))
+        elif bal > 0:
+            txt = t("acct_my_adv", lang, bal=fmt_signed(bal), amt=fmt_sum(bal))
+        else:
+            txt = t("acct_my_zero", lang)
+        bot.send_message(message.chat.id, txt,
+                         reply_markup=main_keyboard(message.from_user.id,
+                                                    message.from_user.username, lang))
+        return
+
+    # ----- admin: pul qo\'shish / yechish -----
+    if len(parts) >= 4 and parts[1] in ("+", "-", "\u2212"):
+        kim = parts[2]
+        try:
+            amount = money(float(parts[3].replace(",", ".")))
+        except Exception:
+            bot.send_message(message.chat.id, "Summani to\u2018g\u2018ri yozing: /hisob + @ali 100")
+            return
+        if amount <= 0:
+            bot.send_message(message.chat.id, "Summa noldan katta bo\u2018lsin.")
+            return
+        izoh = " ".join(parts[4:]).strip()
+
+        if kim.lstrip("-").isdigit():
+            hits = [int(kim)]
+        else:
+            hits = cashback_find_user(kim)
+        if not hits:
+            bot.send_message(message.chat.id, f"\u00ab{kim}\u00bb bo\u2018yicha mijoz topilmadi.")
+            return
+        if len(hits) > 1:
+            users = load_users()
+            ro = "\n".join(f"  {(users.get(str(h)) or {}).get('name') or 'Ism yo\u2018q'} \u2014 {h}"
+                            for h in hits[:10])
+            bot.send_message(message.chat.id,
+                             f"Bir nechta mijoz topildi, ID bilan yozing:\n{ro}")
+            return
+
+        uid = hits[0]
+        delta = amount if parts[1] == "+" else -amount
+        bal = account_move(uid, delta, None, izoh or ("to\u2018lov" if delta > 0 else "qo\u2018lda yechildi"))
+        users = load_users()
+        u = users.get(str(uid)) or {}
+        nom = (u.get("name") or "").strip() or str(uid)
+        bot.send_message(message.chat.id,
+            f"\u2705 {nom}: {fmt_signed(delta)}\nYangi balans: {fmt_signed(bal)}")
+        if delta > 0:
+            try:
+                lang = get_user_lang(uid)
+                bot.send_message(uid, t("acct_paid", lang,
+                                        amt=fmt_sum(delta), bal=fmt_signed(bal)))
+            except Exception:
+                pass
+        return
+
+    # ----- admin: bitta mijoz -----
+    if len(parts) >= 2 and parts[1] not in ("royxat", "ro\u2018yxat", "list"):
+        kim = parts[1]
+        hits = [int(kim)] if kim.lstrip("-").isdigit() else cashback_find_user(kim)
+        if not hits:
+            bot.send_message(message.chat.id, f"\u00ab{kim}\u00bb bo\u2018yicha mijoz topilmadi.")
+            return
+        users = load_users()
+        bloklar = []
+        for uid in hits[:5]:
+            u = users.get(str(uid)) or {}
+            bal = account_balance(uid)
+            rec = (load_account().get(str(uid)) or {})
+            hist = (rec.get("history") or [])[-8:]
+            satrlar = []
+            for h in reversed(hist):
+                vaqt = datetime.fromtimestamp(h.get("ts", 0), TIMEZONE).strftime("%d.%m %H:%M")
+                nomer = f" #{h['order_id']}" if h.get("order_id") else ""
+                satrlar.append(f"  {vaqt}{nomer}  {fmt_signed(h.get('delta', 0))}"
+                               f"  \u2192 {fmt_signed(h.get('bal', 0))}"
+                               + (f"  ({h['note']})" if h.get("note") else ""))
+            bloklar.append(
+                account_line(uid, bal, (u.get("name") or "").strip(), u.get("username") or "")
+                + ("\n" + "\n".join(satrlar) if satrlar else "\n  (harakat yo\u2018q)"))
+        bot.send_message(message.chat.id, "\n\n".join(bloklar))
+        return
+
+    # ----- admin: umumiy ro\'yxat -----
+    tot = account_totals()
+    holders = account_holders()
+    qarzdorlar = [h for h in holders if h[1] < 0]
+    avanslilar = [h for h in holders if h[1] > 0]
+
+    txt = ("\U0001F4D2 Mijozlar hisobi\n\n"
+           f"\U0001F534 Nasiya: {fmt_sum(tot['debt'])} \u2014 {tot['debtors']} ta mijoz\n"
+           f"\U0001F7E2 Avans: {fmt_sum(tot['advance'])} \u2014 {tot['advanced']} ta mijoz\n")
+    if qarzdorlar:
+        txt += "\nQarzdorlar:\n" + "\n".join(account_line(*h) for h in qarzdorlar[:20])
+        if len(qarzdorlar) > 20:
+            txt += f"\n  ...va yana {len(qarzdorlar) - 20} ta"
+    if avanslilar:
+        txt += "\n\nAvansi borlar:\n" + "\n".join(account_line(*h) for h in avanslilar[:20])
+        if len(avanslilar) > 20:
+            txt += f"\n  ...va yana {len(avanslilar) - 20} ta"
+    if not holders:
+        txt += "\nHozircha nol bo\u2018lmagan hisob yo\u2018q."
+    txt += ("\n\nBoshqarish:\n"
+            "/hisob + @ali 100 \u2014 to\u2018lov yoki avans qo\u2018shish\n"
+            "/hisob - @ali 50 \u2014 qo\u2018lda yechish\n"
+            "/hisob @ali \u2014 bitta mijoz va tarixi\n\n"
+            "Buyurtmani nasiyaga yozish: buyurtma xabaridagi "
+            "\u00abHisobga yozish\u00bb tugmasi.")
+    bot.send_message(message.chat.id, txt)
 
 @bot.message_handler(commands=["keshbek_foiz"])
 def cmd_cashback_percent(message):
