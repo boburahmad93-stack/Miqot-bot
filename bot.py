@@ -4041,12 +4041,13 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   }
 
   function sayNeedChrome(){
-    say("Bluetooth bu yerda ishlamaydi — sahifa Telegram ichidagi brauzerda ochilgan. " +
-        "Uni Chrome'da ochsangiz printer ulanadi.<br>" +
-        "<button type=\"button\" id=\"goChrome\" style=\"margin:8px 6px 0 0;padding:9px 13px;" +
-        "border-radius:9px;font-weight:700\">Chrome'da ochish</button>" +
-        "<button type=\"button\" id=\"cpLink\" style=\"margin:8px 0 0 0;padding:9px 13px;" +
-        "border-radius:9px\">Havolani nusxalash</button>", 'err');
+    var bcss = 'margin:8px 6px 0 0;padding:9px 13px;border-radius:9px';
+    say('Bluetooth bu yerda ishlamaydi \u2014 sahifa Telegram ichidagi brauzerda ochilgan. ' +
+        'Uni Chrome\u2019da ochsangiz printer ulanadi.<br>' +
+        '<button type=button id=goChrome style="' + bcss + ';font-weight:700">' +
+        'Chrome\u2019da ochish</button>' +
+        '<button type=button id=cpLink style="' + bcss + '">' +
+        'Havolani nusxalash</button>', 'err');
     var g = document.getElementById('goChrome');
     if (g) g.onclick = openInChrome;
     var c = document.getElementById('cpLink');
