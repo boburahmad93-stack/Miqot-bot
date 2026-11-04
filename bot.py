@@ -47,6 +47,7 @@ SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 CASHBACK_FILE = os.path.join(DATA_DIR, "cashback.json")
 ACCOUNT_FILE = os.path.join(DATA_DIR, "hisob.json")      # nasiya va avans
 TGDRAFT_FILE = os.path.join(DATA_DIR, "tg_drafts.json")  # Telegramdan ko'chirilgan buyurtmalar
+BIZSEEN_FILE = os.path.join(DATA_DIR, "biz_seen.json")   # shaxsiy chatda kimga qachon javob berilgan
 WINBACK_FILE = os.path.join(DATA_DIR, "winback.json")
 
 # ---------- mijozni qaytarish sozlamalari (oson o'zgartirish uchun shu yerda) ----------
@@ -772,6 +773,29 @@ USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
 def load_users():
     return load_json(USERS_FILE, {})
+
+_bot_username = {"v": os.environ.get("BOT_USERNAME", "").lstrip("@")}
+
+def bot_username():
+    """Botning @nomi. Telegramdan bir marta so'raymiz va eslab qolamiz."""
+    if not _bot_username["v"]:
+        try:
+            _bot_username["v"] = (bot.get_me().username or "").lstrip("@")
+        except Exception:
+            pass
+    return _bot_username["v"]
+
+def start_links(payload="dm", app_name=None):
+    """Mijozni botga olib keladigan havolalar."""
+    u = bot_username()
+    if not u:
+        return {}
+    p = urllib.parse.quote(str(payload)[:60])
+    out = {"start": f"https://t.me/{u}?start={p}"}
+    name = (app_name or os.environ.get("MINIAPP_NAME", "")).strip().lstrip("/")
+    if name:
+        out["app"] = f"https://t.me/{u}/{name}?startapp={p}"
+    return out
 
 def add_known_user(user):
     """Bot bilan muloqot qilgan har bir mijozni eslab qolamiz."""
@@ -1656,6 +1680,22 @@ def lang_keyboard():
 @bot.message_handler(commands=["start"])
 def cmd_start(message):
     add_known_user(message.from_user)
+    # "/start dm" \u2014 mijoz qayerdan kelganini eslab qolamiz
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) > 1 and parts[1].strip():
+        src = re.sub(r"[^A-Za-z0-9_\-]", "", parts[1].strip())[:32]
+        if src:
+            try:
+                with DATA_LOCK:
+                    users = load_users()
+                    rec = users.get(str(message.from_user.id)) or {}
+                    if not rec.get("src"):
+                        rec["src"] = src
+                        rec["src_at"] = int(time.time())
+                        users[str(message.from_user.id)] = rec
+                        save_json(USERS_FILE, users)
+            except Exception:
+                pass
     carts.pop(message.from_user.id, None)
     checkout_state.pop(message.from_user.id, None)
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
@@ -3535,6 +3575,8 @@ def cmd_menu_admin(message):
         "🧾 Bugungi cheklar holati: /cheklar\n"
         "📒 Nasiya va avans: /hisob\n"
         "📥 Telegramdan buyurtma: mijoz xabarini botga forward qiling\n"
+        "🔗 Mijozni botga olib o'tish: /havola\n"
+        "💼 Shaxsiy akkaunt (Business): /biznes\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
         "🎁 Viktorina: /viktorina | g'olib: /gholib\n"
         "📣 E'lon yuborish: /elon matn | mijozlar soni: /mijozlar\n"
@@ -6813,6 +6855,247 @@ def cmd_checks(message):
                 "oshxona bo‘limi bo‘sh ko‘rinadi.\n"
                 "Qaytarish: /cheklar qayta  (yoki bittasi: /cheklar qayta 3)")
     bot.send_message(message.chat.id, txt)
+
+# ======================================================================
+#  TELEGRAM BUSINESS — shaxsiy akkauntdagi mijozlarga botning javobi
+#
+#  Telegram Premium bo'lsa, bot egasining SHAXSIY chatiga ulanadi va
+#  mijoz yozganda tugmali javob yuboradi. Egasi istalgan paytda
+#  suhbatga o'zi qo'shiladi — bot unga xalaqit qilmaydi.
+# ======================================================================
+
+BIZ_DEFAULT_TEXT = (
+    "Assalomu alaykum! 🕌\n"
+    "{biz} — halol, lazzatli, barakali ne'mat.\n\n"
+    "Menyu, narxlar va yetkazib berish — hammasi quyidagi tugmada. "
+    "Savolingiz bo'lsa shu yerga yozavering, javob beramiz."
+)
+
+def biz_cfg():
+    s = load_settings()
+    return {
+        "conn": s.get("biz_conn"),
+        "owner": s.get("biz_owner"),
+        "on": bool(s.get("biz_on", True)),
+        "text": s.get("biz_text") or BIZ_DEFAULT_TEXT,
+        "cooldown": int(s.get("biz_cooldown", 6)),      # soat
+    }
+
+def biz_set(**kw):
+    with DATA_LOCK:
+        s = load_settings()
+        s.update(kw)
+        save_settings(s)
+
+def biz_seen_ok(uid, hours):
+    """Shu mijozga yaqinda javob berilganmi. Berilmagan bo'lsa True va belgilaydi."""
+    now = int(time.time())
+    with DATA_LOCK:
+        data = load_json(BIZSEEN_FILE, {})
+        oxirgi = int(data.get(str(uid), 0))
+        if now - oxirgi < hours * 3600:
+            return False
+        data[str(uid)] = now
+        # ro'yxat cheksiz o'smasin
+        if len(data) > 3000:
+            eski = sorted(data.items(), key=lambda x: x[1])[:1000]
+            for k, _ in eski:
+                data.pop(k, None)
+        save_json(BIZSEEN_FILE, data)
+    return True
+
+def biz_keyboard():
+    """Mijoz ko'radigan tugma. Business chatda web_app emas, havola ishlaydi."""
+    kb = types.InlineKeyboardMarkup()
+    links = start_links("dm")
+    url = links.get("app") or links.get("start")
+    if url:
+        kb.add(types.InlineKeyboardButton("🍽 Menyu va buyurtma berish", url=url))
+    return kb if url else None
+
+def biz_reply_text():
+    return biz_cfg()["text"].replace("{biz}", BUSINESS_NAME)
+
+BIZ_SUPPORTED = hasattr(bot, "business_message_handler")
+
+if hasattr(bot, "business_connection_handler"):
+    @bot.business_connection_handler(func=lambda c: True)
+    def on_business_connection(conn):
+        """Egasi botni o'z akkauntiga uladi yoki uzdi."""
+        try:
+            faol = getattr(conn, "is_enabled", None)
+            if faol is None:
+                faol = getattr(conn, "rights", None) is not None
+            uid = getattr(getattr(conn, "user", None), "id", None)
+            biz_set(biz_conn=conn.id if faol else None, biz_owner=uid)
+            if uid:
+                bot.send_message(uid,
+                    ("✅ Bot shaxsiy akkauntingizga ulandi.\n\n"
+                     "Endi mijoz sizga yozganda bot tugmali javob yuboradi. "
+                     "Sozlash: /biznes") if faol else
+                    "ℹ️ Bot shaxsiy akkauntingizdan uzildi.")
+        except Exception as e:
+            print(f"Business ulanishida xato: {e}")
+
+if BIZ_SUPPORTED:
+    @bot.business_message_handler(func=lambda m: True)
+    def on_business_message(message):
+        """Mijoz egasining shaxsiy chatiga yozdi."""
+        try:
+            cfg = biz_cfg()
+            if not cfg["on"]:
+                return
+            conn = getattr(message, "business_connection_id", None)
+            if not conn:
+                return
+            uid = getattr(message.from_user, "id", None)
+            if not uid:
+                return
+            # egasining O'Z xabariga javob bermaymiz
+            if cfg.get("owner") and uid == cfg["owner"]:
+                return
+            if getattr(message.from_user, "is_bot", False):
+                return
+            if not biz_seen_ok(uid, cfg["cooldown"]):
+                return
+            add_known_user(message.from_user)
+            bot.send_message(message.chat.id, biz_reply_text(),
+                             reply_markup=biz_keyboard(),
+                             business_connection_id=conn)
+        except Exception as e:
+            print(f"Business xabariga javobda xato: {e}")
+
+@bot.message_handler(commands=["biznes", "business"])
+def cmd_business(message):
+    """Shaxsiy akkauntdagi avtomatik javobni boshqarish."""
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split(maxsplit=1)
+    arg = (parts[1].strip() if len(parts) > 1 else "")
+    past = arg.lower()
+
+    if past in ("on", "yoq", "yoqish"):
+        biz_set(biz_on=True)
+        bot.send_message(message.chat.id, "✅ Shaxsiy chatdagi avtomatik javob yoqildi.")
+        return
+    if past in ("off", "ochir", "o'chir", "o‘chir"):
+        biz_set(biz_on=False)
+        bot.send_message(message.chat.id, "⏸ Avtomatik javob o'chirildi.")
+        return
+    if past.startswith("matn"):
+        yangi = arg[4:].strip()
+        if not yangi:
+            bot.send_message(message.chat.id,
+                "Matnni ham yozing:\n/biznes matn Assalomu alaykum! ...\n\n"
+                "{biz} deb yozsangiz, o'rniga biznes nomi qo'yiladi.")
+            return
+        biz_set(biz_text=yangi[:900])
+        bot.send_message(message.chat.id, "✅ Matn saqlandi. Hozirgi ko'rinishi:")
+        bot.send_message(message.chat.id, biz_reply_text(), reply_markup=biz_keyboard())
+        return
+    if past.startswith("soat"):
+        try:
+            h = int(arg.split()[1])
+        except Exception:
+            bot.send_message(message.chat.id, "Masalan: /biznes soat 6")
+            return
+        biz_set(biz_cooldown=max(0, min(168, h)))
+        bot.send_message(message.chat.id,
+            f"✅ Bitta mijozga {max(0, min(168, h))} soatda bir marta javob beriladi.")
+        return
+
+    cfg = biz_cfg()
+    if not BIZ_SUPPORTED:
+        bot.send_message(message.chat.id,
+            "⚠️ Serverdagi telebot kutubxonasi eski — Business xabarlarini "
+            "qo'llab-quvvatlamaydi.\n\nrequirements.txt faylida "
+            "`pyTelegramBotAPI>=4.22` deb yozing va qayta deploy qiling.")
+        return
+
+    holat = "🟢 ulangan" if cfg["conn"] else "🔴 ulanmagan"
+    javob_holati = "yoqilgan" if cfg["on"] else "o'chirilgan"
+    txt = ("💼 Telegram Business — shaxsiy akkaunt\n\n"
+           f"Ulanish: {holat}\n"
+           f"Avtomatik javob: {javob_holati}\n"
+           f"Takrorlash oralig'i: {cfg['cooldown']} soat\n\n")
+    if not cfg["conn"]:
+        txt += ("Ulash uchun telefoningizda:\n"
+                "Sozlamalar → Telegram Business → Chatbots → "
+                f"@{bot_username() or 'botingiz'} → ruxsatlarni bering.\n\n"
+                "Telegram Premium kerak.\n\n")
+    txt += ("Hozirgi javob matni:\n— — —\n" + biz_reply_text() +
+            "\n— — —\n\n"
+            "Boshqarish:\n"
+            "/biznes matn <yangi matn> — javobni o'zgartirish\n"
+            "/biznes soat 6 — bitta mijozga necha soatda bir marta\n"
+            "/biznes off — vaqtincha o'chirish | /biznes on — yoqish")
+    bot.send_message(message.chat.id, txt, reply_markup=biz_keyboard())
+
+@bot.message_handler(commands=["havola", "link"])
+def cmd_invite_link(message):
+    """Shaxsiy akkauntdan mijozni botga olib o\u2018tish uchun havolalar."""
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split()
+    payload = re.sub(r"[^A-Za-z0-9_\-]", "", parts[1])[:32] if len(parts) > 1 else "dm"
+    payload = payload or "dm"
+
+    u = bot_username()
+    if not u:
+        bot.send_message(message.chat.id,
+            "Botning @nomini aniqlay olmadim. Railway\u2019da BOT_USERNAME "
+            "o\u2018zgaruvchisiga bot nomini yozing (masalan: miqotfoodbuyurtmabot).")
+        return
+
+    links = start_links(payload)
+    nusxa = ("Assalomu alaykum! Buyurtmani shu yerdan berasiz \u2014 "
+             "menyu, narxlar va yetkazib berish hammasi botda:\n"
+             + (links.get("app") or links["start"]))
+
+    txt = ("\U0001F517 Mijozni botga olib o\u2018tish\n\n"
+           "Shaxsiy akkauntdan tugma yuborib bo\u2018lmaydi \u2014 inline tugmalarni "
+           "faqat botlar yubora oladi. Uning o\u2018rniga havola yuboriladi, "
+           "mijoz bossa bot ochiladi.\n\n"
+           "1\ufe0f\u20e3 Oddiy havola (mijoz START bosadi):\n"
+           f"`{links['start']}`\n\n")
+    if links.get("app"):
+        txt += ("2\ufe0f\u20e3 Mini App to\u2018g\u2018ridan-to\u2018g\u2018ri ochiladi (bitta bosish):\n"
+                f"`{links['app']}`\n\n")
+    else:
+        txt += ("2\ufe0f\u20e3 Mini App\u2019ni bir bosishda ochadigan havola hozircha yo\u2018q.\n"
+                "Buning uchun BotFather \u2192 /mybots \u2192 botingiz \u2192 Bot Settings \u2192 "
+                "Configure Mini App \u2192 Enable \u2014 u yerda qisqa nom beriladi. "
+                "So\u2018ng Railway\u2019da MINIAPP_NAME o\u2018zgaruvchisiga o\u2018sha nomni yozing, "
+                "shunda bu yerda ikkinchi havola ham chiqadi.\n\n")
+
+    txt += ("\u2702\ufe0f Mijozga yuborish uchun tayyor matn:\n\n"
+            f"{nusxa}\n\n"
+            "\U0001F4A1 Telegram\u2019da bu matnni \u00abSaqlangan xabarlar\u00bb ga qo\u2018yib "
+            "qo\u2018ysangiz, har safar nusxalab yuborish oson bo\u2018ladi.\n\n"
+            f"Hisobot: /havola_hisobot \u2014 shu havola orqali nechta mijoz kelgani.\n"
+            f"Boshqa belgi bilan: /havola instagram")
+    bot.send_message(message.chat.id, txt, parse_mode="Markdown",
+                     disable_web_page_preview=True)
+
+@bot.message_handler(commands=["havola_hisobot", "link_report"])
+def cmd_invite_report(message):
+    """Qaysi havola orqali nechta mijoz kelgan."""
+    if not is_owner(message.chat.id):
+        return
+    sanoq = {}
+    for rec in load_users().values():
+        s = rec.get("src")
+        if s:
+            sanoq[s] = sanoq.get(s, 0) + 1
+    if not sanoq:
+        bot.send_message(message.chat.id,
+            "Hozircha havola orqali kelgan mijoz yo\u2018q.\n"
+            "Havolani olish: /havola")
+        return
+    satrlar = [f"  {k} \u2014 {v} ta" for k, v in sorted(sanoq.items(), key=lambda x: -x[1])]
+    bot.send_message(message.chat.id,
+        "\U0001F517 Havola orqali kelgan mijozlar\n\n" + "\n".join(satrlar) +
+        f"\n\nJami: {sum(sanoq.values())} ta")
 
 @bot.message_handler(commands=["oshxona", "kitchen"])
 def cmd_kitchen_link(message):
