@@ -1342,6 +1342,19 @@ def account_line(uid, bal, name, uname):
     belgi = "🔴" if bal < 0 else "🟢"
     return f"{belgi} {fmt_signed(bal)} — {kim} (ID {uid})"
 
+def hisob_webapp_kb(uid, uname):
+    """Nasiya sahifasini ochadigan tugma."""
+    if not WEBAPP_URL:
+        return None
+    ts, sig = sign_user_params(uid, uname)
+    params = (f"uid={uid}&uname={urllib.parse.quote(uname or '')}"
+              f"&ts={ts}&sig={sig}&v={ts}")
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton(
+        "\U0001F4D2 Hisobni ochish",
+        web_app=types.WebAppInfo(url=f"{WEBAPP_URL}/hisob?{params}")))
+    return kb
+
 def order_on_account(order):
     return bool(order.get("on_account"))
 
@@ -6302,7 +6315,340 @@ TGORDER_PAGE_HTML = """<!doctype html>
 </html>
 """
 
+# ---------- nasiya va avans sahifasi ----------
+
+@app.route("/hisob")
+def hisob_page():
+    if not admin_from_request():
+        return ("<h3 style='font-family:sans-serif;padding:24px'>Ruxsat yo'q.<br><br>"
+                "Botda /hisob yuboring va chiqqan tugmani bosing.</h3>"), 403
+    return no_cache(HISOB_PAGE_HTML)
+
+def _hisob_holder_payload():
+    users = load_users()
+    out = []
+    for uid, bal, name, uname in account_holders():
+        out.append({"uid": uid, "bal": bal, "name": name, "uname": uname})
+    return out
+
+@app.route("/api/hisob/data")
+def api_hisob_data():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    tot = account_totals()
+    return jsonify({"holders": _hisob_holder_payload(),
+                    "debt": tot["debt"], "debtors": tot["debtors"],
+                    "advance": tot["advance"], "advanced": tot["advanced"]})
+
+@app.route("/api/hisob/find")
+def api_hisob_find():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    q = (request.args.get("q") or "").strip().lstrip("@").lower()
+    if len(q) < 2:
+        return jsonify({"found": []})
+    found = []
+    for uid, u in load_users().items():
+        name = (u.get("name") or "").strip()
+        uname = (u.get("username") or "").strip()
+        if q in name.lower() or q in uname.lower() or q == str(uid):
+            found.append({"uid": int(uid), "bal": account_balance(uid),
+                          "name": name, "uname": uname})
+        if len(found) >= 40:
+            break
+    found.sort(key=lambda r: (r["bal"], r["name"].lower()))
+    return jsonify({"found": found})
+
+@app.route("/api/hisob/one")
+def api_hisob_one():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    # "uid" admin imzosi uchun band — mijozni "cid" bilan olamiz
+    try:
+        uid = int(request.args.get("cid"))
+    except Exception:
+        return jsonify({"error": "Mijoz ko'rsatilmagan"}), 400
+    u = (load_users().get(str(uid)) or {})
+    rec = (load_account().get(str(uid)) or {})
+    hist = []
+    for h in (rec.get("history") or [])[-15:]:
+        hist.append({
+            "delta": money(h.get("delta", 0)),
+            "note": h.get("note") or "",
+            "when": datetime.fromtimestamp(h.get("ts", 0), TIMEZONE).strftime("%d.%m %H:%M"),
+        })
+    return jsonify({"uid": uid, "bal": account_balance(uid),
+                    "name": (u.get("name") or "").strip(),
+                    "uname": u.get("username") or "", "history": hist})
+
+@app.route("/api/hisob/move", methods=["POST"])
+def api_hisob_move():
+    if not admin_from_request():
+        return jsonify({"error": "Ruxsat yo'q"}), 403
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        uid = int(body.get("uid"))
+        delta = money(float(body.get("delta")))
+    except Exception:
+        return jsonify({"error": "Noto'g'ri ma'lumot"}), 400
+    if delta == 0:
+        return jsonify({"error": "Summa noldan farqli bo'lsin"}), 400
+    if abs(delta) > 100000:
+        return jsonify({"error": "Summa juda katta"}), 400
+    note = (body.get("note") or "").strip()[:120]
+    bal = account_move(uid, delta, None,
+                       note or ("to'lov" if delta > 0 else "qarz qo'shildi"))
+    if delta > 0:
+        try:
+            lang = get_user_lang(uid)
+            bot.send_message(uid, t("acct_paid", lang,
+                                    amt=fmt_sum(delta), bal=fmt_signed(bal)))
+        except Exception:
+            pass
+    return jsonify({"ok": True, "bal": bal})
+
 # ---------- Telegramdan tushgan buyurtma ----------
+
+HISOB_PAGE_HTML = """<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1230">
+<title>Nasiya va avans</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{ --bg:#0a1230; --card:#141c3d; --line:#26305c; --ink:#eef1ff;
+         --dim:#9aa4cc; --gold:#f2c14e; --ok:#43d17c; --err:#ff6b6b; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; background:var(--bg); color:var(--ink);
+        font:15px/1.45 -apple-system,Segoe UI,Roboto,sans-serif; padding-bottom:24px; }
+  header{ position:sticky; top:0; z-index:5; background:var(--bg);
+          border-bottom:1px solid var(--line); padding:12px 14px; }
+  h1{ font-size:16px; margin:0 0 8px; }
+  .tot{ display:flex; gap:10px; }
+  .tot div{ flex:1; background:var(--card); border:1px solid var(--line);
+            border-radius:11px; padding:9px 11px; }
+  .tot b{ display:block; font-size:16px; margin-top:2px; }
+  .tot .d b{ color:var(--err); }
+  .tot .a b{ color:var(--ok); }
+  .tot span{ font-size:11.5px; color:var(--dim); }
+  .wrap{ padding:12px 14px; }
+  .msg{ padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:11px; }
+  .msg.info{ background:#16204a; color:var(--dim); }
+  .msg.err{ background:#3a1620; color:var(--err); }
+  .msg.ok{ background:#102c1d; color:var(--ok); }
+  input{ width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--line);
+         background:#0e1535; color:var(--ink); font:inherit; }
+  .sect{ font-size:12.5px; color:var(--gold); font-weight:700; margin:18px 0 8px; }
+  .row{ display:flex; align-items:center; gap:10px; background:var(--card);
+        border:1px solid var(--line); border-radius:11px; padding:11px 12px; margin-bottom:8px; }
+  .row .nm{ flex:1; min-width:0; }
+  .row .nm b{ display:block; font-weight:600; font-size:14.5px;
+              overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .nm span{ font-size:11.5px; color:var(--dim); }
+  .row .bl{ font-weight:700; font-size:15px; white-space:nowrap; }
+  .minus{ color:var(--err); } .plus{ color:var(--ok); }
+  .empty{ color:var(--dim); font-size:13.5px; padding:10px 2px; }
+  dialog{ border:0; background:transparent; padding:0; max-width:460px; width:94%; }
+  dialog::backdrop{ background:rgba(4,8,24,.75); }
+  .sheet{ background:var(--card); border:1px solid var(--line);
+          border-radius:16px; padding:15px; color:var(--ink); }
+  .sheet h2{ font-size:16px; margin:0 0 2px; }
+  .sheet .who{ font-size:12px; color:var(--dim); margin-bottom:12px; }
+  .bal{ font-size:22px; font-weight:700; margin-bottom:12px; }
+  .acts{ display:flex; gap:9px; margin:12px 0 4px; }
+  .acts button{ flex:1; padding:12px 0; border-radius:10px; border:0;
+                font-size:14px; font-weight:700; }
+  .pay{ background:var(--ok); color:#06240f; }
+  .debt{ background:#3a1620; color:var(--err); border:1px solid #5a2430 !important; }
+  .close{ width:100%; margin-top:10px; padding:11px; border-radius:10px;
+          border:1px solid var(--line); background:transparent; color:var(--dim); font:inherit; }
+  .hist{ margin-top:12px; border-top:1px solid var(--line); padding-top:10px; }
+  .hist div{ font-size:12px; color:var(--dim); padding:3px 0; }
+  .hist .d{ color:var(--err); } .hist .p{ color:var(--ok); }
+  label{ display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Nasiya va avans</h1>
+  <div class="tot">
+    <div class="d"><span>Nasiya</span><b id="t_debt">—</b></div>
+    <div class="a"><span>Avans</span><b id="t_adv">—</b></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="msg" class="msg info">Yuklanmoqda...</div>
+  <input id="q" placeholder="Mijozni qidirish — ism yoki @username" autocomplete="off">
+  <div id="list"></div>
+</div>
+
+<dialog id="dlg"><div class="sheet">
+  <h2 id="d_name">—</h2>
+  <div class="who" id="d_who"></div>
+  <div class="bal" id="d_bal">—</div>
+  <label>Summa (SAR)</label>
+  <input id="d_amt" inputmode="decimal" placeholder="0">
+  <label>Izoh (ixtiyoriy)</label>
+  <input id="d_note" placeholder="masalan: eski nasiya">
+  <div class="acts">
+    <button class="pay" id="b_pay">To‘lov qabul qilish</button>
+    <button class="debt" id="b_debt">Qarz qo‘shish</button>
+  </div>
+  <div class="hist" id="d_hist"></div>
+  <button class="close" id="b_close">Yopish</button>
+</div></dialog>
+
+<script>
+(function(){
+  var tg = window.Telegram && window.Telegram.WebApp;
+  try{ if (tg){ tg.ready(); tg.expand(); } }catch(e){}
+
+  var Q = new URLSearchParams(location.search);
+  function auth(){
+    var p = new URLSearchParams();
+    ['uid','uname','ts','sig'].forEach(function(k){
+      if (Q.get(k) !== null) p.set(k, Q.get(k));
+    });
+    return p.toString();
+  }
+  function $(id){ return document.getElementById(id); }
+  function say(t, k){ var m = $('msg'); m.className = 'msg ' + (k || 'info'); m.textContent = t; }
+  function esc(s){
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function fmt(n){
+    var v = Math.round(Math.abs(n) * 100) / 100;
+    return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)) + ' SAR';
+  }
+  function signed(n){
+    if (n < 0) return '\u2212' + fmt(n);
+    if (n > 0) return '+' + fmt(n);
+    return fmt(0);
+  }
+
+  var holders = [], current = null, timer = null;
+
+  function rowHtml(h){
+    var cls = h.bal < 0 ? 'minus' : 'plus';
+    var sub = h.uname ? '@' + esc(h.uname) : ('ID ' + h.uid);
+    return '<div class="row" data-uid="' + h.uid + '">' +
+             '<div class="nm"><b>' + esc(h.name || 'Ismsiz') + '</b><span>' + sub + '</span></div>' +
+             '<div class="bl ' + cls + '">' + signed(h.bal) + '</div>' +
+           '</div>';
+  }
+
+  function render(){
+    var qarz = holders.filter(function(h){ return h.bal < 0; });
+    var avans = holders.filter(function(h){ return h.bal > 0; });
+    var html = '';
+    if (qarz.length){
+      html += '<div class="sect">Qarzdorlar (' + qarz.length + ')</div>' +
+              qarz.map(rowHtml).join('');
+    }
+    if (avans.length){
+      html += '<div class="sect">Avansi borlar (' + avans.length + ')</div>' +
+              avans.map(rowHtml).join('');
+    }
+    if (!qarz.length && !avans.length){
+      html = '<div class="empty">Nol bo\u2018lmagan hisob yo\u2018q. Mijozni qidirib, qarz yoki avans kiritishingiz mumkin.</div>';
+    }
+    $('list').innerHTML = html;
+  }
+
+  function renderFound(list){
+    if (!list.length){ $('list').innerHTML = '<div class="empty">Topilmadi.</div>'; return; }
+    $('list').innerHTML = '<div class="sect">Topildi (' + list.length + ')</div>' +
+                          list.map(rowHtml).join('');
+  }
+
+  async function load(){
+    try{
+      var r = await fetch('/api/hisob/data?' + auth());
+      var d = await r.json();
+      if (!r.ok){ say(d.error || 'Xatolik', 'err'); return; }
+      holders = d.holders || [];
+      $('t_debt').textContent = fmt(d.debt) + ' \u00b7 ' + d.debtors + ' ta';
+      $('t_adv').textContent = fmt(d.advance) + ' \u00b7 ' + d.advanced + ' ta';
+      render();
+      say('Mijozni bosing \u2014 to\u2018lov qabul qilasiz yoki qarz qo\u2018shasiz.', 'info');
+    }catch(e){ say('Aloqa yo\u2018q: ' + (e && e.message ? e.message : e), 'err'); }
+  }
+
+  async function openOne(uid){
+    try{
+      var r = await fetch('/api/hisob/one?cid=' + encodeURIComponent(uid) + '&' + auth());
+      var d = await r.json();
+      if (!r.ok){ say(d.error || 'Xatolik', 'err'); return; }
+      current = d;
+      $('d_name').textContent = d.name || 'Ismsiz';
+      $('d_who').textContent = (d.uname ? '@' + d.uname + ' \u00b7 ' : '') + 'ID ' + d.uid;
+      $('d_bal').textContent = signed(d.bal);
+      $('d_bal').className = 'bal ' + (d.bal < 0 ? 'minus' : (d.bal > 0 ? 'plus' : ''));
+      $('d_amt').value = ''; $('d_note').value = '';
+      var h = (d.history || []).slice().reverse().map(function(x){
+        return '<div><span class="' + (x.delta < 0 ? 'd' : 'p') + '">' + signed(x.delta) +
+               '</span> \u00b7 ' + esc(x.when) + (x.note ? ' \u00b7 ' + esc(x.note) : '') + '</div>';
+      }).join('');
+      $('d_hist').innerHTML = h || '<div>Harakat yo\u2018q.</div>';
+      $('dlg').showModal();
+    }catch(e){ say('Aloqa yo\u2018q', 'err'); }
+  }
+
+  async function move(sign){
+    if (!current) return;
+    var v = parseFloat(($('d_amt').value || '').replace(',', '.'));
+    if (!(v > 0)){ $('d_amt').focus(); return; }
+    $('b_pay').disabled = $('b_debt').disabled = true;
+    try{
+      var r = await fetch('/api/hisob/move?' + auth(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: current.uid, delta: sign * v, note: $('d_note').value.trim() })
+      });
+      var d = await r.json();
+      if (!r.ok || d.error){ say(d.error || 'Xatolik', 'err'); return; }
+      $('dlg').close();
+      var nomi = current.name || 'Mijoz';
+      $('q').value = '';
+      await load();
+      // xabarni oxirida qo'yamiz, aks holda load() uni o'chirib yuboradi
+      say('\u2705 ' + nomi + ': ' + signed(sign * v) +
+          ' \u2014 yangi balans ' + signed(d.bal), 'ok');
+    }catch(e){ say('Yuborilmadi', 'err'); }
+    finally{ $('b_pay').disabled = $('b_debt').disabled = false; }
+  }
+
+  $('list').addEventListener('click', function(e){
+    var row = e.target.closest ? e.target.closest('.row') : null;
+    if (row && row.dataset.uid) openOne(row.dataset.uid);
+  });
+  $('b_pay').addEventListener('click', function(){ move(1); });
+  $('b_debt').addEventListener('click', function(){ move(-1); });
+  $('b_close').addEventListener('click', function(){ $('dlg').close(); });
+
+  $('q').addEventListener('input', function(){
+    clearTimeout(timer);
+    var v = $('q').value.trim();
+    timer = setTimeout(async function(){
+      if (v.length < 2){ render(); return; }
+      try{
+        var r = await fetch('/api/hisob/find?q=' + encodeURIComponent(v) + '&' + auth());
+        var d = await r.json();
+        if (r.ok) renderFound(d.found || []);
+      }catch(e){}
+    }, 280);
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>
+"""
 
 @app.route("/tgorder")
 def tgorder_page():
@@ -6951,11 +7297,20 @@ if BIZ_SUPPORTED:
             uid = getattr(message.from_user, "id", None)
             if not uid:
                 return
-            # egasining O'Z xabariga javob bermaymiz
-            if cfg.get("owner") and uid == cfg["owner"]:
-                return
             if getattr(message.from_user, "is_bot", False):
                 return
+            # Shaxsiy chatda chat.id \u2014 mijozning id si. Agar xabarni
+            # yozgan odam mijoz bo'lmasa, demak buni egasining o'zi yozgan.
+            # Shunda javob bermaymiz va egasining id sini eslab qolamiz.
+            if uid != getattr(message.chat, "id", None):
+                if not cfg.get("owner"):
+                    biz_set(biz_owner=uid)
+                return
+            if cfg.get("owner") and uid == cfg["owner"]:
+                return
+            # ulanish id sini bilmasak, shu xabardan olib qo'yamiz
+            if not cfg.get("conn"):
+                biz_set(biz_conn=conn)
             if not biz_seen_ok(uid, cfg["cooldown"]):
                 return
             add_known_user(message.from_user)
@@ -7384,7 +7739,9 @@ def cmd_account(message):
             "/hisob @ali \u2014 bitta mijoz va tarixi\n\n"
             "Buyurtmani nasiyaga yozish: buyurtma xabaridagi "
             "\u00abHisobga yozish\u00bb tugmasi.")
-    bot.send_message(message.chat.id, txt)
+    uname = message.from_user.username if message.from_user else None
+    bot.send_message(message.chat.id, txt,
+                     reply_markup=hisob_webapp_kb(message.chat.id, uname))
 
 @bot.message_handler(commands=["keshbek_foiz"])
 def cmd_cashback_percent(message):
