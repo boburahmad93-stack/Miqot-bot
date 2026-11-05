@@ -1655,6 +1655,9 @@ def main_keyboard(user_id=None, username=None, lang=None):
             kitchen_url = f"{WEBAPP_URL}/kitchen?{params}"
             kb.row(types.KeyboardButton("🧑‍🍳 Menyuni boshqarish", web_app=types.WebAppInfo(url=admin_url)))
             kb.row(types.KeyboardButton("🖨 Oshxona", web_app=types.WebAppInfo(url=kitchen_url)))
+            hisob_url = f"{WEBAPP_URL}/hisob?{params}"
+            kb.row(types.KeyboardButton("📒 Nasiya va avans",
+                                        web_app=types.WebAppInfo(url=hisob_url)))
     try:
         if user_id and user_id in users_with_delivery():
             kb.row(types.KeyboardButton(t("btn_repeat", lang)))
