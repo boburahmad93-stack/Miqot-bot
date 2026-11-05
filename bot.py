@@ -2248,11 +2248,16 @@ def handle_checkout_steps(message):
 
 # ---------- buyurtma yaratish (chat va Mini App uchun umumiy) ----------
 
-def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None):
-    """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi."""
+def create_order(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None, custom_items=None):
+    """Muvaffaqiyatli bo'lsa (order, None), zaxira yetmasa (None, xato_matni) qaytaradi.
+
+    custom_items — menyuda yo'q qatorlar: [{"name", "price", "qty", "unit"}].
+    Masalan "1 kg osh" yoki "0.5 kg go'sht".
+    """
     with DATA_LOCK:
         order, error = _create_order_locked(items_cart, customer_name, phone, latitude, longitude,
-                                            address_text, note, tg_user_id, username, use_cashback, extra)
+                                            address_text, note, tg_user_id, username, use_cashback,
+                                            extra, custom_items)
     if error:
         return None, error
     # xabarlarni qulfdan tashqarida yuboramiz — boshqa mijozlar kutib qolmasin
@@ -2266,7 +2271,7 @@ def create_order(items_cart, customer_name, phone, latitude, longitude, address_
             pass
     return order, None
 
-def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None):
+def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, address_text, note, tg_user_id, username, use_cashback=False, extra=None, custom_items=None):
     full_menu = load_menu()
     menu = {d["id"]: d for d in full_menu}
     items = []
@@ -2299,6 +2304,25 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         items.append(item)
         total += unit * qty
         original_total += dish["price"] * qty
+
+    # Menyuda yo'q qatorlar: kilogramm bilan sotiladigan narsalar va boshqalar.
+    # Zaxira tekshirilmaydi, miqdori kasr bo'lishi mumkin (0.5 kg).
+    for ci in (custom_items or []):
+        nomi = str(ci.get("name") or "").strip()[:60]
+        try:
+            narx = money(float(ci.get("price")))
+            miqdor = round(float(ci.get("qty") or 1), 3)
+        except Exception:
+            continue
+        if not nomi or narx < 0 or miqdor <= 0:
+            continue
+        birlik = str(ci.get("unit") or "").strip()[:8]
+        qator = {"name": nomi, "price": narx, "qty": miqdor, "free": True}
+        if birlik:
+            qator["unit"] = birlik
+        items.append(qator)
+        total += narx * miqdor
+        original_total += narx * miqdor
 
     if not items:
         return None, "Savat bo'sh."
@@ -2408,10 +2432,21 @@ def discount_line_for_customer(order, lang):
     return t("discount_line", lang, pct=pct,
              old=fmt_sum(old), new=fmt_sum(order["total"]))
 
+def fmt_qty(it):
+    """Miqdorni chiroyli ko'rsatadi: 2 → "2", 0.5 kg → "0.5 kg"."""
+    q = it.get("qty", 1)
+    try:
+        qf = float(q)
+    except Exception:
+        return str(q)
+    s = str(int(qf)) if abs(qf - round(qf)) < 1e-9 else ("%.3f" % qf).rstrip("0").rstrip(".")
+    u = (it.get("unit") or "").strip()
+    return f"{s} {u}" if u else s
+
 def order_items_text(order, lang="uz"):
     lines = []
     for it in order["items"]:
-        line = f"{it['name']} × {it['qty']} = {fmt_sum(it['price']*it['qty'])}"
+        line = f"{it['name']} × {fmt_qty(it)} = {fmt_sum(it['price']*it['qty'])}"
         if it.get("cancelled"):
             line = f"❌ {line}  (bekor qilindi)"
         lines.append(line)
@@ -2519,7 +2554,7 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
             continue
         L.extend(_wrap(it["name"], w))
         # narx qatorning chap tomonida — o'ng chet kesilsa ham ko'rinadi
-        qty_line = f"{it['qty']} x {fmt_sum(it['price'])} = {fmt_sum(it['price'] * it['qty'])}"
+        qty_line = f"{fmt_qty(it)} x {fmt_sum(it['price'])} = {fmt_sum(it['price'] * it['qty'])}"
         L.extend(_labeled("  ", qty_line, w))
 
     L.append("-" * w)
@@ -2667,7 +2702,7 @@ def status_keyboard(order, include_contact=True):
             if it.get("cancelled"):
                 continue
             nom = it["name"] if len(it["name"]) <= 18 else it["name"][:17] + "…"
-            kb.add(types.InlineKeyboardButton(f"➖ {nom} ({it['qty']}) olib tashlash",
+            kb.add(types.InlineKeyboardButton(f"➖ {nom} ({fmt_qty(it)}) olib tashlash",
                                               callback_data=f"rmitem:{order['id']}:{idx}"))
     if order.get("user_id"):
         if order_on_account(order):
@@ -3631,6 +3666,7 @@ def cmd_menu_admin(message):
         "🧾 Bugungi cheklar holati: /cheklar\n"
         "📒 Nasiya va avans: /hisob\n"
         "📥 Telegramdan buyurtma: mijoz xabarini botga forward qiling\n"
+        "📞 Telefon buyurtmasi: /qolda\n"
         "🔗 Mijozni botga olib o'tish: /havola\n"
         "💼 Shaxsiy akkaunt (Business): /biznes\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
@@ -6152,6 +6188,18 @@ TGORDER_PAGE_HTML = """<!doctype html>
   .msg.info{ background:#16204a; color:var(--dim); }
   .msg.err{ background:#3a1620; color:var(--err); }
   .msg.ok{ background:#102c1d; color:var(--ok); }
+  .freerow{ margin-top:8px; }
+  .freerow.two{ display:flex; gap:8px; }
+  .freerow.two input{ flex:1; min-width:0; }
+  .freerow button{ flex:0 0 108px; border-radius:9px; border:0; background:var(--gold);
+                   color:#1a1200; font-weight:700; font-size:14px; }
+  .fitem{ display:flex; align-items:center; gap:10px; padding:9px 0;
+          border-bottom:1px solid var(--line); }
+  .fitem:last-child{ border-bottom:0; }
+  .fitem .t{ flex:1; min-width:0; font-size:14px; }
+  .fitem .t span{ display:block; font-size:12px; color:var(--dim); }
+  .fitem button{ width:32px; height:32px; border-radius:9px; border:1px solid var(--line);
+                 background:#0e1535; color:var(--err); font-size:16px; }
   .bottom{ position:fixed; left:0; right:0; bottom:0; background:var(--card);
      border-top:1px solid var(--line); padding:11px 14px calc(11px + env(safe-area-inset-bottom)); }
   .sum{ display:flex; justify-content:space-between; font-size:15px; margin-bottom:9px; }
@@ -6166,7 +6214,7 @@ TGORDER_PAGE_HTML = """<!doctype html>
 <body>
 
 <header>
-  <h1>Telegramdan tushgan buyurtma</h1>
+  <h1 id="ttl">Telegramdan tushgan buyurtma</h1>
   <div class="sub" id="who">Yuklanmoqda...</div>
 </header>
 
@@ -6183,6 +6231,22 @@ TGORDER_PAGE_HTML = """<!doctype html>
     <div id="locbox" class="sub" style="margin-top:7px"></div>
     <label>Izoh (oshxona uchun)</label>
     <textarea id="f_note" placeholder="Masalan: achchiq qilmang"></textarea>
+  </div>
+
+  <div class="card">
+    <div class="catname" style="margin-top:0">Qo‘lda qo‘shish (kg, maxsus buyurtma)</div>
+    <div class="freerow">
+      <input id="c_name" placeholder="Nomi — masalan: Osh">
+    </div>
+    <div class="freerow two">
+      <input id="c_qty" inputmode="decimal" placeholder="Miqdor (1 yoki 0.5)">
+      <input id="c_unit" placeholder="Birlik — kg">
+    </div>
+    <div class="freerow two">
+      <input id="c_price" inputmode="decimal" placeholder="Birlik narxi (SAR)">
+      <button type="button" id="c_add">Qo‘shish</button>
+    </div>
+    <div id="c_list"></div>
   </div>
 
   <div class="card" id="menu"></div>
@@ -6218,11 +6282,27 @@ TGORDER_PAGE_HTML = """<!doctype html>
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  var MENU = [], CART = {}, CUR = 'SAR', draft = {};
+  var MENU = [], CART = {}, CUR = 'SAR', draft = {}, FREE = [];
 
   function fmt(n){
     var v = Math.round(n * 100) / 100;
     return (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)) + ' ' + CUR;
+  }
+
+  function fq(q){
+    return (Math.abs(q - Math.round(q)) < 1e-9)
+      ? String(Math.round(q))
+      : String(Math.round(q * 1000) / 1000);
+  }
+
+  function renderFree(){
+    if (!FREE.length){ $('c_list').innerHTML = ''; return; }
+    $('c_list').innerHTML = FREE.map(function(f, i){
+      return '<div class="fitem"><div class="t">' + esc(f.name) +
+             '<span>' + fq(f.qty) + (f.unit ? ' ' + esc(f.unit) : '') +
+             ' \u00d7 ' + fmt(f.price) + ' = ' + fmt(f.qty * f.price) + '</span></div>' +
+             '<button type="button" data-rm="' + i + '">\u00d7</button></div>';
+    }).join('');
   }
 
   function renderTotals(){
@@ -6231,7 +6311,8 @@ TGORDER_PAGE_HTML = """<!doctype html>
       var q = CART[d.id] || 0;
       n += q; s += q * d.price;
     });
-    $('cnt').textContent = n + ' ta taom';
+    FREE.forEach(function(f){ n += 1; s += f.qty * f.price; });
+    $('cnt').textContent = n + ' ta qator';
     $('total').textContent = fmt(s);
     $('go').disabled = (n === 0);
   }
@@ -6285,7 +6366,8 @@ TGORDER_PAGE_HTML = """<!doctype html>
     $('f_phone').value = draft.phone || '';
     $('f_addr').value = draft.address || '';
     $('f_note').value = '';
-    var kim = draft.name || 'mijoz';
+    if (draft.manual) $('ttl').textContent = 'Telefon buyurtmasi';
+    var kim = draft.name || (draft.manual ? 'ism va manzilni to\u2018ldiring' : 'mijoz');
     if (draft.username) kim += ' (@' + draft.username + ')';
     $('who').textContent = kim;
     var box = $('locbox'), parts = [];
@@ -6319,10 +6401,30 @@ TGORDER_PAGE_HTML = """<!doctype html>
     }
   }
 
+  $('c_add').addEventListener('click', function(){
+    var nm = $('c_name').value.trim();
+    var q = parseFloat(($('c_qty').value || '1').replace(',', '.'));
+    var p = parseFloat(($('c_price').value || '').replace(',', '.'));
+    if (!nm){ $('c_name').focus(); return; }
+    if (!(q > 0)){ $('c_qty').focus(); return; }
+    if (!(p >= 0)){ $('c_price').focus(); return; }
+    FREE.push({ name: nm, qty: q, price: p, unit: $('c_unit').value.trim() });
+    $('c_name').value = ''; $('c_qty').value = ''; $('c_price').value = '';
+    renderFree(); renderTotals();
+    say('Qo\u2018shildi: ' + nm, 'ok');
+  });
+
+  $('c_list').addEventListener('click', function(e){
+    var i = e.target && e.target.dataset ? e.target.dataset.rm : null;
+    if (i === null || i === undefined) return;
+    FREE.splice(parseInt(i, 10), 1);
+    renderFree(); renderTotals();
+  });
+
   $('go').addEventListener('click', async function(){
     var cart = {};
     Object.keys(CART).forEach(function(k){ if (CART[k] > 0) cart[k] = CART[k]; });
-    if (!Object.keys(cart).length){ say('Savat bo\u2018sh.', 'err'); return; }
+    if (!Object.keys(cart).length && !FREE.length){ say('Savat bo\u2018sh.', 'err'); return; }
     $('go').disabled = true;
     say('Yuborilmoqda...', 'info');
     try{
@@ -6331,6 +6433,7 @@ TGORDER_PAGE_HTML = """<!doctype html>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cart: cart,
+          custom: FREE,
           name: $('f_name').value.trim(),
           phone: $('f_phone').value.trim(),
           address: $('f_addr').value.trim(),
@@ -6745,7 +6848,20 @@ def api_tgorder_create():
             continue
         if qty > 0:
             cart[dish_id] = qty
-    if not cart:
+    # menyuda yo'q qatorlar: kg bilan sotiladigan narsalar va maxsus buyurtmalar
+    custom = []
+    for c in (body.get("custom") or [])[:25]:
+        try:
+            nm = str(c.get("name") or "").strip()[:60]
+            q = round(float(c.get("qty") or 0), 3)
+            p = money(float(c.get("price")))
+        except Exception:
+            continue
+        if nm and q > 0 and p >= 0:
+            custom.append({"name": nm, "qty": q, "price": p,
+                           "unit": str(c.get("unit") or "").strip()[:8]})
+
+    if not cart and not custom:
         return jsonify({"error": "Savat bo'sh."}), 400
 
     name = (body.get("name") or d.get("name") or "Mijoz").strip()[:60]
@@ -6757,7 +6873,7 @@ def api_tgorder_create():
         address = (d.get("map_link") or d.get("text") or "\u2014")[:300]
 
     extra = {
-        "source": "telegram",
+        "source": "qolda" if d.get("manual") else "telegram",
         "no_cashback": True,            # qo'lda kiritilgan \u2014 keshbek yo'q
         "entered_by": admin["id"],
     }
@@ -6769,7 +6885,7 @@ def api_tgorder_create():
     order, error = create_order(
         cart, name, phone, lat, lon, address, note,
         d.get("user_id"), d.get("username"),
-        use_cashback=False, extra=extra)
+        use_cashback=False, extra=extra, custom_items=custom)
     if error:
         return jsonify({"error": error}), 400
 
@@ -6813,7 +6929,7 @@ def api_print_pending():
             "no": o.get("daily_number"),
             "name": o.get("customer_name"),
             "total": o.get("total"),
-            "items": [f"{it['name']} x{it['qty']}" for it in o.get("items", []) if not it.get("cancelled")],
+            "items": [f"{it['name']} x{fmt_qty(it)}" for it in o.get("items", []) if not it.get("cancelled")],
             "receipt": build_receipt_text(o, width, header=not with_logo),
         })
     out.sort(key=lambda x: x["id"])
@@ -7176,6 +7292,36 @@ def cmd_report(message):
         return
     today = datetime.now(TIMEZONE).date()
     bot.send_message(message.chat.id, build_daily_report_text(today))
+
+@bot.message_handler(commands=["qolda", "tel", "manual"])
+def cmd_manual_order(message):
+    """Telefon orqali kelgan buyurtmani darhol yozib qo'yish.
+
+    Forward kerak emas — bo'sh qoralama ochiladi, savatni o'zingiz yig'asiz.
+    """
+    if not is_staff_or_admin(message.chat.id):
+        return
+    if not WEBAPP_URL:
+        bot.send_message(message.chat.id, "WEBAPP_URL sozlanmagan.")
+        return
+    admin_id = message.chat.id
+    token = hashlib.md5(f"qolda:{admin_id}:{time.time()}".encode()).hexdigest()[:12]
+    izoh = (message.text or "").split(maxsplit=1)
+    d = {"admin_id": admin_id, "manual": True}
+    if len(izoh) > 1 and izoh[1].strip():
+        d["text"] = izoh[1].strip()[:900]
+        tel = extract_phone(izoh[1])
+        if tel:
+            d["phone"] = tel
+    tgdraft_put(token, d)
+    bot.send_message(admin_id,
+        "\U0001F4DE Telefon buyurtmasi\n\n"
+        "Pastdagi tugmani bosing: mijoz ma'lumotini yozasiz va savatni yig'asiz.\n"
+        "Kilogramm bilan sotiladigan narsalar uchun sahifada "
+        "\u00abQo'lda qo'shish\u00bb bo'limi bor — nomi, miqdori va narxini yozasiz.\n\n"
+        "\u26A0\ufe0f Bu buyurtmaga keshbek yozilmaydi.",
+        reply_markup=tgdraft_kb(token, admin_id,
+                                message.from_user.username if message.from_user else None))
 
 @bot.message_handler(commands=["cheklar", "checks"])
 def cmd_checks(message):
