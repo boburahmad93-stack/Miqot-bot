@@ -342,6 +342,12 @@ TEXTS = {
         "uz": "💬 Biz bilan bog'lanish", "ar": "💬 تواصل معنا", "en": "💬 Contact us",
         "ru": "💬 Связаться с нами", "tr": "💬 Bize ulaşın", "ur": "💬 ہم سے رابطہ", "id": "💬 Hubungi kami",
     },
+    "btn_my_account": {
+        "uz": "\U0001F4D2 Mening hisobim", "ar": "\U0001F4D2 \u062d\u0633\u0627\u0628\u064a",
+        "en": "\U0001F4D2 My account", "ru": "\U0001F4D2 \u041c\u043e\u0439 \u0441\u0447\u0451\u0442",
+        "tr": "\U0001F4D2 Hesab\u0131m", "ur": "\U0001F4D2 \u0645\u06cc\u0631\u0627 \u0627\u06a9\u0627\u0624\u0646\u0679",
+        "id": "\U0001F4D2 Akun saya",
+    },
     "btn_lang": {
         "uz": "🌐 Til", "ar": "🌐 اللغة", "en": "🌐 Language",
         "ru": "🌐 Язык", "tr": "🌐 Dil", "ur": "🌐 زبان", "id": "🌐 Bahasa",
@@ -557,6 +563,18 @@ TEXTS = {
         "ru": "\U0001F4D2 \u0412\u0430\u0448 \u0441\u0447\u0451\u0442: {bal}\n\n\u041f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u0430: {amt}.",
         "en": "\U0001F4D2 Your account: {bal}\n\nPrepaid: {amt}.",
         "ar": "\U0001F4D2 \u062d\u0633\u0627\u0628\u0643: {bal}\n\n\u0631\u0635\u064a\u062f \u0645\u062f\u0641\u0648\u0639 \u0645\u0642\u062f\u0645\u0627\u064b: {amt}.",
+    },
+    "acct_receipt_debt": {
+        "uz": "\U0001F4D2 Hisobingizdagi qarz: {amt}\n",
+        "ru": "\U0001F4D2 \u0414\u043e\u043b\u0433 \u043d\u0430 \u0441\u0447\u0451\u0442\u0435: {amt}\n",
+        "en": "\U0001F4D2 Outstanding balance: {amt}\n",
+        "ar": "\U0001F4D2 \u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u0633\u062a\u062d\u0642: {amt}\n",
+    },
+    "acct_receipt_adv": {
+        "uz": "\U0001F4D2 Oldindan to'langan: {amt}\n",
+        "ru": "\U0001F4D2 \u041f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u0430: {amt}\n",
+        "en": "\U0001F4D2 Prepaid balance: {amt}\n",
+        "ar": "\U0001F4D2 \u0631\u0635\u064a\u062f \u0645\u062f\u0641\u0648\u0639 \u0645\u0642\u062f\u0645\u0627\u064b: {amt}\n",
     },
     "acct_my_zero": {
         "uz": "\U0001F4D2 Hisobingiz toza \u2014 qarz ham, avans ham yo\u2018q.",
@@ -1668,11 +1686,20 @@ def main_keyboard(user_id=None, username=None, lang=None):
             kb.row(types.KeyboardButton(QUIZ_BTN), types.KeyboardButton(BOARD_BTN))
     except Exception:
         pass
+    # Qarzi yoki avansi bo'lgan mijozga alohida tugma — boshqalarga ko'rinmaydi
+    try:
+        if user_id and not is_owner(user_id) and account_balance(user_id) != 0:
+            kb.row(types.KeyboardButton(t("btn_my_account", lang)))
+    except Exception:
+        pass
     kb.row(types.KeyboardButton(t("btn_contact", lang)), types.KeyboardButton(t("btn_lang", lang)))
     return kb
 
 def is_contact_button(text):
     return any(text == TEXTS["btn_contact"][l] for l in SUPPORTED_LANGS)
+
+def is_my_account_button(text):
+    return any(text == TEXTS["btn_my_account"][l] for l in SUPPORTED_LANGS)
 
 def is_lang_button(text):
     return any(text == TEXTS["btn_lang"][l] for l in SUPPORTED_LANGS)
@@ -2347,12 +2374,25 @@ def build_customer_receipt_text(order, lang=None):
         + cashback_line_for_customer(order, lang)
         + f"{order_address_line(order)}\n"
     )
+    text += account_line_for_customer(order, lang)
     if order.get("note"):
         text += f"📝 {order['note']}\n"
     if not (order.get("phone") or "").strip():
         text += t("receipt_nophone", lang)
     text += t("receipt_tail", lang)
     return text
+
+def account_line_for_customer(order, lang):
+    """Mijoz chekida: hisobida qarz yoki avans bo'lsa ko'rsatamiz."""
+    try:
+        bal = account_balance(order.get("user_id"))
+    except Exception:
+        return ""
+    if not bal:
+        return ""
+    if bal < 0:
+        return t("acct_receipt_debt", lang, amt=fmt_sum(-bal))
+    return t("acct_receipt_adv", lang, amt=fmt_sum(bal))
 
 def cashback_line_for_customer(order, lang):
     used = order_cashback_used(order)
@@ -8026,6 +8066,10 @@ def handle_contact_button(message):
 def cmd_lang(message):
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
     bot.send_message(message.chat.id, t("lang_choose", lang), reply_markup=lang_keyboard())
+
+@bot.message_handler(func=lambda m: m.text and is_my_account_button(m.text))
+def btn_my_account(message):
+    cmd_account(message)
 
 @bot.message_handler(func=lambda m: m.text and is_lang_button(m.text))
 def handle_lang_button(message):
