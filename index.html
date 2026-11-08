@@ -258,6 +258,35 @@
 
   .empty-state{padding:56px 24px;text-align:center;color:var(--ink-soft);font-size:14px;}
 
+  /* ---- bo'limlar sahifasi ---- */
+  .sec-title{margin:4px 16px 10px;font-size:12px;color:var(--ink-soft);font-weight:700;
+             text-transform:uppercase;letter-spacing:.6px;}
+  .cat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:0 16px 22px;}
+  .cat-tile{background:var(--card);border:1px solid rgba(255,255,255,.04);
+            border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+            cursor:pointer;text-align:start;padding:0;color:inherit;font:inherit;
+            display:block;width:100%;}
+  .cat-tile:active{transform:scale(.985);}
+  .ct-img{height:86px;position:relative;display:flex;align-items:center;
+          justify-content:center;font-size:36px;background:var(--card-2);overflow:hidden;}
+  .ct-img img{width:100%;height:100%;object-fit:cover;}
+  .ct-img::after{content:'';position:absolute;inset:0;
+                 background:linear-gradient(180deg,transparent 35%,rgba(19,28,64,.9));}
+  .ct-tx{padding:9px 11px 11px;}
+  .ct-tx b{display:block;font-size:13px;font-weight:700;}
+  .ct-tx span{font-size:11px;color:var(--ink-soft);}
+  .cat-tile.wide{grid-column:1/-1;}
+  .cat-tile.wide .ct-img{height:66px;}
+  .ct-new{position:absolute;top:8px;inset-inline-start:8px;z-index:2;
+          background:var(--accent1);color:#201802;font-size:9.5px;font-weight:800;
+          padding:3px 7px;border-radius:999px;}
+  .back-row{display:flex;align-items:center;gap:8px;padding:2px 6px 8px;
+            font-size:14px;font-weight:700;cursor:pointer;color:var(--ink);}
+  .back-row .ba{color:var(--accent1);font-size:19px;line-height:1;}
+  html[dir="rtl"] .back-row .ba{transform:scaleX(-1);}
+  .min-note{margin:0 16px 10px;background:rgba(227,179,74,.1);border:1px solid #4a3a16;
+            border-radius:11px;padding:9px 12px;font-size:11.5px;color:var(--accent1);}
+
   /* ---------- suzuvchi savat ---------- */
   .cart-bar{
     position:fixed;left:16px;right:16px;bottom:16px;
@@ -394,6 +423,7 @@
 </div>
 
 <div class="sticky-bar" id="sticky-bar">
+  <div class="back-row" id="back-row" hidden><span class="ba">‹</span><span id="back-text">Bo'limlar</span></div>
   <div class="search-wrap">
     <span class="si">🔍</span>
     <input type="text" id="search-input" placeholder="Taom qidirish..." autocomplete="off">
@@ -403,6 +433,7 @@
 </div>
 
 <div id="sale-strip"></div>
+<div id="landing"></div>
 <div id="menu-sections"></div>
 
 <div class="cart-bar" id="cart-bar">
@@ -496,6 +527,8 @@ const I18N = {
     tagline:"Taom tanlang va buyurtma bering",
     search:"Taom qidirish...", add:"Qo'shish", soldOut:"Tugadi",
     lastN:(n)=>`Oxirgi ${n} dona`, dishCount:(n)=>`${n} ta taom`, itemCount:(n)=>`${n} ta mahsulot`,
+    minNote:(m)=>`Eng kam buyurtma summasi \u2014 ${m}`,
+    sections:"Bo'limlar", backToSections:"Bo'limlar", dishesN:(n)=>`${n} ta taom`, newTag:"YANGI",
     cartTitle:"Savatingiz", cartEmpty:"Savat bo'sh.", perUnit:"dona", total:"Jami",
     minWarn:(m,c,d)=>`Eng kam buyurtma summasi \u2014 ${m}. Hozir ${c}, yana ${d} qo\u2018shsangiz bo\u2018ldi.`,
     order:"Buyurtma berish", close:"Yopish",
@@ -538,6 +571,8 @@ const I18N = {
     tagline:"اختر طعامك واطلب الآن",
     search:"ابحث عن طبق...", add:"أضف", soldOut:"نفد",
     lastN:(n)=>`آخر ${n} قطعة`, dishCount:(n)=>`${n} طبق`, itemCount:(n)=>`${n} منتج`,
+    minNote:(m)=>`الحد الأدنى للطلب ${m}`,
+    sections:"الأقسام", backToSections:"الأقسام", dishesN:(n)=>`${n} طبق`, newTag:"جديد",
     cartTitle:"سلتك", cartEmpty:"السلة فارغة.", perUnit:"للقطعة", total:"الإجمالي",
     minWarn:(m,c,d)=>`الحد الأدنى للطلب ${m}. الحالي ${c}، أضف ${d} فقط.`,
     order:"إتمام الطلب", close:"إغلاق",
@@ -579,7 +614,9 @@ const I18N = {
     cbNote:(a,p)=>`Cashback: −${a} • To pay: ${p}`,
     tagline:"Pick your food and place an order",
     search:"Search dishes...", add:"Add", soldOut:"Sold out",
-    lastN:(n)=>`Only ${n} left`, dishCount:(n)=>`${n} dishes`, itemCount:(n)=>`${n} items`,
+    lastN:(n)=>`Only ${n} left`, dishCount:(n)=>`${n} dish${n===1?'':'es'}`, itemCount:(n)=>`${n} items`,
+    minNote:(m)=>`Minimum order ${m}`,
+    sections:"Sections", backToSections:"Sections", dishesN:(n)=>`${n} dish${n===1?'':'es'}`, newTag:"NEW",
     cartTitle:"Your cart", cartEmpty:"Your cart is empty.", perUnit:"each", total:"Total",
     minWarn:(m,c,d)=>`Minimum order is ${m}. You have ${c} — just ${d} more to go.`,
     order:"Place order", close:"Close",
@@ -621,7 +658,9 @@ const I18N = {
     cbNote:(a,p)=>`Кешбэк: −${a} • К оплате: ${p}`,
     tagline:"Выберите блюдо и оформите заказ",
     search:"Поиск блюда...", add:"Добавить", soldOut:"Закончилось",
-    lastN:(n)=>`Осталось ${n} шт.`, dishCount:(n)=>`${n} блюд`, itemCount:(n)=>`${n} товаров`,
+    lastN:(n)=>`Осталось ${n} шт.`, dishCount:(n)=>{const a=n%10,b=n%100;return `${n} ` + (a===1&&b!==11?'блюдо':(a>=2&&a<=4&&(b<10||b>=20)?'блюда':'блюд'));}, itemCount:(n)=>`${n} товаров`,
+    minNote:(m)=>`Минимальный заказ ${m}`,
+    sections:"Разделы", backToSections:"Разделы", dishesN:(n)=>{const a=n%10,b=n%100;return `${n} ` + (a===1&&b!==11?'блюдо':(a>=2&&a<=4&&(b<10||b>=20)?'блюда':'блюд'));}, newTag:"НОВОЕ",
     cartTitle:"Ваша корзина", cartEmpty:"Корзина пуста.", perUnit:"за шт.", total:"Итого",
     minWarn:(m,c,d)=>`Минимальный заказ — ${m}. Сейчас ${c}, добавьте ещё ${d}.`,
     order:"Оформить заказ", close:"Закрыть",
@@ -664,6 +703,8 @@ const I18N = {
     tagline:"Yemeğinizi seçin ve sipariş verin",
     search:"Yemek ara...", add:"Ekle", soldOut:"Tükendi",
     lastN:(n)=>`Son ${n} adet`, dishCount:(n)=>`${n} yemek`, itemCount:(n)=>`${n} ürün`,
+    minNote:(m)=>`En az sipariş ${m}`,
+    sections:"Bölümler", backToSections:"Bölümler", dishesN:(n)=>`${n} yemek`, newTag:"YENİ",
     cartTitle:"Sepetiniz", cartEmpty:"Sepet boş.", perUnit:"adet", total:"Toplam",
     minWarn:(m,c,d)=>`En az sipariş tutarı ${m}. Şu an ${c}, ${d} daha ekleyin.`,
     order:"Sipariş ver", close:"Kapat",
@@ -706,6 +747,8 @@ const I18N = {
     tagline:"اپنا کھانا منتخب کریں اور آرڈر دیں",
     search:"کھانا تلاش کریں...", add:"شامل کریں", soldOut:"ختم",
     lastN:(n)=>`صرف ${n} باقی`, dishCount:(n)=>`${n} کھانے`, itemCount:(n)=>`${n} اشیاء`,
+    minNote:(m)=>`کم از کم آرڈر ${m}`,
+    sections:"حصے", backToSections:"حصے", dishesN:(n)=>`${n} کھانے`, newTag:"نیا",
     cartTitle:"آپ کی ٹوکری", cartEmpty:"ٹوکری خالی ہے۔", perUnit:"فی عدد", total:"کل",
     minWarn:(m,c,d)=>`کم از کم آرڈر ${m} ہے۔ ابھی ${c}، مزید ${d} شامل کریں۔`,
     order:"آرڈر دیں", close:"بند کریں",
@@ -748,6 +791,8 @@ const I18N = {
     tagline:"Pilih makanan dan pesan sekarang",
     search:"Cari menu...", add:"Tambah", soldOut:"Habis",
     lastN:(n)=>`Sisa ${n}`, dishCount:(n)=>`${n} menu`, itemCount:(n)=>`${n} item`,
+    minNote:(m)=>`Pesanan minimum ${m}`,
+    sections:"Bagian", backToSections:"Bagian", dishesN:(n)=>`${n} hidangan`, newTag:"BARU",
     cartTitle:"Keranjang Anda", cartEmpty:"Keranjang kosong.", perUnit:"per porsi", total:"Total",
     minWarn:(m,c,d)=>`Pesanan minimum ${m}. Saat ini ${c}, tambah ${d} lagi.`,
     order:"Pesan sekarang", close:"Tutup",
@@ -798,6 +843,7 @@ const signedUser = {
 
 let menu = [];
 let setCatalog = {};      // 'non' -> {emoji, names:{uz,ar,...}}
+let view = 'landing';     // 'landing' yoki 'menu'
 let builderCat = '';      // "O'zingiz yig'ing" bo'limi nomi
 let builderMin = 0;       // shu bo'limdan yig'ilgan taomning eng kam summasi
 let categories = [];
@@ -859,6 +905,7 @@ function applyLang(code, redraw){
 
   txt('business-tagline', serverTagline || t.tagline);
   ph('search-input', t.search);
+  txt('back-text', t.backToSections);
   txt('t-cartTitle', t.cartTitle);
   txt('t-total', t.total);
   txt('go-checkout-btn', t.order);
@@ -1014,6 +1061,8 @@ async function loadMenu(){
       : '<div class="logo-fallback">🍽️</div>';
     renderChips();
     renderMenu();
+    renderLanding();
+    applyView();
   }catch(e){
     $('menu-sections').innerHTML = '<div class="empty-state">' + esc(T().loadFail) + '</div>';
   }
@@ -1023,6 +1072,82 @@ async function loadMenu(){
 function activeCategories(){
   return (categories.length ? categories : [...new Set(menu.map(d => d.category))])
     .filter(cat => menu.some(d => d.category === cat));
+}
+
+/* ---------- bo'limlar sahifasi ---------- */
+
+// Bo'lim uchun rasm: o'sha bo'limdagi birinchi rasmli taom
+function catPhoto(cat){
+  const d = menu.find(x => x.category === cat && x.photo_url);
+  return d ? d.photo_url : null;
+}
+
+function renderLanding(){
+  const box = $('landing');
+  if (!box) return;
+  const cats = activeCategories();
+  if (!cats.length){ box.innerHTML = ''; return; }
+  const t = T();
+  box.innerHTML = '<div class="sec-title">' + esc(t.sections) + '</div>' +
+    '<div class="cat-grid">' + cats.map(function(cat){
+      const items = menu.filter(d => d.category === cat);
+      const ph = catPhoto(cat);
+      const keng = (cat === builderCat);
+      const inner = ph
+        ? '<img src="' + esc(ph) + '" alt="">'
+        : (categoryEmoji[cat] || '\u{1F37D}');
+      const nishon = keng ? '<span class="ct-new">' + esc(t.newTag) + '</span>' : '';
+      return '<button class="cat-tile' + (keng ? ' wide' : '') + '" data-gocat="' + esc(cat) + '">' +
+               '<div class="ct-img">' + nishon + inner + '</div>' +
+               '<div class="ct-tx"><b>' + esc(catName(cat)) + '</b>' +
+                 '<span>' + esc(t.dishesN(items.length)) + '</span></div>' +
+             '</button>';
+    }).join('') + '</div>';
+
+  box.querySelectorAll('[data-gocat]').forEach(function(el){
+    el.addEventListener('click', function(){
+      haptic('light');
+      showMenu(el.getAttribute('data-gocat'));
+    });
+  });
+}
+
+function applyView(){
+  const landing = view === 'landing';
+  $('landing').hidden = !landing;
+  $('menu-sections').hidden = landing;
+  $('back-row').hidden = landing;
+  $('chips').style.display = landing ? 'none' : '';
+  try{
+    if (tg && tg.BackButton){
+      if (landing) tg.BackButton.hide(); else tg.BackButton.show();
+    }
+  }catch(e){}
+}
+
+function showLanding(){
+  view = 'landing';
+  searchQuery = '';
+  const si = $('search-input');
+  if (si) si.value = '';
+  applyView();
+  renderLanding();
+  window.scrollTo(0, 0);
+}
+
+function showMenu(cat){
+  view = 'menu';
+  applyView();
+  renderMenu();
+  if (cat){
+    setActiveChip(cat);
+    requestAnimationFrame(function(){
+      const sec = document.getElementById(slug(cat));
+      if (sec) sec.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
+  } else {
+    window.scrollTo(0, 0);
+  }
 }
 
 function renderChips(){
@@ -1178,11 +1303,13 @@ function renderMenu(){
   container.innerHTML = activeCategories().map(cat => {
     const items = menu.filter(d => d.category === cat);
     const emoji = categoryEmoji[cat] || '🍽';
+    const eslatma = (cat === builderCat && builderMin > 0)
+      ? '<div class="min-note">' + esc(T().minNote(fmtSar(builderMin))) + '</div>' : '';
     return '<div class="category-section" id="' + slug(cat) + '" data-cat="' + esc(cat) + '">' +
         '<div class="category-header">' +
           '<span class="cat-emoji">' + emoji + '</span>' +
           '<div><h2>' + esc(catName(cat)) + '</h2><div class="ch-sub">' + esc(T().dishCount(items.length)) + '</div></div>' +
-        '</div>' +
+        '</div>' + eslatma +
         '<div class="grid">' + items.map(dishCardHtml).join('') + '</div>' +
       '</div>';
   }).join('');
@@ -1214,17 +1341,29 @@ function bindDishButtons(){
   });
 }
 
+$('back-row').addEventListener('click', function(){ haptic('light'); showLanding(); });
+try{
+  if (tg && tg.BackButton && tg.BackButton.onClick){
+    tg.BackButton.onClick(function(){ showLanding(); });
+  }
+}catch(e){}
+
 /* ---------- qidiruv ---------- */
 $('search-input').addEventListener('input', (e) => {
   searchQuery = e.target.value.trim();
   $('search-clear').classList.toggle('show', searchQuery.length > 0);
+  if (searchQuery && view === 'landing'){
+    // qidirish boshlandi — natijalarni ko'rsatish uchun menyuga o'tamiz
+    view = 'menu';
+    applyView();
+  }
   renderMenu();
 });
 $('search-clear').addEventListener('click', () => {
   $('search-input').value = '';
   searchQuery = '';
   $('search-clear').classList.remove('show');
-  renderMenu();
+  showLanding();
 });
 
 /* ---------- savat ---------- */
