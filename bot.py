@@ -134,13 +134,18 @@ def renumber_day(orders, day_key):
 carts = {}
 checkout_state = {}
 
-CATEGORIES = ["Nonushta", "Ovqatlar", "Fast Food", "Salatlar", "Salqin ichimliklar", "Boshqa mahsulotlar"]
+BUILDER_CATEGORY = "O'zingiz yig'ing"     # mijoz o'zi yig'adigan taom
+BUILDER_MIN_DEFAULT = 30                  # shundan kam bo'lsa qabul qilinmaydi
+
+CATEGORIES = ["Nonushta", "Ovqatlar", "Fast Food", "Salatlar",
+              BUILDER_CATEGORY, "Salqin ichimliklar", "Boshqa mahsulotlar"]
 DEFAULT_CATEGORY = "Boshqa mahsulotlar"
 CATEGORY_EMOJI = {
     "Nonushta": "🍳",
     "Ovqatlar": "🍲",
     "Fast Food": "🍔",
     "Salatlar": "🥗",
+    BUILDER_CATEGORY: "🍱",
     "Salqin ichimliklar": "🥤",
     "Boshqa mahsulotlar": "🍽",
 }
@@ -1054,6 +1059,20 @@ def closed_message(lang, st=None):
     return t("closed_hours", lang, open=st["open_time"], close=st["close_time"])
 
 # ---------- aksiya (chegirma) ----------
+
+def builder_min():
+    """«O'zingiz yig'ing» bo'limi uchun eng kam summa."""
+    try:
+        v = money(load_settings().get("yigma_min", BUILDER_MIN_DEFAULT))
+    except Exception:
+        v = BUILDER_MIN_DEFAULT
+    return v if v > 0 else 0.0
+
+def set_builder_min(value):
+    with DATA_LOCK:
+        s = load_settings()
+        s["yigma_min"] = money(max(0, value))
+        save_settings(s)
 
 def get_discount():
     """Hozirgi aksiya: {'active': bool, 'percent': int}."""
@@ -2326,6 +2345,18 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
 
     if not items:
         return None, "Savat bo'sh."
+
+    # «O'zingiz yig'ing» qoidasi: butun buyurtma shu bo'limdan iborat bo'lsa,
+    # jami belgilangan summadan kam bo'lmasligi kerak. Boshqa taom ham olingan
+    # bo'lsa (masalan lag'mon + kotlet) qoida qo'llanmaydi.
+    eng_kam = builder_min()
+    if eng_kam > 0 and parsed_cart and not (custom_items or []):
+        hammasi_yigma = all((d.get("category") or DEFAULT_CATEGORY) == BUILDER_CATEGORY
+                            for d, _ in parsed_cart)
+        if hammasi_yigma and money(total) < eng_kam:
+            yetmaydi = money(eng_kam - money(total))
+            return None, (f"Eng kam buyurtma summasi \u2014 {fmt_sum(eng_kam)}. "
+                          f"Hozir {fmt_sum(total)}, yana {fmt_sum(yetmaydi)} qo'shsangiz bo'ldi.")
 
     # zaxirani kamaytiramiz
     for dish, qty in parsed_cart:
@@ -3667,6 +3698,7 @@ def cmd_menu_admin(message):
         "📒 Nasiya va avans: /hisob\n"
         "📥 Telegramdan buyurtma: mijoz xabarini botga forward qiling\n"
         "📞 Telefon buyurtmasi: /qolda\n"
+        "🍱 O'zingiz yig'ing bo'limi: /yigma\n"
         "🔗 Mijozni botga olib o'tish: /havola\n"
         "💼 Shaxsiy akkaunt (Business): /biznes\n"
         "🖨 Chekni qayta chiqarish: /chek 7\n"
@@ -4340,6 +4372,8 @@ def api_menu():
         "tagline": BUSINESS_TAGLINE,
         "discount": disc,
         "set_catalog": set_catalog_payload(),
+        "builder_category": BUILDER_CATEGORY,
+        "builder_min": builder_min(),
         "shop": shop_status(),
         "logo_url": "/static/logo.jpg" if os.path.exists(LOGO_PATH) else None
     })
@@ -7292,6 +7326,45 @@ def cmd_report(message):
         return
     today = datetime.now(TIMEZONE).date()
     bot.send_message(message.chat.id, build_daily_report_text(today))
+
+@bot.message_handler(commands=["yigma", "builder"])
+def cmd_builder_min(message):
+    """«O'zingiz yig'ing» bo'limining eng kam summasi."""
+    if not is_owner(message.chat.id):
+        return
+    parts = (message.text or "").split()
+    if len(parts) > 1:
+        try:
+            v = float(parts[1].replace(",", "."))
+        except Exception:
+            bot.send_message(message.chat.id, "Masalan: /yigma 30")
+            return
+        if v < 0 or v > 1000:
+            bot.send_message(message.chat.id, "0 dan 1000 gacha bo'lsin.")
+            return
+        set_builder_min(v)
+        if v == 0:
+            bot.send_message(message.chat.id,
+                "✅ Chegara olib tashlandi — istalgan summada buyurtma qabul qilinadi.")
+        else:
+            bot.send_message(message.chat.id,
+                f"✅ Endi «{BUILDER_CATEGORY}» bo'limidan yig'ilgan taom "
+                f"{fmt_sum(v)} dan kam bo'lsa qabul qilinmaydi.")
+        return
+
+    nechta = sum(1 for d in load_menu()
+                 if (d.get("category") or DEFAULT_CATEGORY) == BUILDER_CATEGORY)
+    bot.send_message(message.chat.id,
+        f"\U0001F371 {BUILDER_CATEGORY}\n\n"
+        f"Eng kam summa: {fmt_sum(builder_min())}\n"
+        f"Bo'limdagi mahsulotlar: {nechta} ta\n\n"
+        "Mijoz shu bo'limdan o'zi taom yig'adi. Agar butun buyurtma shu bo'limdan "
+        "iborat bo'lsa, jami shu summadan kam bo'lmasligi kerak. Boshqa taom ham "
+        "olingan bo'lsa, chegara qo'llanmaydi.\n\n"
+        "O'zgartirish: /yigma 30\n"
+        "O'chirish: /yigma 0\n\n"
+        "Mahsulot qo'shish: «Menyuni boshqarish» → kategoriya "
+        f"«{BUILDER_CATEGORY}».")
 
 @bot.message_handler(commands=["qolda", "tel", "manual"])
 def cmd_manual_order(message):
