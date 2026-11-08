@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+  .min-warn{ margin:10px 0 0; padding:10px 12px; border-radius:10px;
+             background:rgba(242,193,78,.12); color:#f2c14e;
+             font-size:13px; line-height:1.4; }
   :root{
     --bg:#0a1230;
     --card:#131c40;
@@ -303,7 +306,7 @@
     font-weight:700;font-size:14.5px;cursor:pointer;font-family:'Inter',sans-serif;margin-top:14px;
     box-shadow:0 8px 20px rgba(227,179,74,0.3);
   }
-  .primary-btn:disabled{opacity:0.6;}
+  .primary-btn:disabled{opacity:0.38;filter:grayscale(.5);cursor:not-allowed;}
   .ghost-btn{
     width:100%;padding:12px 0;border-radius:14px;border:1.5px solid var(--line);background:transparent;
     color:var(--ink-soft);font-weight:600;font-size:13.5px;cursor:pointer;margin-top:8px;
@@ -414,6 +417,7 @@
   <h2 id="t-cartTitle">Savatingiz</h2>
   <div id="cart-lines"></div>
   <div class="cart-total-row"><span id="t-total">Jami</span><span id="cart-total-amt">0 SAR</span></div>
+  <div class="min-warn" id="min-warn" hidden></div>
   <div class="cb-line" id="cb-line" hidden><span id="t-cbApplied">Keshbek</span><span id="cb-line-amt">0 SAR</span></div>
   <div class="cb-pay" id="cb-pay" hidden><span id="t-cbPay">To'lanadi</span><span id="cb-pay-amt">0 SAR</span></div>
   <div class="cb-box" id="cb-box" hidden>
@@ -493,6 +497,7 @@ const I18N = {
     search:"Taom qidirish...", add:"Qo'shish", soldOut:"Tugadi",
     lastN:(n)=>`Oxirgi ${n} dona`, dishCount:(n)=>`${n} ta taom`, itemCount:(n)=>`${n} ta mahsulot`,
     cartTitle:"Savatingiz", cartEmpty:"Savat bo'sh.", perUnit:"dona", total:"Jami",
+    minWarn:(m,c,d)=>`Eng kam buyurtma summasi \u2014 ${m}. Hozir ${c}, yana ${d} qo\u2018shsangiz bo\u2018ldi.`,
     order:"Buyurtma berish", close:"Yopish",
     infoTitle:"Ma'lumotlaringiz", nameLabel:"Ismingiz", namePh:"Ismingiz",
     phoneLabel:"Telefon raqami", phonePh:"05xxxxxxxx yoki +998...",
@@ -534,6 +539,7 @@ const I18N = {
     search:"ابحث عن طبق...", add:"أضف", soldOut:"نفد",
     lastN:(n)=>`آخر ${n} قطعة`, dishCount:(n)=>`${n} طبق`, itemCount:(n)=>`${n} منتج`,
     cartTitle:"سلتك", cartEmpty:"السلة فارغة.", perUnit:"للقطعة", total:"الإجمالي",
+    minWarn:(m,c,d)=>`الحد الأدنى للطلب ${m}. الحالي ${c}، أضف ${d} فقط.`,
     order:"إتمام الطلب", close:"إغلاق",
     infoTitle:"بياناتك", nameLabel:"الاسم", namePh:"اسمك",
     phoneLabel:"رقم الهاتف", phonePh:"05xxxxxxxx",
@@ -575,6 +581,7 @@ const I18N = {
     search:"Search dishes...", add:"Add", soldOut:"Sold out",
     lastN:(n)=>`Only ${n} left`, dishCount:(n)=>`${n} dishes`, itemCount:(n)=>`${n} items`,
     cartTitle:"Your cart", cartEmpty:"Your cart is empty.", perUnit:"each", total:"Total",
+    minWarn:(m,c,d)=>`Minimum order is ${m}. You have ${c} — just ${d} more to go.`,
     order:"Place order", close:"Close",
     infoTitle:"Your details", nameLabel:"Your name", namePh:"Your name",
     phoneLabel:"Phone number", phonePh:"05xxxxxxxx or +...",
@@ -616,6 +623,7 @@ const I18N = {
     search:"Поиск блюда...", add:"Добавить", soldOut:"Закончилось",
     lastN:(n)=>`Осталось ${n} шт.`, dishCount:(n)=>`${n} блюд`, itemCount:(n)=>`${n} товаров`,
     cartTitle:"Ваша корзина", cartEmpty:"Корзина пуста.", perUnit:"за шт.", total:"Итого",
+    minWarn:(m,c,d)=>`Минимальный заказ — ${m}. Сейчас ${c}, добавьте ещё ${d}.`,
     order:"Оформить заказ", close:"Закрыть",
     infoTitle:"Ваши данные", nameLabel:"Ваше имя", namePh:"Ваше имя",
     phoneLabel:"Номер телефона", phonePh:"05xxxxxxxx или +998...",
@@ -657,6 +665,7 @@ const I18N = {
     search:"Yemek ara...", add:"Ekle", soldOut:"Tükendi",
     lastN:(n)=>`Son ${n} adet`, dishCount:(n)=>`${n} yemek`, itemCount:(n)=>`${n} ürün`,
     cartTitle:"Sepetiniz", cartEmpty:"Sepet boş.", perUnit:"adet", total:"Toplam",
+    minWarn:(m,c,d)=>`En az sipariş tutarı ${m}. Şu an ${c}, ${d} daha ekleyin.`,
     order:"Sipariş ver", close:"Kapat",
     infoTitle:"Bilgileriniz", nameLabel:"Adınız", namePh:"Adınız",
     phoneLabel:"Telefon numarası", phonePh:"05xxxxxxxx veya +90...",
@@ -698,6 +707,7 @@ const I18N = {
     search:"کھانا تلاش کریں...", add:"شامل کریں", soldOut:"ختم",
     lastN:(n)=>`صرف ${n} باقی`, dishCount:(n)=>`${n} کھانے`, itemCount:(n)=>`${n} اشیاء`,
     cartTitle:"آپ کی ٹوکری", cartEmpty:"ٹوکری خالی ہے۔", perUnit:"فی عدد", total:"کل",
+    minWarn:(m,c,d)=>`کم از کم آرڈر ${m} ہے۔ ابھی ${c}، مزید ${d} شامل کریں۔`,
     order:"آرڈر دیں", close:"بند کریں",
     infoTitle:"آپ کی معلومات", nameLabel:"آپ کا نام", namePh:"آپ کا نام",
     phoneLabel:"فون نمبر", phonePh:"05xxxxxxxx یا +92...",
@@ -739,6 +749,7 @@ const I18N = {
     search:"Cari menu...", add:"Tambah", soldOut:"Habis",
     lastN:(n)=>`Sisa ${n}`, dishCount:(n)=>`${n} menu`, itemCount:(n)=>`${n} item`,
     cartTitle:"Keranjang Anda", cartEmpty:"Keranjang kosong.", perUnit:"per porsi", total:"Total",
+    minWarn:(m,c,d)=>`Pesanan minimum ${m}. Saat ini ${c}, tambah ${d} lagi.`,
     order:"Pesan sekarang", close:"Tutup",
     infoTitle:"Data Anda", nameLabel:"Nama Anda", namePh:"Nama Anda",
     phoneLabel:"Nomor telepon", phonePh:"05xxxxxxxx atau +62...",
@@ -787,6 +798,8 @@ const signedUser = {
 
 let menu = [];
 let setCatalog = {};      // 'non' -> {emoji, names:{uz,ar,...}}
+let builderCat = '';      // "O'zingiz yig'ing" bo'limi nomi
+let builderMin = 0;       // shu bo'limdan yig'ilgan taomning eng kam summasi
 let categories = [];
 let categoryEmoji = {};
 let cart = {};            // id -> qty
@@ -987,7 +1000,9 @@ async function loadMenu(){
     categories = data.categories || [];
     categoryEmoji = data.category_emoji || {};
     saleInfo = data.discount || {active:false, percent:0};
-    setCatalog = {};
+    builderCat = data.builder_category || '';
+  builderMin = Number(data.builder_min || 0);
+  setCatalog = {};
     (data.set_catalog || []).forEach(function(it){ setCatalog[it.key] = it; });
     shopInfo = data.shop || {open:true, reason:null};
     $('business-name').textContent = data.business_name || "Uy oshxonasi";
@@ -1220,6 +1235,22 @@ function cartTotal(){
     return sum + (dish ? dish.price*qty : 0);
   },0);
 }
+// Butun savat "O'zingiz yig'ing" bo'limidan iboratmi va summa yetarlimi
+function builderBlock(){
+  if (!builderCat || !(builderMin > 0)) return null;
+  const entries = Object.entries(cart);
+  if (!entries.length) return null;
+  let total = 0, hammasi = true;
+  for (const [id, qty] of entries){
+    const dish = menu.find(d => String(d.id) === String(id));
+    if (!dish) continue;
+    if (dish.category !== builderCat){ hammasi = false; break; }
+    total += dish.price * qty;
+  }
+  if (!hammasi || total >= builderMin) return null;
+  return { need: builderMin, now: total };
+}
+
 function updateCartBar(){
   const count = cartCount();
   $('cart-count').textContent = count;
@@ -1293,12 +1324,23 @@ function renderCartSheet(){
     });
   }
   $('cart-total-amt').textContent = fmtSar(cartTotal());
+  const blok = builderBlock();
+  const warn = $('min-warn');
+  if (blok){
+    warn.textContent = T().minWarn(fmtSar(blok.need), fmtSar(blok.now),
+                                   fmtSar(blok.need - blok.now));
+    warn.hidden = false;
+  } else {
+    warn.hidden = true;
+  }
+  $('go-checkout-btn').disabled = !!blok;
   renderCashbackRows();
 }
 
 /* ---------- checkout ---------- */
 $('go-checkout-btn').addEventListener('click', ()=>{
   if (cartCount() === 0) return;
+  if (builderBlock()) return;
   closeSheet('cart');
   const tgUser = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
   if (tgUser && tgUser.first_name && !$('in-name').value){
