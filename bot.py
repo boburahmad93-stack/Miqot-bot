@@ -137,8 +137,9 @@ checkout_state = {}
 BUILDER_CATEGORY = "O'zingiz yig'ing"     # mijoz o'zi yig'adigan taom
 BUILDER_MIN_DEFAULT = 30                  # shundan kam bo'lsa qabul qilinmaydi
 
-CATEGORIES = ["Nonushta", "Ovqatlar", "Fast Food", "Salatlar",
-              BUILDER_CATEGORY, "Salqin ichimliklar", "Boshqa mahsulotlar"]
+# Tartib muhim: shu ketma-ketlikda bo'limlar sahifasida va menyuda ko'rinadi
+CATEGORIES = [BUILDER_CATEGORY, "Ovqatlar", "Nonushta", "Fast Food", "Salatlar",
+              "Salqin ichimliklar", "Boshqa mahsulotlar"]
 DEFAULT_CATEGORY = "Boshqa mahsulotlar"
 CATEGORY_EMOJI = {
     "Nonushta": "🍳",
