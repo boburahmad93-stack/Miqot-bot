@@ -134,8 +134,11 @@ def renumber_day(orders, day_key):
 carts = {}
 checkout_state = {}
 
-BUILDER_CATEGORY = "O'zingiz yig'ing"     # mijoz o'zi yig'adigan taom
-BUILDER_MIN_DEFAULT = 30                  # shundan kam bo'lsa qabul qilinmaydi
+BUILDER_CATEGORY = "Taomni o'zingiz tayyorlang"   # mijoz o'zi yig'adigan taom
+BUILDER_MIN_DEFAULT = 30                          # shundan kam bo'lsa qabul qilinmaydi
+
+# Bo'lim nomi o'zgarsa, menyudagi eski mahsulotlar osilib qolmasligi uchun
+BUILDER_OLD_NAMES = ["O'zingiz yig'ing"]
 
 # Tartib muhim: shu ketma-ketlikda bo'limlar sahifasida va menyuda ko'rinadi
 CATEGORIES = [BUILDER_CATEGORY, "Ovqatlar", "Nonushta", "Fast Food", "Salatlar",
@@ -146,7 +149,7 @@ CATEGORY_EMOJI = {
     "Ovqatlar": "🍲",
     "Fast Food": "🍔",
     "Salatlar": "🥗",
-    BUILDER_CATEGORY: "🍱",
+    BUILDER_CATEGORY: "🧑‍🍳",
     "Salqin ichimliklar": "🥤",
     "Boshqa mahsulotlar": "🍽",
 }
@@ -1060,6 +1063,27 @@ def closed_message(lang, st=None):
     return t("closed_hours", lang, open=st["open_time"], close=st["close_time"])
 
 # ---------- aksiya (chegirma) ----------
+
+def migrate_builder_category():
+    """Bo'lim nomi o'zgargan bo'lsa, menyudagi mahsulotlarni yangi nomga ko'chiramiz."""
+    if not BUILDER_OLD_NAMES:
+        return 0
+    try:
+        with DATA_LOCK:
+            menu = load_menu()
+            n = 0
+            for d in menu:
+                if (d.get("category") or "") in BUILDER_OLD_NAMES:
+                    d["category"] = BUILDER_CATEGORY
+                    n += 1
+            if n:
+                save_menu(menu)
+        if n:
+            print(f"Bo'lim nomi yangilandi: {n} ta mahsulot \u2192 {BUILDER_CATEGORY}")
+        return n
+    except Exception as e:
+        print(f"Bo'lim nomini ko'chirishda xato: {e}")
+        return 0
 
 def builder_min():
     """«O'zingiz yig'ing» bo'limi uchun eng kam summa."""
@@ -9085,6 +9109,7 @@ def run_bot_polling():
     bot.infinity_polling()
 
 if __name__ == "__main__":
+    migrate_builder_category()
     qoshildi = backfill_users_from_history()
     if qoshildi:
         print(f"Eski buyurtmalardan {qoshildi} ta mijoz ro'yxatga qo'shildi.")
