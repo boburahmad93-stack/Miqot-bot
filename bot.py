@@ -444,6 +444,15 @@ TEXTS = {
         "ur": "💰 کل: {sum} (ڈیلیوری پر نقد)",
         "id": "💰 Total: {sum} (tunai saat pengantaran)",
     },
+    "receipt_total_plain": {
+        "uz": "\U0001F4B0 Jami: {sum}",
+        "ar": "\U0001F4B0 \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a: {sum}",
+        "en": "\U0001F4B0 Total: {sum}",
+        "ru": "\U0001F4B0 \u0418\u0442\u043e\u0433\u043e: {sum}",
+        "tr": "\U0001F4B0 Toplam: {sum}",
+        "ur": "\U0001F4B0 \u06a9\u0644: {sum}",
+        "id": "\U0001F4B0 Total: {sum}",
+    },
     "receipt_nophone": {
         "uz": "\n📱 Telefon raqami kiritilmadi — siz bilan shu bot orqali bog'lanamiz. Xabarlarni kuzatib turing.",
         "ar": "\n📱 لم يُدخل رقم هاتف — سنتواصل معك عبر هذا البوت. تابع الرسائل.",
@@ -593,6 +602,12 @@ TEXTS = {
         "en": "\U0001F4D2 Prepaid balance: {amt}\n",
         "ar": "\U0001F4D2 \u0631\u0635\u064a\u062f \u0645\u062f\u0641\u0648\u0639 \u0645\u0642\u062f\u0645\u0627\u064b: {amt}\n",
     },
+    "acct_my_hist": {
+        "uz": "\U0001F4C3 Oxirgi harakatlar:",
+        "ar": "\U0001F4C3 \u0623\u062d\u062f\u062b \u0627\u0644\u062d\u0631\u0643\u0627\u062a:",
+        "en": "\U0001F4C3 Recent activity:",
+        "ru": "\U0001F4C3 \u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u043e\u043f\u0435\u0440\u0430\u0446\u0438\u0438:",
+    },
     "acct_my_zero": {
         "uz": "\U0001F4D2 Hisobingiz toza \u2014 qarz ham, avans ham yo\u2018q.",
         "ru": "\U0001F4D2 \u0421\u0447\u0451\u0442 \u0447\u0438\u0441\u0442: \u043d\u0438 \u0434\u043e\u043b\u0433\u0430, \u043d\u0438 \u043f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u044b.",
@@ -634,6 +649,54 @@ TEXTS = {
         "tr": "\U0001F4B3 Nakit iade: \u2212{amt}\n\U0001F4B5 Ödenecek: {pay}\n",
         "ur": "\U0001F4B3 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9: \u2212{amt}\n\U0001F4B5 \u0642\u0627\u0628\u0644 \u0627\u062F\u0627: {pay}\n",
         "id": "\U0001F4B3 Cashback: \u2212{amt}\n\U0001F4B5 Dibayar: {pay}\n",
+    },
+    "cb_line_only": {
+        "uz": "\U0001F4B3 Keshbek: \u2212{amt}\n",
+        "ar": "\U0001F4B3 \u0643\u0627\u0634 \u0628\u0627\u0643: \u2212{amt}\n",
+        "en": "\U0001F4B3 Cashback: \u2212{amt}\n",
+        "ru": "\U0001F4B3 \u041a\u0435\u0448\u0431\u044d\u043a: \u2212{amt}\n",
+        "tr": "\U0001F4B3 Nakit iade: \u2212{amt}\n",
+        "ur": "\U0001F4B3 \u06A9\u06CC\u0634 \u0628\u06CC\u06A9: \u2212{amt}\n",
+        "id": "\U0001F4B3 Cashback: \u2212{amt}\n",
+    },
+    "adv_line_only": {
+        "uz": "\U0001F4D2 Avansingizdan: \u2212{amt}\n",
+        "ar": "\U0001F4D2 \u0645\u0646 \u0631\u0635\u064a\u062f\u0643 \u0627\u0644\u0645\u062f\u0641\u0648\u0639: \u2212{amt}\n",
+        "en": "\U0001F4D2 From your prepaid balance: \u2212{amt}\n",
+        "ru": "\U0001F4D2 \u0418\u0437 \u043f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u044b: \u2212{amt}\n",
+        "tr": "\U0001F4D2 \u00d6n \u00f6demenizden: \u2212{amt}\n",
+        "ur": "\U0001F4D2 \u0622\u067e \u06a9\u06cc \u067e\u06cc\u0634\u06af\u06cc \u0633\u06d2: \u2212{amt}\n",
+        "id": "\U0001F4D2 Dari saldo prabayar: \u2212{amt}\n",
+    },
+    "pay_line_only": {
+        "uz": "\U0001F4B5 To'lanadi: {pay}\n",
+        "ar": "\U0001F4B5 \u0627\u0644\u0645\u0637\u0644\u0648\u0628: {pay}\n",
+        "en": "\U0001F4B5 To pay: {pay}\n",
+        "ru": "\U0001F4B5 \u041a \u043e\u043f\u043b\u0430\u0442\u0435: {pay}\n",
+        "tr": "\U0001F4B5 \u00d6denecek: {pay}\n",
+        "ur": "\U0001F4B5 \u0642\u0627\u0628\u0644 \u0627\u062f\u0627: {pay}\n",
+        "id": "\U0001F4B5 Dibayar: {pay}\n",
+    },
+    "paid_full_line": {
+        "uz": "\u2705 Hammasi to'langan \u2014 kuryerga pul berishingiz shart emas.\n",
+        "ar": "\u2705 \u062a\u0645 \u0627\u0644\u062f\u0641\u0639 \u0628\u0627\u0644\u0643\u0627\u0645\u0644 \u2014 \u0644\u0627 \u062d\u0627\u062c\u0629 \u0644\u0644\u062f\u0641\u0639 \u0644\u0644\u0645\u0646\u062f\u0648\u0628.\n",
+        "en": "\u2705 Fully paid \u2014 nothing to pay the courier.\n",
+        "ru": "\u2705 \u041e\u043f\u043b\u0430\u0447\u0435\u043d\u043e \u043f\u043e\u043b\u043d\u043e\u0441\u0442\u044c\u044e \u2014 \u043a\u0443\u0440\u044c\u0435\u0440\u0443 \u043f\u043b\u0430\u0442\u0438\u0442\u044c \u043d\u0435 \u043d\u0443\u0436\u043d\u043e.\n",
+        "tr": "\u2705 Tamamen \u00f6dendi \u2014 kuryeye \u00f6deme yapman\u0131z gerekmez.\n",
+        "ur": "\u2705 \u0645\u06a9\u0645\u0644 \u0627\u062f\u0627\u0626\u06af\u06cc \u06c1\u0648 \u06af\u0626\u06cc\u06d4\n",
+        "id": "\u2705 Sudah dibayar penuh \u2014 tidak perlu bayar ke kurir.\n",
+    },
+    "adv_refunded": {
+        "uz": "\U0001F4D2 Buyurtma bekor qilindi \u2014 {amt} avansingiz hisobingizga qaytarildi.\nHozirgi hisobingiz: {bal}",
+        "ar": "\U0001F4D2 \u062a\u0645 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0637\u0644\u0628 \u2014 \u062a\u0645 \u0625\u0631\u062c\u0627\u0639 {amt} \u0625\u0644\u0649 \u062d\u0633\u0627\u0628\u0643.\n\u0627\u0644\u0631\u0635\u064a\u062f: {bal}",
+        "en": "\U0001F4D2 Order cancelled \u2014 {amt} was returned to your account.\nCurrent balance: {bal}",
+        "ru": "\U0001F4D2 \u0417\u0430\u043a\u0430\u0437 \u043e\u0442\u043c\u0435\u043d\u0451\u043d \u2014 {amt} \u0432\u043e\u0437\u0432\u0440\u0430\u0449\u0435\u043d\u043e \u043d\u0430 \u0432\u0430\u0448 \u0441\u0447\u0451\u0442.\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0431\u0430\u043b\u0430\u043d\u0441: {bal}",
+    },
+    "adv_spent": {
+        "uz": "\U0001F4D2 Buyurtmangizdan {amt} avansingizdan yechildi.\nHozirgi hisobingiz: {bal}",
+        "ar": "\U0001F4D2 \u062a\u0645 \u062e\u0635\u0645 {amt} \u0645\u0646 \u0631\u0635\u064a\u062f\u0643.\n\u0627\u0644\u0631\u0635\u064a\u062f: {bal}",
+        "en": "\U0001F4D2 {amt} was taken from your prepaid balance.\nCurrent balance: {bal}",
+        "ru": "\U0001F4D2 \u0421 \u043f\u0440\u0435\u0434\u043e\u043f\u043b\u0430\u0442\u044b \u0441\u043f\u0438\u0441\u0430\u043d\u043e {amt}.\n\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u0431\u0430\u043b\u0430\u043d\u0441: {bal}",
     },
     "btn_repeat": {
         "uz": "🔁 Avvalgi buyurtmani takrorlash",
@@ -1427,6 +1490,68 @@ def hisob_webapp_kb(uid, uname):
 
 def order_on_account(order):
     return bool(order.get("on_account"))
+
+# ---------- avansni buyurtmada ishlatish ----------
+#
+#  Mijozning avansi (balans plyusda) bo'lsa, buyurtma tushgan payt bot
+#  o'zi yechib qo'yadi — keshbek chegirilgandan keyin qolgan summadan.
+#  Qarzni esa faqat qo'lda kiritamiz: mijoz "pulim yo'q" desa.
+
+def order_advance_used(order):
+    return money(order.get("advance_used") or 0)
+
+def order_cash_due(order):
+    """Mijoz naqd beradigan summa: jami − keshbek − avans."""
+    return max(0.0, money(order_payable(order) - order_advance_used(order)))
+
+def advance_for_order(user_id, payable):
+    """Shu buyurtmaga avansdan qancha ishlatish mumkin."""
+    if not user_id:
+        return 0.0
+    bal = account_balance(user_id)
+    if bal <= 0:
+        return 0.0
+    use = money(min(bal, max(0.0, money(payable))))
+    return use if use >= 0.01 else 0.0
+
+def refund_used_advance(order, note="buyurtma bekor qilindi"):
+    """Bekor qilinganda ishlatilgan avans hisobga qaytadi."""
+    uid = order.get("user_id")
+    used = order_advance_used(order)
+    if not uid or used <= 0 or order.get("advance_refunded"):
+        return 0.0, account_balance(uid)
+    order["advance_refunded"] = True
+    return used, account_move(uid, used, order.get("id"), note)
+
+def recharge_used_advance(order):
+    """Bekor qaytarilganda avansni qaytadan yechadi.
+    Hisob minusga tushsa ham yechiladi — bu haqiqiy pul, qarzga aylanadi."""
+    uid = order.get("user_id")
+    used = order_advance_used(order)
+    if not uid or used <= 0 or not order.get("advance_refunded"):
+        return 0.0, account_balance(uid)
+    order["advance_refunded"] = False
+    return used, account_move(uid, -used, order.get("id"), "bekor qaytarildi")
+
+def trim_advance_to_total(order):
+    """Taom olib tashlangach avans ortib qolsa, ortig'i hisobga qaytadi."""
+    used = order_advance_used(order)
+    cap = money(order_payable(order))
+    if used <= cap:
+        return 0.0
+    extra = money(used - cap)
+    order["advance_used"] = cap
+    if order.get("user_id") and not order.get("advance_refunded"):
+        account_move(order["user_id"], extra, order.get("id"), "taom olib tashlandi")
+    return extra
+
+def account_history(user_id, limit=10):
+    """Mijozga ko'rsatiladigan oxirgi harakatlar — yangisi birinchi."""
+    if not user_id:
+        return []
+    rec = load_account().get(str(user_id)) or {}
+    hist = (rec.get("history") or [])[-limit:]
+    return list(reversed(hist))
 
 # ======================================================================
 #  TELEGRAMDAN TUSHGAN BUYURTMA
@@ -2404,6 +2529,10 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         if cb_used < 0.01:
             cb_used = 0.0
 
+    # avans: oldindan to'langan puli bo'lsa, qolgan summadan o'zi yechiladi.
+    # Keshbekdan keyin hisoblanadi — avval bonus, keyin haqiqiy pul.
+    adv_used = advance_for_order(tg_user_id, money(total) - cb_used)
+
     orders = load_orders()
     created_at = int(time.time())
     day_key = today_key(created_at)
@@ -2425,6 +2554,7 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
         "cashback_used": cb_used,
         "cashback_earned": 0.0,
         "cashback_credited": False,
+        "advance_used": adv_used,
         "printed": False,
         "payment": "naqd",
         "created_at": created_at,
@@ -2437,6 +2567,8 @@ def _create_order_locked(items_cart, customer_name, phone, latitude, longitude, 
     save_orders(orders)
     if cb_used > 0:
         cashback_move(tg_user_id, -cb_used, order["id"], "buyurtmada ishlatildi")
+    if adv_used > 0:
+        account_move(tg_user_id, -adv_used, order["id"], "avans buyurtmada ishlatildi")
     if tg_user_id:
         try:
             users = load_users()
@@ -2458,7 +2590,9 @@ def build_customer_receipt_text(order, lang=None):
         t("receipt_title", lang, no=order["daily_number"]) + "\n\n"
         f"{order_items_text(order, lang)}\n\n"
         + discount_line_for_customer(order, lang)
-        + t("receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
+        + t("receipt_total_plain" if (order_cashback_used(order) > 0
+                                       or order_advance_used(order) > 0)
+            else "receipt_total", lang, sum=fmt_sum(order["total"])) + "\n"
         + cashback_line_for_customer(order, lang)
         + f"{order_address_line(order)}\n"
     )
@@ -2483,10 +2617,22 @@ def account_line_for_customer(order, lang):
     return t("acct_receipt_adv", lang, amt=fmt_sum(bal))
 
 def cashback_line_for_customer(order, lang):
+    """Keshbek va avans qatorlari, oxirida naqd beriladigan summa."""
     used = order_cashback_used(order)
-    if used <= 0:
+    adv = order_advance_used(order)
+    if used <= 0 and adv <= 0:
         return ""
-    return t("cb_receipt_line", lang, amt=fmt_sum(used), pay=fmt_sum(order_payable(order)))
+    out = ""
+    if used > 0:
+        out += t("cb_line_only", lang, amt=fmt_sum(used))
+    if adv > 0:
+        out += t("adv_line_only", lang, amt=fmt_sum(adv))
+    naqd = order_cash_due(order)
+    if naqd > 0:
+        out += t("pay_line_only", lang, pay=fmt_sum(naqd))
+    else:
+        out += t("paid_full_line", lang)
+    return out
 
 def discount_line_for_customer(order, lang):
     pct = order.get("discount_percent") or 0
@@ -2629,13 +2775,23 @@ def build_receipt_lines(order, width=None, safe=True, header=True):
         L.extend(_labeled(f"Aksiya -{pct}%: ", f"-{old - order['total']:.0f}", w))
     L.extend(_labeled("JAMI: ", fmt_sum(order.get("total", 0)), w))
     used_cb = order_cashback_used(order)
+    used_adv = order_advance_used(order)
     if used_cb > 0:
         L.extend(_labeled("Keshbek: ", "-" + fmt_sum(used_cb), w))
-        L.extend(_labeled("TO'LOVGA: ", fmt_sum(order_payable(order)), w))
+    if used_adv > 0:
+        L.extend(_labeled("Avansdan: ", "-" + fmt_sum(used_adv), w))
+    if used_cb > 0 or used_adv > 0:
+        L.extend(_labeled("TO'LOVGA: ", fmt_sum(order_cash_due(order)), w))
     L.append("")
     # katta yozuvda ustunlar soni yarmiga tushadi — qator sig'ishi kerak
     if order_on_account(order):
         pay = "To'lov: HISOBGA (naqd emas)" if w >= 28 else "To'lov: HISOBGA"
+    elif order_cash_due(order) <= 0:
+        pay = "To'lov: TO'LANGAN (naqd emas)" if w >= 28 else "To'lov: TO'LANGAN"
+    elif used_adv > 0 and used_cb > 0:
+        pay = "To'lov: NAQD + KESHBEK + AVANS" if w >= 32 else "NAQD+KESHBEK+AVANS"
+    elif used_adv > 0:
+        pay = "To'lov: NAQD + AVANS" if w >= 24 else "NAQD + AVANS"
     elif used_cb > 0:
         pay = "To'lov: NAQD + KESHBEK" if w >= 24 else "NAQD + KESHBEK"
     else:
@@ -2674,13 +2830,18 @@ def order_discount_line(order):
     return f"🏷 Aksiya −{pct}%: {fmt_sum(old)} → {fmt_sum(order['total'])} (−{fmt_sum(saved)})\n"
 
 def order_money_lines(order):
-    """Admin ko'radigan pul qatorlari — keshbek ishlatilgan bo'lsa ajratib ko'rsatamiz."""
+    """Admin ko'radigan pul qatorlari — keshbek va avans ajratib ko'rsatiladi."""
     used = order_cashback_used(order)
-    if used <= 0:
+    adv = order_advance_used(order)
+    if used <= 0 and adv <= 0:
         return f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))} (naqd)\n"
-    return (f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))}\n"
-            f"\U0001F4B3 Keshbek bilan: \u2212{fmt_sum(used)}\n"
-            f"\U0001F4B5 Naqd olinadi: {fmt_sum(order_payable(order))}\n")
+    satr = f"\U0001F4B0 Jami: {fmt_sum(order.get('total', 0))}\n"
+    if used > 0:
+        satr += f"\U0001F4B3 Keshbek bilan: \u2212{fmt_sum(used)}\n"
+    if adv > 0:
+        satr += f"\U0001F4D2 Avansdan: \u2212{fmt_sum(adv)}\n"
+    satr += f"\U0001F4B5 Naqd olinadi: {fmt_sum(order_cash_due(order))}\n"
+    return satr
 
 def order_account_line(order):
     """Admin kartasida: hisobga yozilganmi va mijozning balansi qancha."""
@@ -2689,7 +2850,7 @@ def order_account_line(order):
         return ""
     bal = account_balance(uid)
     if order_on_account(order):
-        amt = money(order.get("account_amount") or order_payable(order))
+        amt = money(order.get("account_amount") or order_cash_due(order))
         return (f"\U0001F4D2 Hisobga yozilgan: {fmt_sum(amt)} (naqd olinmaydi)\n"
                 f"   Mijoz hisobi: {fmt_signed(bal)}\n")
     if bal != 0:
@@ -2882,6 +3043,7 @@ def cb_cancel_order(call):
     order_id = int(call.data.split(":", 1)[1])
     err = None
     taken_back = refunded = new_balance = 0.0
+    adv_back = adv_bal = 0.0
     with DATA_LOCK:
         orders = load_orders()
         order = next((o for o in orders if o["id"] == order_id), None)
@@ -2901,6 +3063,8 @@ def cb_cancel_order(call):
         # yozilgan keshbek bekor bo'ladi, ishlatilgani esa mijozga qaytadi
         taken_back, _ = revoke_order_cashback(order, "buyurtma bekor qilindi")
         refunded, new_balance = refund_used_cashback(order)
+        # ishlatilgan avans ham hisobga qaytadi — bu haqiqiy pul
+        adv_back, adv_bal = refund_used_advance(order)
         save_orders(orders)
 
     msg = "❌ Buyurtma bekor qilindi."
@@ -2908,11 +3072,15 @@ def cb_cancel_order(call):
         msg += f" Keshbek −{fmt_sum(taken_back)}."
     if refunded > 0:
         msg += f" Mijozga {fmt_sum(refunded)} keshbek qaytarildi."
+    if adv_back > 0:
+        msg += f" Avans {fmt_sum(adv_back)} qaytarildi (balans {fmt_signed(adv_bal)})."
     bot.answer_callback_query(call.id, msg)
     refresh_order_card(call, order)
     tell_customer(order, "order_cancelled", no=order["daily_number"])
     if refunded > 0:
         tell_customer(order, "cb_refunded", amt=fmt_sum(refunded), bal=fmt_sum(new_balance))
+    if adv_back > 0:
+        tell_customer(order, "adv_refunded", amt=fmt_sum(adv_back), bal=fmt_signed(adv_bal))
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("uncancel:"))
 def cb_uncancel_order(call):
@@ -2933,8 +3101,11 @@ def cb_uncancel_order(call):
         order.pop("cancelled_at", None)
         order.pop("cancelled_by", None)
         cb_ok = recharge_used_cashback(order)
+        adv_again, adv_bal = recharge_used_advance(order)
         save_orders(orders)
     msg = "♻️ Buyurtma qaytarildi."
+    if adv_again > 0:
+        msg += f" Avans yana yechildi: {fmt_sum(adv_again)} (balans {fmt_signed(adv_bal)})."
     if not cb_ok:
         msg = ("♻️ Qaytarildi, lekin mijozning keshbegi yetmadi — "
                "buyurtma to'liq naqd to'lanadigan bo'ldi.")
@@ -2973,11 +3144,15 @@ def cb_remove_item(call):
         recalc_order_total(order)
         # keshbek yangi summadan oshib ketgan bo'lsa, ortig'i mijozga qaytadi
         given_back = trim_cashback_to_total(order)
+        # avans ham yangi summadan oshib ketgan bo'lsa, ortig'i hisobga qaytadi
+        adv_extra = trim_advance_to_total(order)
         save_orders(orders)
 
     msg = f"➖ {it['name']} olib tashlandi."
     if given_back > 0:
         msg += f" {fmt_sum(given_back)} keshbek mijozga qaytarildi."
+    if adv_extra > 0:
+        msg += f" {fmt_sum(adv_extra)} avans hisobga qaytarildi."
     bot.answer_callback_query(call.id, msg)
     refresh_order_card(call, order)
     tell_customer(order, "item_cancelled", no=order["daily_number"],
@@ -3007,14 +3182,18 @@ def cb_account_charge(call):
             err = "Allaqachon hisobga yozilgan."
         elif not charge and not order_on_account(order):
             err = "Bu buyurtma hisobda emas."
+        elif charge and money(order_cash_due(order)) <= 0:
+            err = ("Bu buyurtmadan naqd olinmaydi — "
+                   "summa keshbek va avansdan to‘langan.")
         else:
             uid = order["user_id"]
             if charge:
-                amount = money(order_payable(order))
+                # avans va keshbek chegirilgandan keyin qolgan qismi yoziladi
+                amount = money(order_cash_due(order))
                 order["on_account"] = True
                 order["account_amount"] = amount
             else:
-                amount = money(order.get("account_amount") or order_payable(order))
+                amount = money(order.get("account_amount") or order_cash_due(order))
                 order["on_account"] = False
                 order.pop("account_amount", None)
             save_orders(orders)
@@ -4511,8 +4690,10 @@ def api_order():
         "order_id": order["daily_number"],
         "total": order["total"],
         "cashback_used": order_cashback_used(order),
-        "payable": order_payable(order),
+        "payable": order_cash_due(order),
+        "advance_used": order_advance_used(order),
         "cashback_balance": cashback_balance(user.get("id")) if user.get("id") else 0,
+        "account_balance": account_balance(user.get("id")) if user.get("id") else 0,
     })
 
 @app.route("/api/cashback")
@@ -4524,10 +4705,23 @@ def api_cashback():
                                   request.args.get("ts"), request.args.get("sig")))
     # imzosiz so'rovga balans bermaymiz — birovning hisobini ko'rib bo'lmaydi
     uid = user["id"] if user else None
+    hist = []
+    for h in (account_history(uid, 12) if uid else []):
+        hist.append({
+            "ts": h.get("ts", 0),
+            "delta": money(h.get("delta", 0)),
+            "bal": money(h.get("bal", 0)),
+            "order_id": h.get("order_id"),
+            "note": h.get("note") or "",
+        })
     return jsonify({
         "active": cfg["active"],
         "percent": cfg["percent"],
         "balance": cashback_balance(uid) if uid else 0,
+        "account": {
+            "balance": account_balance(uid) if uid else 0,
+            "history": hist,
+        },
     })
 
 # ---------- admin paneli (Mini App orqali taom qo'shish) ----------
@@ -7932,6 +8126,16 @@ def cmd_account(message):
             txt = t("acct_my_adv", lang, bal=fmt_signed(bal), amt=fmt_sum(bal))
         else:
             txt = t("acct_my_zero", lang)
+        # oxirgi harakatlar — raqamning orqasi ko'rinib tursin, bahs bo'lmasin
+        hist = account_history(message.from_user.id, 8)
+        if hist:
+            satrlar = []
+            for h in hist:
+                vaqt = datetime.fromtimestamp(h.get("ts", 0), TIMEZONE).strftime("%d.%m")
+                izoh = h.get("note") or ""
+                satrlar.append(f"  {vaqt}  {fmt_signed(h.get('delta', 0))}"
+                               + (f"  — {izoh}" if izoh else ""))
+            txt += "\n\n" + t("acct_my_hist", lang) + "\n" + "\n".join(satrlar)
         bot.send_message(message.chat.id, txt,
                          reply_markup=main_keyboard(message.from_user.id,
                                                     message.from_user.username, lang))
