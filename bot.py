@@ -310,18 +310,26 @@ def set_user_lang(user_id, lang):
     data[str(user_id)] = lang
     save_json(LANG_FILE, data)
 
+DEFAULT_LANG = "uz"
+
+def lang_hint(lang):
+    """Boshqa tilda o'qiydigan mijoz tilni qayerdan o'zgartirishni bilsin."""
+    if lang != DEFAULT_LANG:
+        return ""
+    return "\n\n🌐 اللغة · Язык · Language → /til"
+
 def get_user_lang(user_id, tg_code=None):
-    """Avval mijoz tanlagan til, bo'lmasa Telegram tilidan taxmin, bo'lmasa inglizcha."""
+    """Mijoz o'zi tanlagan til, tanlamagan bo'lsa — o'zbekcha.
+
+    Telefon tiliga qaramaymiz: mijozlarimizning ko'pchiligi telefonini
+    ingliz yoki rus tilida ishlatadi, lekin o'sha tillarni bilmaydi.
+    Xohlagan odam «Til» tugmasidan o'zgartirib oladi.
+    """
     if user_id:
         saved = load_user_langs().get(str(user_id))
         if saved in SUPPORTED_LANGS:
             return saved
-    code = (tg_code or "").lower().split("-")[0]
-    if code in SUPPORTED_LANGS:
-        return code
-    if code in LANG_ALIASES:
-        return LANG_ALIASES[code]
-    return "uz"
+    return DEFAULT_LANG
 
 TEXTS = {
     "welcome": {
@@ -527,9 +535,9 @@ TEXTS = {
         "tr": "Sipariş #{no} durumu: {st}", "ur": "آپ کے آرڈر #{no} کی حالت: {st}",
         "id": "Status pesanan #{no}: {st}",
     },
+    # Oyna qaysi tilda ochilishidan qat'i nazar hamma tushunsin
     "lang_choose": {
-        "uz": "Tilni tanlang:", "ar": "اختر اللغة:", "en": "Choose your language:",
-        "ru": "Выберите язык:", "tr": "Dil seçin:", "ur": "زبان منتخب کریں:", "id": "Pilih bahasa:",
+        "uz": "🌐 Tilni tanlang · اختر اللغة · Выберите язык · Choose language",
     },
     "cb_earned": {
         "uz": "\U0001F381 Sizga {amt} keshbek yozildi!\n\U0001F4B3 Keshbek hisobingiz: {bal}\n\nKeyingi buyurtmada ishlatishingiz mumkin \u2014 savatda \u00abKeshbekdan foydalanish\u00bb ni belgilang.",
@@ -1788,7 +1796,7 @@ def cmd_start(message):
     lang = get_user_lang(message.from_user.id, getattr(message.from_user, "language_code", None))
     st = shop_status()
     if st["open"] or is_owner(message.chat.id):
-        welcome = t("welcome", lang, biz=BUSINESS_NAME)
+        welcome = t("welcome", lang, biz=BUSINESS_NAME) + lang_hint(lang)
         if not st["open"]:
             welcome = closed_message(lang, st) + "\n\n— — —\n(Siz adminsiz, shuning uchun buyurtma bera olasiz.)"
     else:
