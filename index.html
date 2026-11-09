@@ -881,13 +881,9 @@ function detectLang(){
     const saved = localStorage.getItem('miqot_lang');
     if (saved && I18N[saved]) return saved;
   }catch(e){}
-  let code = '';
-  try{ code = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) || ''; }catch(e){}
-  if (!code){ try{ code = (navigator.language || '').toLowerCase(); }catch(e){} }
-  code = String(code).toLowerCase().split('-')[0];
-  const map = { uz:'uz', ar:'ar', en:'en', ru:'ru', tr:'tr', ur:'ur', id:'id', ms:'id',
-                az:'tr', kk:'ru', ky:'ru', tg:'ru', tk:'ru', hi:'ur', pa:'ur', fa:'ar' };
-  return map[code] || 'en';
+  // Telefon tiliga qaramaymiz: mijozlarimizning ko'pchiligi telefonini ingliz
+  // yoki rus tilida ishlatadi, lekin o'sha tillarni bilmaydi. Tilni o'zi tanlasin.
+  return 'uz';
 }
 
 function applyLang(code, redraw){
