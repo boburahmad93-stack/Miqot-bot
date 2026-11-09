@@ -93,6 +93,43 @@
   .cb-chip .hint{font-size:10.5px;color:var(--dim);font-weight:600;text-align:end;flex:none;max-width:40%;}
   .cb-chip.empty .vl{font-size:12.5px;color:var(--fg);font-weight:600;}
 
+  /* ---------- mijoz hisobi: qarz va avans ---------- */
+  .acct-chip{
+    position:relative;z-index:1;margin-top:9px;
+    display:flex;align-items:center;gap:9px;
+    padding:9px 12px;border-radius:13px;cursor:pointer;
+    background:linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06));
+    border:1px solid rgba(239,68,68,0.38);
+  }
+  .acct-chip.adv{
+    background:linear-gradient(135deg, rgba(34,197,94,0.18), rgba(34,197,94,0.06));
+    border-color:rgba(34,197,94,0.38);
+  }
+  .acct-chip .ic{font-size:17px;line-height:1;flex:none;}
+  .acct-chip .tx{min-width:0;flex:1;}
+  .acct-chip .lb{font-size:10.5px;color:var(--dim);font-weight:600;letter-spacing:0.2px;}
+  .acct-chip .vl{font-size:15px;font-weight:700;line-height:1.25;color:#ff8d8d;}
+  .acct-chip.adv .vl{color:#6ee7a0;}
+  .acct-chip .go{font-size:18px;color:var(--dim);flex:none;line-height:1;}
+
+  .acct-sum{
+    margin:2px 0 12px;padding:12px;border-radius:13px;
+    background:rgba(255,255,255,0.04);border:1px solid var(--line);
+  }
+  .acct-sum .big{font-size:24px;font-weight:800;color:#ff8d8d;}
+  .acct-sum.adv .big{color:#6ee7a0;}
+  .acct-sum .sub{font-size:12.5px;color:var(--dim);margin-top:5px;line-height:1.5;}
+  .acct-hist{margin-top:4px;}
+  .acct-hist h3{font-size:12px;color:var(--dim);font-weight:700;margin:0 0 7px;letter-spacing:0.3px;}
+  .acct-row{
+    display:flex;align-items:baseline;gap:9px;
+    padding:9px 0;border-top:1px solid var(--line);font-size:13px;
+  }
+  .acct-row .dt{color:var(--dim);font-size:11.5px;flex:none;width:44px;}
+  .acct-row .nt{flex:1;min-width:0;color:var(--fg);opacity:0.88;}
+  .acct-row .dl{font-weight:700;flex:none;color:#ff8d8d;}
+  .acct-row .dl.plus{color:#6ee7a0;}
+
   .cb-box{
     margin-top:14px;padding:12px;border-radius:13px;
     background:rgba(227,179,74,0.08);border:1px solid rgba(227,179,74,0.28);
@@ -421,6 +458,14 @@
     </span>
     <span class="hint" id="cb-hint"></span>
   </div>
+  <div class="acct-chip" id="acct-chip" hidden>
+    <span class="ic" id="acct-ic">📒</span>
+    <span class="tx">
+      <span class="lb" id="acct-label">Qarzingiz</span>
+      <span class="vl" id="acct-value">0 SAR</span>
+    </span>
+    <span class="go">›</span>
+  </div>
 </div>
 
 <div class="sticky-bar" id="sticky-bar">
@@ -451,6 +496,7 @@
   <div class="cart-total-row"><span id="t-total">Jami</span><span id="cart-total-amt">0 SAR</span></div>
   <div class="min-warn" id="min-warn" hidden></div>
   <div class="cb-line" id="cb-line" hidden><span id="t-cbApplied">Keshbek</span><span id="cb-line-amt">0 SAR</span></div>
+  <div class="cb-line" id="adv-line" hidden><span id="t-advApplied">Avansdan</span><span id="adv-line-amt">0 SAR</span></div>
   <div class="cb-pay" id="cb-pay" hidden><span id="t-cbPay">To'lanadi</span><span id="cb-pay-amt">0 SAR</span></div>
   <div class="cb-box" id="cb-box" hidden>
     <label class="cb-toggle">
@@ -485,6 +531,19 @@
   <div class="loc-status" id="t-payNote">To'lov: naqd — kuryer yetkazib berganda olinadi.</div>
   <div class="cb-line" id="cb-checkout-note" hidden></div>
   <button class="primary-btn" id="submit-order-btn">Buyurtmani tasdiqlash</button>
+</div>
+
+<!-- MENING HISOBIM -->
+<div class="sheet-overlay" id="acct-overlay"></div>
+<div class="sheet" id="acct-sheet">
+  <div class="sheet-handle"></div>
+  <h2 id="t-acctTitle">Mening hisobim</h2>
+  <div class="acct-sum" id="acct-sum">
+    <div class="big" id="acct-big">0 SAR</div>
+    <div class="sub" id="acct-note"></div>
+  </div>
+  <div class="acct-hist" id="acct-hist"></div>
+  <button class="ghost-btn" id="close-acct-btn">Yopish</button>
 </div>
 
 <!-- TIL TANLASH -->
@@ -522,6 +581,14 @@ const LANGS = [
 const I18N = {
   uz:{
     cbLabel:"Keshbegingiz", cbUse:"Keshbekdan foydalanish", cbApplied:"Keshbek", cbPay:"To'lanadi",
+    acctTitle:"Mening hisobim", acctDebtLabel:"Qarzingiz", acctAdvLabel:"Oldindan to'langan",
+    acctDebtNote:"Keyingi buyurtmada yoki naqd to'lab yuborishingiz mumkin.",
+    acctAdvNote:"Buyurtmalaringiz shu summadan yechib boriladi.",
+    acctZeroNote:"Qarz ham, avans ham yo'q.",
+    acctHistTitle:"Oxirgi harakatlar", acctNoHist:"Hozircha harakat yo'q.", acctClose:"Yopish",
+    advApplied:"Avansdan", advPay:"Naqd beriladi", advPaidAll:"Hammasi to'langan",
+    histForOrder:"Buyurtma uchun", histCharge:"Hisobdan yechildi",
+    histReturned:"Qaytarildi", histPayment:"To'lov qabul qilindi",
     cbAvail:(a)=>`Mavjud: ${a}`, cbEarnHint:(p)=>`Har buyurtmadan ${p}%`,
     cbStart:(p)=>`Har yetkazilgan buyurtmadan ${p}% keshbek yig'iladi`,
     cbNote:(a,p)=>`Keshbek: −${a} • To'lanadi: ${p}`,
@@ -566,6 +633,14 @@ const I18N = {
   },
   ar:{
     cbLabel:"رصيدك", cbUse:"استخدام الكاش باك", cbApplied:"كاش باك", cbPay:"المطلوب",
+    acctTitle:"حسابي", acctDebtLabel:"المبلغ المستحق", acctAdvLabel:"رصيد مدفوع مقدماً",
+    acctDebtNote:"يمكنك السداد نقداً أو مع الطلب القادم.",
+    acctAdvNote:"سيتم خصم طلباتك من هذا الرصيد.",
+    acctZeroNote:"لا دين ولا رصيد.",
+    acctHistTitle:"أحدث الحركات", acctNoHist:"لا توجد حركات بعد.", acctClose:"إغلاق",
+    advApplied:"من الرصيد", advPay:"المطلوب نقداً", advPaidAll:"تم الدفع بالكامل",
+    histForOrder:"مقابل طلب", histCharge:"خصم من الحساب",
+    histReturned:"إرجاع", histPayment:"تم استلام الدفعة",
     cbAvail:(a)=>`المتاح: ${a}`, cbEarnHint:(p)=>`${p}% من كل طلب`,
     cbStart:(p)=>`تحصل على ${p}% من كل طلب يتم توصيله`,
     cbNote:(a,p)=>`كاش باك: −${a} • المطلوب: ${p}`,
@@ -610,6 +685,14 @@ const I18N = {
   },
   en:{
     cbLabel:"Your cashback", cbUse:"Use cashback", cbApplied:"Cashback", cbPay:"To pay",
+    acctTitle:"My account", acctDebtLabel:"You owe", acctAdvLabel:"Prepaid balance",
+    acctDebtNote:"You can pay in cash or with your next order.",
+    acctAdvNote:"Your orders are deducted from this balance.",
+    acctZeroNote:"No debt, no prepaid balance.",
+    acctHistTitle:"Recent activity", acctNoHist:"No activity yet.", acctClose:"Close",
+    advApplied:"From prepaid", advPay:"Cash to pay", advPaidAll:"Fully paid",
+    histForOrder:"For an order", histCharge:"Charged to account",
+    histReturned:"Returned", histPayment:"Payment received",
     cbAvail:(a)=>`Available: ${a}`, cbEarnHint:(p)=>`${p}% on every order`,
     cbStart:(p)=>`You earn ${p}% on every delivered order`,
     cbNote:(a,p)=>`Cashback: −${a} • To pay: ${p}`,
@@ -654,6 +737,14 @@ const I18N = {
   },
   ru:{
     cbLabel:"Ваш кешбэк", cbUse:"Использовать кешбэк", cbApplied:"Кешбэк", cbPay:"К оплате",
+    acctTitle:"Мой счёт", acctDebtLabel:"Ваш долг", acctAdvLabel:"Предоплата",
+    acctDebtNote:"Можно оплатить наличными или со следующим заказом.",
+    acctAdvNote:"Заказы списываются с этой суммы.",
+    acctZeroNote:"Ни долга, ни предоплаты.",
+    acctHistTitle:"Последние операции", acctNoHist:"Операций пока нет.", acctClose:"Закрыть",
+    advApplied:"Из предоплаты", advPay:"Наличными", advPaidAll:"Оплачено полностью",
+    histForOrder:"За заказ", histCharge:"Списано со счёта",
+    histReturned:"Возврат", histPayment:"Оплата получена",
     cbAvail:(a)=>`Доступно: ${a}`, cbEarnHint:(p)=>`${p}% с каждого заказа`,
     cbStart:(p)=>`С каждого доставленного заказа начисляется ${p}%`,
     cbNote:(a,p)=>`Кешбэк: −${a} • К оплате: ${p}`,
@@ -698,6 +789,14 @@ const I18N = {
   },
   tr:{
     cbLabel:"Nakit iadeniz", cbUse:"Nakit iadeyi kullan", cbApplied:"Nakit iade", cbPay:"Ödenecek",
+    acctTitle:"Hesabım", acctDebtLabel:"Borcunuz", acctAdvLabel:"Ön ödeme",
+    acctDebtNote:"Nakit veya sonraki siparişinizle ödeyebilirsiniz.",
+    acctAdvNote:"Siparişleriniz bu bakiyeden düşülür.",
+    acctZeroNote:"Borç ya da ön ödeme yok.",
+    acctHistTitle:"Son hareketler", acctNoHist:"Henüz hareket yok.", acctClose:"Kapat",
+    advApplied:"Ön ödemeden", advPay:"Nakit ödenecek", advPaidAll:"Tamamen ödendi",
+    histForOrder:"Sipariş için", histCharge:"Hesaptan düşüldü",
+    histReturned:"İade", histPayment:"Ödeme alındı",
     cbAvail:(a)=>`Mevcut: ${a}`, cbEarnHint:(p)=>`Her siparişte %${p}`,
     cbStart:(p)=>`Teslim edilen her siparişten %${p} kazanırsınız`,
     cbNote:(a,p)=>`Nakit iade: −${a} • Ödenecek: ${p}`,
@@ -742,6 +841,14 @@ const I18N = {
   },
   ur:{
     cbLabel:"آپ کا کیش بیک", cbUse:"کیش بیک استعمال کریں", cbApplied:"کیش بیک", cbPay:"قابل ادا",
+    acctTitle:"میرا اکاؤنٹ", acctDebtLabel:"واجب الادا", acctAdvLabel:"پیشگی رقم",
+    acctDebtNote:"آپ نقد یا اگلے آرڈر کے ساتھ ادا کر سکتے ہیں۔",
+    acctAdvNote:"آپ کے آرڈر اسی رقم سے کاٹے جائیں گے۔",
+    acctZeroNote:"کوئی قرض یا پیشگی رقم نہیں۔",
+    acctHistTitle:"حالیہ حرکات", acctNoHist:"ابھی کوئی حرکت نہیں۔", acctClose:"بند کریں",
+    advApplied:"پیشگی سے", advPay:"نقد ادائگی", advPaidAll:"مکمل ادائگی",
+    histForOrder:"آرڈر کے لیے", histCharge:"اکاؤنٹ سے کٹوتی",
+    histReturned:"واپس", histPayment:"ادائگی موصول",
     cbAvail:(a)=>`دستیاب: ${a}`, cbEarnHint:(p)=>`ہر آرڈر پر ${p}%`,
     cbStart:(p)=>`ہر ڈلیور آرڈر پر ${p}% ملتا ہے`,
     cbNote:(a,p)=>`کیش بیک: −${a} • قابل ادا: ${p}`,
@@ -786,6 +893,14 @@ const I18N = {
   },
   id:{
     cbLabel:"Cashback Anda", cbUse:"Pakai cashback", cbApplied:"Cashback", cbPay:"Dibayar",
+    acctTitle:"Akun saya", acctDebtLabel:"Utang Anda", acctAdvLabel:"Saldo prabayar",
+    acctDebtNote:"Bisa dibayar tunai atau bersama pesanan berikutnya.",
+    acctAdvNote:"Pesanan Anda dipotong dari saldo ini.",
+    acctZeroNote:"Tidak ada utang atau saldo.",
+    acctHistTitle:"Aktivitas terakhir", acctNoHist:"Belum ada aktivitas.", acctClose:"Tutup",
+    advApplied:"Dari prabayar", advPay:"Bayar tunai", advPaidAll:"Sudah dibayar penuh",
+    histForOrder:"Untuk pesanan", histCharge:"Dibebankan ke akun",
+    histReturned:"Dikembalikan", histPayment:"Pembayaran diterima",
     cbAvail:(a)=>`Tersedia: ${a}`, cbEarnHint:(p)=>`${p}% tiap pesanan`,
     cbStart:(p)=>`Anda mendapat ${p}% dari setiap pesanan yang terkirim`,
     cbNote:(a,p)=>`Cashback: −${a} • Dibayar: ${p}`,
@@ -925,6 +1040,7 @@ function applyLang(code, redraw){
   renderLangList();
   renderCashbackChip();
   renderCashbackRows();
+  renderAcctChip();
   if (redraw){ renderChips(); renderMenu(); updateCartBar(); }
   saveLangToServer();
 }
@@ -964,6 +1080,8 @@ function saveLangToServer(){
 /* ---------- keshbek ---------- */
 let cbInfo = { active:false, percent:0, balance:0 };
 let useCashback = false;
+/* mijoz hisobi: manfiy = qarz, musbat = avans */
+let acctInfo = { balance:0, history:[] };
 
 async function loadCashback(){
   const hasInit = !!(tg && tg.initData);
@@ -976,10 +1094,82 @@ async function loadCashback(){
     const d = await res.json();
     cbInfo = { active: !!d.active, percent: Number(d.percent) || 0,
                balance: Number(d.balance) || 0 };
+    const a = d.account || {};
+    acctInfo = { balance: Number(a.balance) || 0,
+                 history: Array.isArray(a.history) ? a.history : [] };
   }catch(e){ /* keshbek ko'rinmasa ham ilova ishlaydi */ }
   if (cbInfo.balance <= 0) useCashback = false;
   renderCashbackChip();
   renderCashbackRows();
+  renderAcctChip();
+}
+
+/* ---------- mijoz hisobi: qarz va avans ---------- */
+
+/* Avansdan shu savatga qancha yechiladi — keshbekdan keyin qolgan summadan */
+function advUsable(){
+  if (acctInfo.balance <= 0) return 0;
+  const qoldiq = Math.max(0, cartTotal() - cbApplied());
+  return Math.min(acctInfo.balance, qoldiq);
+}
+
+function renderAcctChip(){
+  const chip = $('acct-chip');
+  if (!chip) return;
+  const t = T();
+  const bal = acctInfo.balance;
+  if (!bal){ chip.hidden = true; return; }
+  chip.hidden = false;
+  const avans = bal > 0;
+  chip.classList.toggle('adv', avans);
+  $('acct-ic').textContent = avans ? '\uD83D\uDCB0' : '\uD83D\uDCD2';
+  $('acct-label').textContent = avans ? t.acctAdvLabel : t.acctDebtLabel;
+  $('acct-value').textContent = fmtSar(Math.abs(bal));
+}
+
+function histLabel(h){
+  const t = T();
+  const d = Number(h.delta) || 0;
+  if (d < 0) return h.order_id ? t.histForOrder : t.histCharge;
+  return h.order_id ? t.histReturned : t.histPayment;
+}
+
+function histDate(ts){
+  try{
+    const dt = new Date((Number(ts) || 0) * 1000);
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    return dd + '.' + mm;
+  }catch(e){ return ''; }
+}
+
+function renderAcctSheet(){
+  const t = T();
+  const bal = acctInfo.balance;
+  const avans = bal > 0;
+  $('t-acctTitle').textContent = t.acctTitle;
+  const sum = $('acct-sum');
+  sum.classList.toggle('adv', avans);
+  $('acct-big').textContent = (bal ? (avans ? '+' : '\u2212') : '') + fmtSar(Math.abs(bal));
+  $('acct-note').textContent = !bal ? t.acctZeroNote : (avans ? t.acctAdvNote : t.acctDebtNote);
+  $('close-acct-btn').textContent = t.acctClose;
+  const box = $('acct-hist');
+  if (!acctInfo.history.length){
+    box.innerHTML = '<h3>' + esc(t.acctHistTitle) + '</h3>'
+      + '<div class="loc-status">' + esc(t.acctNoHist) + '</div>';
+    return;
+  }
+  let html = '<h3>' + esc(t.acctHistTitle) + '</h3>';
+  acctInfo.history.forEach(function(h){
+    const d = Number(h.delta) || 0;
+    html += '<div class="acct-row">'
+         +  '<span class="dt">' + esc(histDate(h.ts)) + '</span>'
+         +  '<span class="nt">' + esc(histLabel(h)) + '</span>'
+         +  '<span class="dl' + (d > 0 ? ' plus' : '') + '">'
+         +  (d > 0 ? '+' : '\u2212') + esc(fmtSar(Math.abs(d))) + '</span>'
+         +  '</div>';
+  });
+  box.innerHTML = html;
 }
 
 function renderCashbackChip(){
@@ -1017,22 +1207,35 @@ function renderCashbackRows(){
     if (chk) chk.checked = useCashback;
   }
   const applied = cbApplied();
-  const lineEl = $('cb-line'), payEl = $('cb-pay');
+  const adv = advUsable();
+  const naqd = Math.max(0, cartTotal() - applied - adv);
+  const lineEl = $('cb-line'), payEl = $('cb-pay'), advEl = $('adv-line');
   if (lineEl){
     lineEl.hidden = applied <= 0;
     $('t-cbApplied').textContent = t.cbApplied;
     $('cb-line-amt').textContent = '−' + fmtSar(applied);
   }
+  if (advEl){
+    advEl.hidden = adv <= 0;
+    $('t-advApplied').textContent = t.advApplied;
+    $('adv-line-amt').textContent = '−' + fmtSar(adv);
+  }
   if (payEl){
-    payEl.hidden = applied <= 0;
-    $('t-cbPay').textContent = t.cbPay;
-    $('cb-pay-amt').textContent = fmtSar(Math.max(0, cartTotal() - applied));
+    payEl.hidden = (applied <= 0 && adv <= 0);
+    $('t-cbPay').textContent = naqd > 0 ? (adv > 0 ? t.advPay : t.cbPay) : t.advPaidAll;
+    $('cb-pay-amt').textContent = fmtSar(naqd);
   }
   const note = $('cb-checkout-note');
   if (note){
-    note.hidden = applied <= 0;
-    note.textContent = applied > 0
-      ? t.cbNote(fmtSar(applied), fmtSar(Math.max(0, cartTotal() - applied))) : '';
+    note.hidden = (applied <= 0 && adv <= 0);
+    if (applied > 0 && adv <= 0){
+      note.textContent = t.cbNote(fmtSar(applied), fmtSar(naqd));
+    } else if (adv > 0){
+      note.textContent = t.advApplied + ' −' + fmtSar(adv) + '. '
+        + (naqd > 0 ? t.advPay + ': ' + fmtSar(naqd) : t.advPaidAll + '.');
+    } else {
+      note.textContent = '';
+    }
   }
 }
 
@@ -1409,6 +1612,9 @@ $('cart-overlay').addEventListener('click', ()=>closeSheet('cart'));
 $('lang-btn').addEventListener('click', ()=>{ haptic('light'); renderLangList(); openSheet('lang'); });
 $('lang-overlay').addEventListener('click', ()=>closeSheet('lang'));
 $('close-cart-btn').addEventListener('click', ()=>closeSheet('cart'));
+$('acct-chip').addEventListener('click', ()=>{ haptic('light'); renderAcctSheet(); openSheet('acct'); });
+$('acct-overlay').addEventListener('click', ()=>closeSheet('acct'));
+$('close-acct-btn').addEventListener('click', ()=>closeSheet('acct'));
 document.addEventListener('change', (e)=>{
   if (e.target && e.target.id === 'use-cb'){
     useCashback = e.target.checked;
@@ -1576,7 +1782,9 @@ $('submit-order-btn').addEventListener('click', async ()=>{
     cart = {};
     useCashback = false;
     if (typeof data.cashback_balance === 'number') cbInfo.balance = data.cashback_balance;
+    if (typeof data.account_balance === 'number') acctInfo.balance = data.account_balance;
     renderCashbackChip();
+    renderAcctChip();
     updateCartBar();
     renderMenu();
     closeSheet('checkout');
