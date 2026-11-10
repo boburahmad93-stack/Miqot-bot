@@ -8678,6 +8678,9 @@ def ig_detect_host():
 IG_MIN_ORDER = float(os.environ.get("IG_MIN_ORDER", "30"))
 IG_COMMENT_ALL = os.environ.get("IG_COMMENT_ALL", "0") == "1"
 IG_TG_BOT_URL = os.environ.get("IG_TG_BOT_URL", "https://t.me/miqotfoodbuyurtmabot")
+# Mini App'ning to'g'ridan-to'g'ri havolasi — bosilsa darrov menyu ochiladi
+IG_TG_MENU_URL = os.environ.get(
+    "IG_TG_MENU_URL", IG_TG_BOT_URL.rstrip("/") + "/menyu")
 
 IG_SESSIONS_FILE = os.path.join(DATA_DIR, "ig_sessions.json")
 IG_LOCK = threading.RLock()
@@ -9120,6 +9123,52 @@ def ig_handle_messaging(ev):
     # oddiy savol/shikoyat — adminga
     ig_forward_to_admins(sender, text)
 
+def ig_comment_buttons(igsid):
+    """Izohga javoban ketadigan tugmalar. Birinchisi — bir bosishda menyu."""
+    tugma = []
+    if WEBAPP_URL and igsid:
+        tugma.append({"type": "web_url", "url": ig_menu_url(igsid),
+                      "title": "\U0001F6CD Menyuni ochish"})
+    if IG_TG_MENU_URL:
+        tugma.append({"type": "web_url", "url": IG_TG_MENU_URL,
+                      "title": "\u2708\uFE0F Telegramda ochish"})
+    if not tugma and WEBAPP_URL:
+        tugma.append({"type": "web_url", "url": WEBAPP_URL,
+                      "title": "\U0001F6CD Menyuni ochish"})
+    return tugma[:3]
+
+def ig_comment_private_reply(cid, igsid):
+    """Izoh qoldirgan odamga Direct'ga tugmali menyu yuboradi.
+    Karta ketmasa — havolali oddiy matn bilan urinadi (baribir bitta xabar)."""
+    tugma = ig_comment_buttons(igsid)
+    if tugma:
+        el = {
+            "title": f"{BUSINESS_NAME} — menyu \U0001F37D",
+            "subtitle": "Yetkazib berish BEPUL \U0001F69A",
+            "buttons": tugma,
+        }
+        if WEBAPP_URL and os.path.exists(LOGO_PATH):
+            el["image_url"] = f"{WEBAPP_URL}/static/logo.jpg"
+        res = ig_api_post("me/messages", {
+            "recipient": {"comment_id": cid},
+            "message": {"attachment": {"type": "template", "payload": {
+                "template_type": "generic", "elements": [el]}}},
+        })
+        if res is not None:
+            return res
+        print("[IG] izohga tugmali karta ketmadi — matn bilan urinamiz")
+
+    havola = (ig_menu_url(igsid) if (WEBAPP_URL and igsid)
+              else (IG_TG_MENU_URL or WEBAPP_URL or ""))
+    matn = f"Assalomu alaykum! {BUSINESS_NAME} menyusi \U0001F37D"
+    if havola:
+        matn += f"\n{havola}"
+    matn += "\nYetkazib berish BEPUL \U0001F69A"
+    return ig_api_post("me/messages", {
+        "recipient": {"comment_id": cid},
+        "message": {"text": matn},
+    })
+
 def ig_handle_comment(val):
     frm = val.get("from") or {}
     if not frm.get("id") or str(frm.get("id")) == IG_USER_ID:
@@ -9130,16 +9179,16 @@ def ig_handle_comment(val):
     cid = val.get("id")
     if not cid:
         return
-    # 1) Direct'ga shaxsiy javob (har izohga bir marta ruxsat)
-    res = ig_api_post("me/messages", {
-        "recipient": {"comment_id": cid},
-        "message": {"text": f"Assalomu alaykum! {BUSINESS_NAME} menyusi 🍽\n"
-                            "Shu yerga «menyu» deb yozing — taomlarni ko'rsatib, "
-                            "buyurtmani shu yerning o'zida qabul qilamiz. Yetkazib berish BEPUL 🚚"},
-    })
-    # 2) izohning o'ziga ochiq javob
+    igsid = str(frm.get("id") or "")
+
+    #  Direct'ga shaxsiy javob — har izohga faqat BIR marta ruxsat beriladi,
+    #  shuning uchun o'sha bitta xabarning o'zida menyu tugmasi ketadi.
+    #  Mijozga "yana menyu deb yozing" demaymiz: bosdi — menyu ochildi.
+    res = ig_comment_private_reply(cid, igsid)
+
+    #  izohning o'ziga ochiq javob
     if res is not None:
-        ig_api_post(f"{cid}/replies", {"message": "Direct'ga yozdik 📩"})
+        ig_api_post(f"{cid}/replies", {"message": "Menyuni Direct'ga yubordik \U0001F4E9"})
 
 def ig_process(body):
     try:
