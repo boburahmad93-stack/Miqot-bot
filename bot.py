@@ -2732,90 +2732,175 @@ def _center(text, w):
     rows = _wrap(text, w)
     return [r.center(w).rstrip() for r in rows]
 
-def build_receipt_lines(order, width=None, safe=True, header=True):
-    """Termoprinter uchun chek matni — oddiy qatorlar ro'yxati.
-    header=False — tepaga logo rasmi chiqadi, nom yozuvi kerak emas."""
+# Chekning pastki yozuvi — printerning o'z shrifti chiroyli emas, shuning uchun
+# uni logo kabi rasm qilib yuboramiz. 1152 nuqta eni: 80 mm uchun ikki barobar
+# zaxira, 58 mm qog'ozga kichraytirilganda ham harflar toza chiqadi.
+RECEIPT_FOOT_TEXT = "Ibodatga quvvat bo'lsin"
+RECEIPT_FOOT_PNG = (
+    "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"
+)
+
+@app.route("/static/chek_pastki.png")
+def chek_pastki_png():
+    """Chek pastidagi yozuvning rasmi (oshxona sahifasi shuni printerga yuboradi)."""
+    import base64
+    data = base64.b64decode(RECEIPT_FOOT_PNG)
+    resp = app.response_class(data, mimetype="image/png")
+    resp.headers["Cache-Control"] = "public, max-age=604800"
+    return resp
+
+
+RECEIPT_INDENT = int(os.environ.get("RECEIPT_INDENT", "2"))   # yozuvlarni ichkariga surish
+
+def _blk(text, style="n"):
+    return {"t": text, "s": style}
+
+def _fits_big(text, w):
+    """Ikki barobar kattalikda qator qog'ozga sig'adimi (ustunlar yarmiga tushadi)."""
+    return len(text) <= max(8, w // 2)
+
+def build_receipt_blocks(order, width=None, safe=True, header=True):
+    """Chek — har qatori o'z uslubi bilan.
+    Uslublar: n oddiy, b qalin, d ikki barobar, db ikki barobar qalin,
+    hr ajratuvchi chiziq, foot pastki yozuv (rasm bo'lib chiqadi)."""
     w = width or RECEIPT_WIDTH
-    L = []
+    ind = " " * max(0, RECEIPT_INDENT)
+    tw = max(8, w - len(ind))          # surilgan matn uchun qolgan kenglik
+    B = []
+
+    def add(rows, style="n"):
+        for r in rows:
+            B.append(_blk(ind + r if r else "", style))
+
     if header:
-        L.extend(_wrap(BUSINESS_NAME.upper(), w))
-    L.append("-" * w)
+        add(_wrap(BUSINESS_NAME.upper(), tw))
+    B.append(_blk("-" * w, "hr"))
     created = datetime.fromtimestamp(order.get("created_at", int(time.time())), TIMEZONE)
-    L.append(f"Buyurtma #{order.get('daily_number', '?')}")
-    L.extend(_labeled("Sana: ", created.strftime("%d.%m.%Y %H:%M"), w))
-    L.append("")
-    L.extend(_labeled("Mijoz: ", order.get("customer_name") or "-", w))
+    add([f"Buyurtma #{order.get('daily_number', '?')}"])
+    add(_labeled("Sana: ", created.strftime("%d.%m.%Y %H:%M"), tw))
+    B.append(_blk("", "n"))
+    add(_labeled("Mijoz: ", order.get("customer_name") or "-", tw))
     tel = (order.get("phone") or "").strip()
     if tel:
-        L.extend(_labeled("Tel: ", tel, w))
+        add(_labeled("Tel: ", tel, tw))
     else:
-        L.extend(_labeled("Tel: ", "yo'q (Telegram orqali)" if w >= 28 else "yo'q, Telegram", w))
+        add(_labeled("Tel: ", "yo'q (Telegram orqali)" if tw >= 28 else "yo'q, Telegram", tw))
     if order.get("username"):
-        L.extend(_labeled("TG: ", "@" + str(order["username"]), w))
+        add(_labeled("TG: ", "@" + str(order["username"]), tw))
     if order.get("latitude") is not None:
-        L.extend(_labeled("Manzil: ", "xaritada yuborilgan" if w >= 28 else "xaritada", w))
-        L.extend(_labeled("  ", f"{order['latitude']:.5f}, {order['longitude']:.5f}", w))
+        add(_labeled("Manzil: ", "xaritada yuborilgan" if tw >= 28 else "xaritada", tw))
+        add(_labeled("  ", f"{order['latitude']:.5f}, {order['longitude']:.5f}", tw))
     else:
-        L.extend(_labeled("Manzil: ", order.get("address_text") or "-", w))
-    L.append("-" * w)
+        add(_labeled("Manzil: ", order.get("address_text") or "-", tw))
+    B.append(_blk("-" * w, "hr"))
 
     for it in order.get("items", []):
         if it.get("cancelled"):
             continue
-        L.extend(_wrap(it["name"], w))
-        # narx qatorning chap tomonida — o'ng chet kesilsa ham ko'rinadi
+        add(_wrap(it["name"], tw), "b")           # taom nomi qalin
         qty_line = f"{fmt_qty(it)} x {fmt_sum(it['price'])} = {fmt_sum(it['price'] * it['qty'])}"
-        L.extend(_labeled("  ", qty_line, w))
+        add(_labeled("  ", qty_line, tw))
 
-    L.append("-" * w)
+    B.append(_blk("-" * w, "hr"))
     pct = order.get("discount_percent") or 0
     old = order.get("original_total")
     if pct and old and old > order.get("total", 0):
-        L.extend(_labeled("Oldingi: " if w < 26 else "Oldingi summa: ", f"{old:.0f}", w))
-        L.extend(_labeled(f"Aksiya -{pct}%: ", f"-{old - order['total']:.0f}", w))
-    L.extend(_labeled("JAMI: ", fmt_sum(order.get("total", 0)), w))
+        add(_labeled("Oldingi: " if tw < 26 else "Oldingi summa: ", f"{old:.0f}", tw))
+        add(_labeled(f"Aksiya -{pct}%: ", f"-{old - order['total']:.0f}", tw))
     used_cb = order_cashback_used(order)
     used_adv = order_advance_used(order)
     if used_cb > 0:
-        L.extend(_labeled("Keshbek: ", "-" + fmt_sum(used_cb), w))
+        add(_labeled("Keshbek: ", "-" + fmt_sum(used_cb), tw))
     if used_adv > 0:
-        L.extend(_labeled("Avansdan: ", "-" + fmt_sum(used_adv), w))
-    if used_cb > 0 or used_adv > 0:
-        L.extend(_labeled("TO'LOVGA: ", fmt_sum(order_cash_due(order)), w))
-    L.append("")
-    # katta yozuvda ustunlar soni yarmiga tushadi — qator sig'ishi kerak
-    if order_on_account(order):
-        pay = "To'lov: HISOBGA (naqd emas)" if w >= 28 else "To'lov: HISOBGA"
-    elif order_cash_due(order) <= 0:
-        pay = "To'lov: TO'LANGAN (naqd emas)" if w >= 28 else "To'lov: TO'LANGAN"
-    elif used_adv > 0 and used_cb > 0:
-        pay = "To'lov: NAQD + KESHBEK + AVANS" if w >= 32 else "NAQD+KESHBEK+AVANS"
-    elif used_adv > 0:
-        pay = "To'lov: NAQD + AVANS" if w >= 24 else "NAQD + AVANS"
-    elif used_cb > 0:
-        pay = "To'lov: NAQD + KESHBEK" if w >= 24 else "NAQD + KESHBEK"
-    else:
-        pay = "To'lov: NAQD (yetkazishda)" if w >= 28 else "To'lov: NAQD"
-    L.extend(_wrap(pay, w))
+        add(_labeled("Avansdan: ", "-" + fmt_sum(used_adv), tw))
 
-    # Kuryer bilsin: mijozning eski qarzi yoki avansi bormi
+    # Summalar — katta harfda. Sig'masa oddiy o'lchamga tushamiz.
+    B.append(_blk("", "n"))
+    jami = " " + f"JAMI: {fmt_sum(order.get('total', 0))}"
+    if _fits_big(jami, w):
+        B.append(_blk(jami, "d"))
+    else:
+        add([jami.strip()], "b")
+    if used_cb > 0 or used_adv > 0:
+        naqd = " " + f"TO'LOVGA: {fmt_sum(order_cash_due(order))}"
+        if _fits_big(naqd, w):
+            B.append(_blk(naqd, "db"))
+        else:
+            add([naqd.strip()], "b")
+    B.append(_blk("", "n"))
+
+    if order_on_account(order):
+        pay = "To'lov: HISOBGA (naqd emas)" if tw >= 28 else "To'lov: HISOBGA"
+    elif order_cash_due(order) <= 0:
+        pay = "To'lov: TO'LANGAN (naqd emas)" if tw >= 28 else "To'lov: TO'LANGAN"
+    elif used_adv > 0 and used_cb > 0:
+        pay = "To'lov: NAQD + KESHBEK + AVANS" if tw >= 32 else "NAQD+KESHBEK+AVANS"
+    elif used_adv > 0:
+        pay = "To'lov: NAQD + AVANS" if tw >= 24 else "NAQD + AVANS"
+    elif used_cb > 0:
+        pay = "To'lov: NAQD + KESHBEK" if tw >= 24 else "NAQD + KESHBEK"
+    else:
+        pay = "To'lov: NAQD (yetkazishda)" if tw >= 28 else "To'lov: NAQD"
+    add(_wrap(pay, tw))
+
     try:
         bal = account_balance(order.get("user_id"))
     except Exception:
         bal = 0
     if bal:
-        yorliq = "Qarzi: " if bal < 0 else "Avansi: "
-        L.extend(_labeled(yorliq, fmt_sum(abs(bal)), w))
+        add(_labeled("Qarzi: " if bal < 0 else "Avansi: ", fmt_sum(abs(bal)), tw))
 
     if order.get("note"):
-        L.append("-" * w)
-        L.append("IZOH:")
-        for ln in _wrap(order["note"], w - 2):
-            L.append("  " + ln)
+        B.append(_blk("-" * w, "hr"))
+        add(["IZOH:"], "b")
+        for ln in _wrap(order["note"], max(4, tw - 2)):
+            add(["  " + ln])
 
-    L.append("-" * w)
-    L.extend(_wrap("Ibodatga quvvat bo'lsin", w))
-    return [ascii_safe(x) for x in L] if safe else L
+    B.append(_blk("-" * w, "hr"))
+    B.append(_blk("", "n"))
+    B.append(_blk(RECEIPT_FOOT_TEXT, "foot"))
+
+    if safe:
+        for b in B:
+            b["t"] = ascii_safe(b["t"])
+    return B
+
+
+def build_receipt_lines(order, width=None, safe=True, header=True):
+    """Oddiy matn ko'rinishi — ko'rib turish, nusxalash va tizim chopi uchun."""
+    return [x["t"] for x in build_receipt_blocks(order, width, safe, header)]
 
 def build_receipt_text(order, width=None, safe=True, header=True):
     return "\n".join(build_receipt_lines(order, width, safe, header))
@@ -4835,9 +4920,19 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       display:block; margin:0 auto 3mm; width:72%; max-width:100%; height:auto;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
+    #printArea pre:empty{ height:1em; }   /* bo'sh qator ham joy egallasin */
     #printArea.sz-n pre{ font-size:12pt; line-height:1.12; font-weight:600; }
     #printArea.sz-h pre{ font-size:13pt; line-height:1.2; font-weight:600; }
     #printArea.sz-b pre{ font-size:17pt; line-height:1.18; font-weight:700; }
+    /* qator uslublari: taom nomi qalin, summa ikki barobar */
+    #printArea pre.bl-b{ font-weight:900; }
+    #printArea pre.bl-d, #printArea pre.bl-db{
+      font-size:2em; line-height:1.05; letter-spacing:-0.02em;
+    }
+    #printArea pre.bl-db{ font-weight:900; }
+    #printArea img.pfoot{
+      display:block; margin:1mm auto 0; width:97%; max-width:100%; height:auto;
+    }
     #printArea, #printArea pre, #printArea img{
       page-break-inside:avoid; break-inside:avoid;
     }
@@ -5144,10 +5239,20 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     });
   }
 
+  var footCache = {};             // pastki yozuv rasmi — kenglik bo'yicha
+
   async function buildLogo(width){
-    if (logoCache[width]) return logoCache[width];
-    var im = await loadImage(url('/static/logo.jpg'));
-    var maxH = 520;                                  // qog'oz behuda ketmasin
+    return buildRaster('/static/logo.jpg', width, 520, logoCache, true);
+  }
+
+  // Pastki yozuv printerning o'z shriftida emas, rasm bo'lib chiqadi.
+  async function buildFoot(width){
+    return buildRaster('/static/chek_pastki.png', width, 140, footCache, false);
+  }
+
+  async function buildRaster(src, width, maxH, cache, preview){
+    if (cache[width]) return cache[width];
+    var im = await loadImage(url(src));
     var w = width;
     var h = Math.round(im.height * (w / im.width));
     if (h > maxH){ h = maxH; w = Math.round(im.width * (h / im.height)); }
@@ -5291,10 +5396,12 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       bands.push(one);
     }
 
-    logoCache[width] = { bands: bands, url: cv.toDataURL('image/png') };
-    var pv = $('logoPrev');
-    if (pv){ pv.src = logoCache[width].url; pv.hidden = false; }
-    return logoCache[width];
+    cache[width] = { bands: bands, url: cv.toDataURL('image/png') };
+    if (preview){
+      var pv = $('logoPrev');
+      if (pv){ pv.src = cache[width].url; pv.hidden = false; }
+    }
+    return cache[width];
   }
 
   function joinBytes(parts){
@@ -5306,18 +5413,69 @@ KITCHEN_PAGE_HTML = """<!doctype html>
   }
 
   // Har bir bo'lak alohida yuboriladi, orasida printer nafas oladi.
-  function escpos(text, logo){
+
+  function baseSize(){
+    var s = fsize();
+    if (s === 'h') return 0x01;
+    if (s === 'b') return 0x11;
+    return 0x00;
+  }
+
+  // Qator uslubi: n oddiy, b qalin, d ikki barobar, db ikki barobar qalin
+  function styleBytes(st){
+    var size = (st === 'd' || st === 'db') ? 0x11 : baseSize();
+    var bold = (st === 'b' || st === 'db') ? 0x01 : 0x00;
+    return new Uint8Array([0x1d, 0x21, size, 0x1b, 0x45, bold]);
+  }
+
+  function centered(bands){
+    var out = [new Uint8Array([0x1b, 0x61, 0x01])];
+    for (var i = 0; i < bands.length; i++) out.push(bands[i]);
+    out.push(new Uint8Array([0x0a, 0x1b, 0x61, 0x00]));
+    return out;
+  }
+
+  // blocks — [{t:matn, s:uslub}]. Bir xil uslubdagi qatorlar bitta buyruqqa
+  // yig'iladi: har qator uchun alohida yuborish printerni sekinlashtiradi.
+  function escposBlocks(blocks, logo, foot){
     var enc = new TextEncoder();
     var segs = [new Uint8Array([0x1b,0x40, 0x1b,0x74,0x00])];   // reset + kodlash jadvali
     if (logo && logo.bands && logo.bands.length){
-      segs.push(new Uint8Array([0x1b,0x61,0x01]));              // o'rtaga
-      for (var i = 0; i < logo.bands.length; i++) segs.push(logo.bands[i]);
-      segs.push(new Uint8Array([0x0a, 0x1b,0x61,0x00]));        // chapga qaytaramiz
+      segs = segs.concat(centered(logo.bands));
     }
-    segs.push(sizeBytes());
-    segs.push(enc.encode(text + "\\n"));
-    segs.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00])); // bo'sh joy + kesish
+    var buf = [], cur = null;
+    function flush(){
+      if (!buf.length) return;
+      segs.push(styleBytes(cur));
+      segs.push(enc.encode(buf.join("\\n") + "\\n"));
+      buf = [];
+    }
+    for (var i = 0; i < blocks.length; i++){
+      var bl = blocks[i] || {};
+      var txt = bl.t == null ? '' : String(bl.t);
+      if (bl.s === 'foot'){
+        flush(); cur = null;
+        if (foot && foot.bands && foot.bands.length){
+          segs = segs.concat(centered(foot.bands));
+        } else {                       // rasm yuklanmasa — oddiy matn bilan
+          segs.push(styleBytes('n'));
+          segs.push(enc.encode(txt + "\\n"));
+        }
+        continue;
+      }
+      var st = (bl.s === 'hr' || !bl.s) ? 'n' : bl.s;
+      if (st !== cur){ flush(); cur = st; }
+      buf.push(txt);
+    }
+    flush();
+    segs.push(new Uint8Array([0x1b,0x45,0x00, 0x1d,0x21,0x00]));            // uslubni qaytaramiz
+    segs.push(new Uint8Array([0x0a,0x0a,0x0a,0x0a, 0x1d,0x56,0x42,0x00]));  // bo'sh joy + kesish
     return segs;
+  }
+
+  // Eski chaqiriqlar uchun: oddiy matnni bitta blok qilib yuboramiz.
+  function escpos(text, logo){
+    return escposBlocks([{t: String(text == null ? '' : text), s: 'n'}], logo, null);
   }
 
   // Paket o'lchami. Kattasi tezroq, lekin ba'zi printerlar qabul qilmaydi.
@@ -5380,7 +5538,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     if (st) st.textContent = '@page{ size:' + mm + 'mm auto; margin:2mm; }';
   }
 
-  function systemPrint(text, logo){
+  function systemPrint(text, logo, blocks, foot){
     applyPageSize();
     // Chop etish oynasi ochiladi — RawBT, printer yoki kompyuterdagi printer tanlanadi.
     // Oyna yopilgunicha kutamiz, chunki brauzer chop etilgan-etilmaganini aytmaydi.
@@ -5394,9 +5552,27 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       im.src = url('/static/logo.jpg');
       area.appendChild(im);
     }
-    var pre = document.createElement('pre');
-    pre.textContent = text;
-    area.appendChild(pre);
+    if (blocks && blocks.length){
+      blocks.forEach(function(bl){
+        var t = bl.t == null ? '' : String(bl.t);
+        if (bl.s === 'foot'){
+          var fi = document.createElement('img');
+          fi.className = 'pfoot';
+          fi.src = url('/static/chek_pastki.png');
+          fi.alt = t;
+          area.appendChild(fi);
+          return;
+        }
+        var ln = document.createElement('pre');
+        ln.className = 'bl-' + (bl.s || 'n');
+        ln.textContent = t;
+        area.appendChild(ln);
+      });
+    } else {
+      var pre = document.createElement('pre');
+      pre.textContent = text;
+      area.appendChild(pre);
+    }
 
     return new Promise(function(resolve){
       var done = false;
@@ -5460,7 +5636,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     if (savedW && $('w')) $('w').value = savedW;
   }catch(e){}
 
-  async function printText(text, no){
+  async function printText(text, no, blocks){
     var logo = null;
     if (logoOn()){
       try{
@@ -5470,13 +5646,19 @@ KITCHEN_PAGE_HTML = """<!doctype html>
         say("Logo yuklanmadi — chek nom yozuvi bilan chiqadi.", 'info');
       }
     }
+    // Pastki yozuv rasmi. Yuklanmasa chek baribir chiqadi — oddiy matn bo'lib.
+    var foot = null;
+    if (blocks && blocks.length){
+      try{ foot = await buildFoot(dots()); }catch(e){ foot = null; }
+    }
     if (mode() === 'sys'){
       // Brauzer chop etish muvaffaqiyatli bo'ldimi deb aytmaydi — shuning uchun o'zingizdan so'raymiz.
-      await systemPrint(text, logo);
+      await systemPrint(text, logo, blocks, foot);
       return await askPrinted(no);
     }
     if (!chr) throw new Error('printer ulanmagan');
-    await sendBytes(escpos(text, logo));
+    if (blocks && blocks.length) await sendBytes(escposBlocks(blocks, logo, foot));
+    else await sendBytes(escpos(text, logo));
     return true;
   }
 
@@ -5494,7 +5676,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     if (printing && !manual) return false;
     printing = true;
     try{
-      var ok = await printText(o.receipt, o.no);
+      var ok = await printText(o.receipt, o.no, o.blocks);
       if (!ok){
         // chiqmadi — buyurtma ro'yxatda qoladi, yo'qolib ketmaydi
         failed[o.id] = o;
@@ -7192,6 +7374,7 @@ def api_print_pending():
             "total": o.get("total"),
             "items": [f"{it['name']} x{fmt_qty(it)}" for it in o.get("items", []) if not it.get("cancelled")],
             "receipt": build_receipt_text(o, width, header=not with_logo),
+            "blocks": build_receipt_blocks(o, width, header=not with_logo),
         })
     out.sort(key=lambda x: x["id"])
     return jsonify({"orders": out, "shop": shop_status(),
