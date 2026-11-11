@@ -4736,13 +4736,8 @@ def api_order():
 
     if not items_cart:
         return jsonify({"error": "Savatingiz bo'sh."}), 400
-    # Raqam majburiy emas: raqami bo'lmagan mijoz bilan bot orqali bog'lanamiz.
-    # Lekin raqam ham, Telegram hisobi ham bo'lmasa — bog'lanishning iloji yo'q.
-    if not phone and not user.get("id"):
-        return jsonify({"error": "Telefon raqamingizni kiriting — aks holda siz bilan bog'lana olmaymiz."}), 400
-
-    # keshbekni faqat shaxsi tasdiqlangan foydalanuvchi ishlata oladi —
-    # imzosiz so'rov bilan birovning hisobidan yechib bo'lmaydi
+    # Instagram'dan kelgan mijozni raqam tekshiruvidan OLDIN aniqlaymiz:
+    # unda Telegram hisobi bo'lmaydi, lekin bog'lanish yo'li bor — Direct.
     ig_extra = None
     if not user.get("id"):
         try:
@@ -4751,6 +4746,14 @@ def api_order():
             _igsid = None
         if _igsid:
             ig_extra = {"source": "instagram", "ig_user_id": _igsid, "ig_username": ig_username(_igsid)}
+
+    # Raqam majburiy emas: raqami bo'lmagan mijoz bilan bot orqali bog'lanamiz.
+    # Lekin raqam ham, Telegram hisobi ham, Instagram ham bo'lmasa — iloji yo'q.
+    if not phone and not user.get("id") and not ig_extra:
+        return jsonify({"error": "Telefon raqamingizni kiriting — aks holda siz bilan bog'lana olmaymiz."}), 400
+
+    # keshbekni faqat shaxsi tasdiqlangan foydalanuvchi ishlata oladi —
+    # imzosiz so'rov bilan birovning hisobidan yechib bo'lmaydi
     order, error = create_order(
         extra=ig_extra,
         use_cashback=bool(body.get("use_cashback")) and verified,
