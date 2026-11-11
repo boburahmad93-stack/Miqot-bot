@@ -2811,12 +2811,13 @@ def build_receipt_blocks(order, width=None, safe=True, header=True):
     add([f"Buyurtma #{order.get('daily_number', '?')}"])
     add(_labeled("Sana: ", created.strftime("%d.%m.%Y %H:%M"), tw))
     B.append(_blk("", "n"))
-    add(_labeled("Mijoz: ", order.get("customer_name") or "-", tw))
+    # ism va telefon — kuryer eng ko'p qaraydigan ikki qator, taom nomi kabi qalin
+    add(_labeled("Mijoz: ", order.get("customer_name") or "-", tw), "b")
     tel = (order.get("phone") or "").strip()
     if tel:
-        add(_labeled("Tel: ", tel, tw))
+        add(_labeled("Tel: ", tel, tw), "b")
     else:
-        add(_labeled("Tel: ", "yo'q (Telegram orqali)" if tw >= 28 else "yo'q, Telegram", tw))
+        add(_labeled("Tel: ", "yo'q (Telegram orqali)" if tw >= 28 else "yo'q, Telegram", tw), "b")
     if order.get("username"):
         add(_labeled("TG: ", "@" + str(order["username"]), tw))
     if order.get("latitude") is not None:
@@ -4917,7 +4918,7 @@ KITCHEN_PAGE_HTML = """<!doctype html>
       font-size:11pt; line-height:1.28; white-space:pre;
     }
     #printArea img.plogo{
-      display:block; margin:0 auto 3mm; width:72%; max-width:100%; height:auto;
+      display:block; margin:0 auto 1.5mm; width:72%; max-width:100%; height:auto;
     }
     #printArea pre{ margin:0; font:inherit; white-space:pre; }
     #printArea pre:empty{ height:1em; }   /* bo'sh qator ham joy egallasin */
@@ -5383,10 +5384,24 @@ KITCHEN_PAGE_HTML = """<!doctype html>
     // ulgurmaydi: printer o'rtada och qolib siltiydi va chiziqlar uzilib chiqadi.
     // Shuning uchun uni 24 qatorli bo'laklarga bo'lamiz — har bo'lak mustaqil
     // buyruq, printer uni to'liq olgandan keyingina bosadi.
+    // Rasmning tepasi va pastidagi oq joyni kesamiz: logo faylida ko'rinmas
+    // chekka bo'lsa, chekda bo'sh joy bo'lib bosiladi va qog'oz behuda ketadi.
+    function rowDark(r){
+      for (var q = 0; q < bpr; q++) if (bits[r * bpr + q]) return true;
+      return false;
+    }
+    var y0 = 0, y1 = h - 1;
+    while (y0 < h && !rowDark(y0)) y0++;
+    while (y1 > y0 && !rowDark(y1)) y1--;
+    if (y0 > y1){ y0 = 0; y1 = h - 1; }        // butunlay oq — tegmaymiz
+    var MARGIN = 4;                            // ozgina nafas qolsin
+    y0 = Math.max(0, y0 - MARGIN);
+    y1 = Math.min(h - 1, y1 + MARGIN);
+
     var BAND = 64;
     var bands = [];
-    for (var by = 0; by < h; by += BAND){
-      var bh = Math.min(BAND, h - by);
+    for (var by = y0; by <= y1; by += BAND){
+      var bh = Math.min(BAND, y1 - by + 1);
       var seg = bits.subarray(by * bpr, (by + bh) * bpr);
       var hd = new Uint8Array([0x1d, 0x76, 0x30, 0x00,
                                bpr & 0xff, (bpr >> 8) & 0xff,
